@@ -1,253 +1,234 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
+  import { services, type ServiceDef } from "$lib/services/registry";
 
   let profiles = $state<string[]>([]);
   let selectedProfile = $state("default");
   let region = $state("us-east-1");
-
   let isAuthenticated = $state(false);
-  let alarms = $state<{ name: string; state: string; description: string }[]>(
-    [],
-  );
-  let ec2Instances = $state<
-    { id: string; state: string; instance_type: string }[]
-  >([]);
-  let s3Buckets = $state<{ name: string; creation_date: string }[]>([]);
+  let loading = $state(false);
   let error = $state("");
 
+  // Service enable/disable (persisted in localStorage)
+  let enabledIds = $state<Set<string>>(new Set());
+  let activeId = $state(services[0]?.id ?? "");
+  let refreshKey = $state(0);
+  let showSettings = $state(false);
+
   onMount(async () => {
+    // Load enabled services from localStorage
+    const saved = localStorage.getItem("aws_enabled_services");
+    if (saved) {
+      enabledIds = new Set(JSON.parse(saved));
+    } else {
+      enabledIds = new Set(
+        services.filter((s) => s.defaultEnabled).map((s) => s.id),
+      );
+    }
+    // Make sure active is enabled
+    if (!enabledIds.has(activeId)) {
+      const first = services.find((s) => enabledIds.has(s.id));
+      if (first) activeId = first.id;
+    }
+
     try {
       profiles = await invoke("list_profiles");
-      if (profiles.length > 0) {
-        selectedProfile = profiles[0];
-      }
+      if (profiles.length > 0) selectedProfile = profiles[0];
     } catch (e) {
       console.error(e);
       profiles = ["default"];
-      selectedProfile = "default";
     }
   });
 
+  function toggleService(id: string) {
+    const next = new Set(enabledIds);
+    if (next.has(id)) {
+      if (next.size > 1) {
+        next.delete(id);
+        if (activeId === id) {
+          activeId = [...next][0];
+          refreshKey++;
+        }
+      }
+    } else {
+      next.add(id);
+    }
+    enabledIds = next;
+    localStorage.setItem("aws_enabled_services", JSON.stringify([...next]));
+  }
+
   async function login() {
     try {
+      loading = true;
       await invoke("authenticate", {
         payload: { profile: selectedProfile, region },
       });
       isAuthenticated = true;
       error = "";
-      refreshDashboard();
+      refreshKey++;
     } catch (e) {
       error = e as string;
+    } finally {
+      loading = false;
     }
   }
 
-  async function refreshDashboard() {
-    try {
-      alarms = await invoke("fetch_alarms");
-      ec2Instances = await invoke("fetch_ec2_instances");
-      s3Buckets = await invoke("fetch_s3_buckets");
-    } catch (e) {
-      error = e as string;
-    }
+  function switchTab(id: string) {
+    activeId = id;
+    refreshKey++;
   }
+
+  let enabledServices = $derived(services.filter((s) => enabledIds.has(s.id)));
+  let activeService = $derived(services.find((s) => s.id === activeId));
 </script>
 
-<main class="min-h-screen bg-gray-900 text-white p-6 font-sans">
+<main
+  class="h-screen bg-gray-950 text-white flex flex-col font-sans overflow-hidden"
+>
   {#if !isAuthenticated}
-    <!-- 1. Authentication View -->
-    <div
-      class="max-w-md mx-auto bg-gray-800 p-8 rounded-xl shadow-lg mt-20 border border-gray-700"
-    >
-      <h1 class="text-2xl font-bold mb-6 text-blue-400">AWS Local Setup</h1>
-
-      {#if error}<div
-          class="bg-red-500/20 text-red-300 p-3 rounded mb-4 text-sm font-semibold"
-        >
-          {error}
-        </div>{/if}
-
-      <div class="space-y-4">
-        <div>
-          <label for="profileSelect" class="block text-sm text-gray-400 mb-1"
-            >AWS Profile</label
+    <div class="flex items-center justify-center flex-1">
+      <div
+        class="w-full max-w-sm bg-gray-900 p-6 rounded-xl shadow-2xl border border-gray-800"
+      >
+        <h1 class="text-xl font-bold mb-4 text-blue-400">AWS Connect</h1>
+        {#if error}<div
+            class="bg-red-500/20 text-red-300 p-2 rounded mb-3 text-xs"
           >
-          <select
-            id="profileSelect"
-            bind:value={selectedProfile}
-            class="w-full bg-gray-700 p-3 rounded text-white outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600 appearance-none"
+            {error}
+          </div>{/if}
+        <div class="space-y-3">
+          <div>
+            <label
+              for="profileSelect"
+              class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+              >Profile</label
+            >
+            <select
+              id="profileSelect"
+              bind:value={selectedProfile}
+              class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500"
+            >
+              {#each profiles as p}<option value={p}>{p}</option>{/each}
+            </select>
+          </div>
+          <div>
+            <label
+              for="regionSelect"
+              class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+              >Region</label
+            >
+            <select
+              id="regionSelect"
+              bind:value={region}
+              class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500"
+            >
+              <option value="us-east-1">us-east-1</option>
+              <option value="us-east-2">us-east-2</option>
+              <option value="us-west-1">us-west-1</option>
+              <option value="us-west-2">us-west-2</option>
+              <option value="eu-west-1">eu-west-1</option>
+              <option value="eu-central-1">eu-central-1</option>
+              <option value="ap-southeast-1">ap-southeast-1</option>
+              <option value="ap-southeast-2">ap-southeast-2</option>
+              <option value="ap-northeast-1">ap-northeast-1</option>
+            </select>
+          </div>
+          <button
+            onclick={login}
+            class="w-full bg-blue-600 hover:bg-blue-500 p-2.5 rounded font-bold text-sm shadow-lg transition"
+            >{loading ? "Connecting..." : "Connect"}</button
           >
-            {#each profiles as profile}
-              <option value={profile}>{profile}</option>
-            {/each}
-          </select>
         </div>
-        <div>
-          <label for="regionInput" class="block text-sm text-gray-400 mb-1"
-            >Region</label
-          >
-          <input
-            id="regionInput"
-            bind:value={region}
-            placeholder="us-east-1"
-            class="w-full bg-gray-700 p-3 rounded text-white outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600"
-          />
-        </div>
-        <button
-          onclick={login}
-          class="w-full bg-blue-600 hover:bg-blue-500 p-3 rounded font-bold shadow-lg transition duration-200 mt-2"
-          >Connect Local Session</button
-        >
       </div>
     </div>
   {:else}
-    <!-- Dashboard -->
-    <div class="max-w-6xl mx-auto mt-6">
-      <div class="flex justify-between items-center mb-8">
-        <div>
-          <h1 class="text-3xl font-bold text-white">AWS Dashboard</h1>
-          <p class="text-gray-400 text-sm mt-1">
-            Region: <span class="text-blue-400 font-mono">{region}</span>
-          </p>
-        </div>
-        <button
-          onclick={refreshDashboard}
-          class="bg-gray-700 hover:bg-gray-600 px-5 py-2.5 rounded shadow transition font-semibold"
-          >Refresh All</button
-        >
-      </div>
-
-      {#if error}<div
-          class="bg-red-500/20 text-red-300 p-3 rounded mb-8 text-sm font-semibold"
-        >
-          {error}
-        </div>{/if}
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- Left Pane: CloudWatch Alarms -->
-        <div>
-          <h2
-            class="text-xl font-bold mb-4 text-gray-200 border-b border-gray-700 pb-2"
+    <!-- Top Bar: Tabs left, selectors right -->
+    <header
+      class="flex items-center justify-between px-3 py-1.5 bg-gray-900 border-b border-gray-800 shrink-0"
+    >
+      <nav class="flex gap-1">
+        {#each enabledServices as svc}
+          <button
+            onclick={() => switchTab(svc.id)}
+            class="px-3 py-1.5 rounded text-xs font-semibold transition {activeId ===
+            svc.id
+              ? 'bg-blue-600 text-white shadow'
+              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'}"
+            >{svc.label}</button
           >
-            CloudWatch Health
-          </h2>
-          <div class="space-y-4">
-            {#each alarms as alarm}
-              <div
-                class="bg-gray-800 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between shadow-md border-l-4 transition-transform hover:scale-[1.01] duration-200 {alarm.state ===
-                'ALARM'
-                  ? 'border-red-500'
-                  : 'border-green-500'}"
-              >
-                <div class="mb-2 sm:mb-0">
-                  <h3 class="font-bold text-md text-gray-100">{alarm.name}</h3>
-                  <p class="text-gray-400 text-xs mt-1 truncate max-w-xs">
-                    {alarm.description ||
-                      "No description available for this metric."}
-                  </p>
-                </div>
-                <span
-                  class="px-3 py-1 self-start sm:self-auto rounded-full text-xs font-bold tracking-wide {alarm.state ===
-                  'ALARM'
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/50'
-                    : 'bg-green-500/20 text-green-400 border border-green-500/50'}"
-                >
-                  {alarm.state}
-                </span>
-              </div>
-            {/each}
-
-            {#if alarms.length === 0}
-              <div
-                class="text-gray-500 text-center py-8 bg-gray-800/50 rounded-lg border border-gray-700 border-dashed text-sm"
-              >
-                No active CloudWatch alarms found.
-              </div>
-            {/if}
-          </div>
-        </div>
-
-        <!-- Right Pane: Resource Explorer (EC2 & S3) -->
-        <div class="space-y-8">
-          <!-- EC2 Instances -->
-          <div>
-            <h2
-              class="text-xl font-bold mb-4 text-gray-200 border-b border-gray-700 pb-2"
-            >
-              EC2 Instances ({ec2Instances.length})
-            </h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {#each ec2Instances as instance}
-                <div
-                  class="bg-gray-800 p-4 rounded-lg shadow-md border border-gray-700"
-                >
-                  <div class="flex justify-between items-center mb-2">
-                    <span class="font-mono text-sm text-blue-300"
-                      >{instance.id}</span
-                    >
-                    <span
-                      class="w-2 h-2 rounded-full {instance.state.toLowerCase() ===
-                      'running'
-                        ? 'bg-green-500'
-                        : 'bg-yellow-500'}"
-                    ></span>
-                  </div>
-                  <div class="text-xs text-gray-400">
-                    Type: <span class="text-gray-200 font-semibold"
-                      >{instance.instance_type}</span
-                    >
-                  </div>
-                  <div class="text-xs text-gray-400 mt-1">
-                    State: <span class="text-gray-200 font-semibold"
-                      >{instance.state}</span
-                    >
-                  </div>
-                </div>
-              {/each}
-              {#if ec2Instances.length === 0}
-                <div
-                  class="col-span-1 sm:col-span-2 text-gray-500 text-center py-8 bg-gray-800/50 rounded-lg border border-gray-700 border-dashed text-sm"
-                >
-                  No instances found.
-                </div>
-              {/if}
-            </div>
-          </div>
-
-          <!-- S3 Buckets -->
-          <div>
-            <h2
-              class="text-xl font-bold mb-4 text-gray-200 border-b border-gray-700 pb-2"
-            >
-              S3 Buckets ({s3Buckets.length})
-            </h2>
-            <ul
-              class="bg-gray-800 rounded-lg shadow-md border border-gray-700 divide-y divide-gray-700 max-h-64 overflow-y-auto"
-            >
-              {#each s3Buckets as bucket}
-                <li
-                  class="p-3 flex justify-between items-center hover:bg-gray-700 transition"
-                >
-                  <span
-                    class="text-sm font-semibold text-gray-200 truncate pr-4"
-                    >{bucket.name}</span
-                  >
-                  <span class="text-xs text-gray-500 whitespace-nowrap"
-                    >{bucket.creation_date
-                      ? new Date(bucket.creation_date).toLocaleDateString()
-                      : ""}</span
-                  >
-                </li>
-              {/each}
-              {#if s3Buckets.length === 0}
-                <li class="p-4 text-center text-gray-500 text-sm">
-                  No buckets found.
-                </li>
-              {/if}
-            </ul>
-          </div>
-        </div>
+        {/each}
+        <!-- Settings gear -->
+        <button
+          onclick={() => (showSettings = !showSettings)}
+          class="px-2 py-1.5 rounded text-xs text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition ml-1"
+          title="Manage services">⚙</button
+        >
+      </nav>
+      <div class="flex items-center gap-2">
+        <select
+          bind:value={selectedProfile}
+          onchange={login}
+          class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
+        >
+          {#each profiles as p}<option value={p}>{p}</option>{/each}
+        </select>
+        <select
+          bind:value={region}
+          onchange={login}
+          class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
+        >
+          <option value="us-east-1">us-east-1</option>
+          <option value="us-east-2">us-east-2</option>
+          <option value="us-west-1">us-west-1</option>
+          <option value="us-west-2">us-west-2</option>
+          <option value="eu-west-1">eu-west-1</option>
+          <option value="eu-central-1">eu-central-1</option>
+          <option value="ap-southeast-1">ap-southeast-1</option>
+          <option value="ap-southeast-2">ap-southeast-2</option>
+          <option value="ap-northeast-1">ap-northeast-1</option>
+        </select>
+        <button
+          onclick={() => refreshKey++}
+          class="bg-gray-800 hover:bg-gray-700 px-2.5 py-1.5 rounded text-xs font-semibold border border-gray-700 transition"
+          >⟳</button
+        >
       </div>
+    </header>
+
+    <!-- Service Settings Dropdown -->
+    {#if showSettings}
+      <div
+        class="bg-gray-900 border-b border-gray-800 px-3 py-2 flex flex-wrap gap-2"
+      >
+        {#each services as svc}
+          <button
+            onclick={() => toggleService(svc.id)}
+            class="px-3 py-1 rounded text-xs font-semibold border transition {enabledIds.has(
+              svc.id,
+            )
+              ? 'bg-blue-600/20 text-blue-400 border-blue-500/50'
+              : 'bg-gray-800 text-gray-500 border-gray-700 hover:text-gray-300'}"
+            >{svc.label}</button
+          >
+        {/each}
+      </div>
+    {/if}
+
+    {#if error}<div
+        class="bg-red-500/20 text-red-300 px-3 py-1.5 text-xs border-b border-red-500/30"
+      >
+        {error}
+      </div>{/if}
+
+    <!-- Active Service Content -->
+    <div class="flex-1 overflow-auto p-3">
+      {#if activeService}
+        {#key refreshKey}
+          {@const Comp = activeService.component}
+          <Comp />
+        {/key}
+      {/if}
     </div>
   {/if}
 </main>

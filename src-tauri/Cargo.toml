@@ -30,6 +30,9 @@ aws-config = { version = "1.1", default-features = false, features = ["rustls", 
 aws-sdk-ec2 = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
 aws-sdk-s3 = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
 aws-sdk-cloudwatch = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
+aws-sdk-dynamodb = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
+aws-sdk-sqs = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
+aws-sdk-cloudfront = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
 
 [profile.release]
 opt-level = "s"       # Optimize for binary size
