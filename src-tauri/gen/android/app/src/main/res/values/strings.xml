@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">AWS Console</string>
+    <string name="main_activity_title">AWS Console</string>
+</resources>

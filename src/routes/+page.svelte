@@ -29,6 +29,22 @@
   let allProfiles = $state<string[]>([]);
   let selectedProfile = $state("default");
   let region = $state("us-east-1");
+  let authType = $state<"profile" | "manual" | "sso">("profile");
+
+  // Custom API Keys
+  let accessKeyId = $state("");
+  let secretAccessKey = $state("");
+  let sessionToken = $state("");
+  let saveProfileChecked = $state(false);
+  let saveProfileName = $state("");
+
+  // SSO Login
+  let ssoProfileName = $state("");
+  let ssoStartUrl = $state("");
+  let ssoRegion = $state("");
+  let ssoAccountId = $state("");
+  let ssoRoleName = $state("");
+
   let isAuthenticated = $state(false);
   let loading = $state(false);
   let error = $state("");
@@ -43,6 +59,7 @@
 
   let activeId = $state(services[0]?.id ?? "");
   let refreshKey = $state(0);
+  let currentLoginId = $state(0);
 
   // Settings dialog
   let showSettings = $state(false);
@@ -88,6 +105,17 @@
         serviceOrder,
         serviceVisible: [...serviceVisible],
         activeId,
+        authType,
+        accessKeyId,
+        secretAccessKey,
+        sessionToken,
+        saveProfileChecked,
+        saveProfileName,
+        ssoProfileName,
+        ssoStartUrl,
+        ssoRegion,
+        ssoAccountId,
+        ssoRoleName,
       }),
     );
   }
@@ -154,28 +182,110 @@
     }
 
     // Restore profile/region and auto-login
+    if (saved?.authType) authType = saved.authType;
+    if (saved?.accessKeyId) accessKeyId = saved.accessKeyId;
+    if (saved?.secretAccessKey) secretAccessKey = saved.secretAccessKey;
+    if (saved?.sessionToken) sessionToken = saved.sessionToken;
+    if (saved?.saveProfileChecked)
+      saveProfileChecked = saved.saveProfileChecked;
+    if (saved?.saveProfileName) saveProfileName = saved.saveProfileName;
+    if (saved?.ssoProfileName) ssoProfileName = saved.ssoProfileName;
+    if (saved?.ssoStartUrl) ssoStartUrl = saved.ssoStartUrl;
+    if (saved?.ssoRegion) ssoRegion = saved.ssoRegion;
+    if (saved?.ssoAccountId) ssoAccountId = saved.ssoAccountId;
+    if (saved?.ssoRoleName) ssoRoleName = saved.ssoRoleName;
+
     if (saved?.profile && allProfiles.includes(saved.profile))
       selectedProfile = saved.profile;
     else if (allProfiles.length > 0) selectedProfile = allProfiles[0];
     if (saved?.region) region = saved.region;
 
-    if (selectedProfile) await login(true);
+    // Auto connect only if we have explicit manual keys, or if profile is explicitly something
+    // other than 'default', OR if we have actively saved 'default' as a known working profile previously
+    let shouldAutoConnect = false;
+    if (authType === "manual" && accessKeyId && secretAccessKey) {
+      shouldAutoConnect = true;
+    } else if (authType === "profile" && selectedProfile) {
+      if (selectedProfile !== "default" || saved?.profile === "default") {
+        shouldAutoConnect = true;
+      }
+    }
+
+    if (shouldAutoConnect) {
+      await login(true);
+    }
   });
 
+  function switchAuthType(type: "profile" | "manual" | "sso") {
+    authType = type;
+    currentLoginId++;
+    loading = false;
+    error = "";
+  }
+
   async function login(silent = false) {
+    const loginId = ++currentLoginId;
     try {
       loading = true;
+      error = "";
+
+      if (authType === "sso") {
+        if (
+          !ssoProfileName ||
+          !ssoStartUrl ||
+          !ssoRegion ||
+          !ssoAccountId ||
+          !ssoRoleName
+        ) {
+          if (loginId !== currentLoginId) return;
+          error = "All SSO fields are required to establish a session.";
+          loading = false;
+          return;
+        }
+
+        await invoke("save_sso_profile", {
+          name: ssoProfileName,
+          startUrl: ssoStartUrl,
+          ssoRegion,
+          accountId: ssoAccountId,
+          roleName: ssoRoleName,
+          region,
+        });
+
+        try {
+          allProfiles = await invoke("list_profiles");
+        } catch {}
+
+        if (!profileOrder.includes(ssoProfileName)) {
+          profileOrder = [...profileOrder, ssoProfileName];
+        }
+        profileVisible.add(ssoProfileName);
+        selectedProfile = ssoProfileName;
+        authType = "profile";
+      }
+
       await invoke("authenticate", {
-        payload: { profile: selectedProfile, region },
+        payload: {
+          auth_type: authType,
+          profile: authType === "profile" ? selectedProfile : undefined,
+          region,
+          access_key_id: authType === "manual" ? accessKeyId : undefined,
+          secret_access_key:
+            authType === "manual" ? secretAccessKey : undefined,
+          session_token: authType === "manual" ? sessionToken : undefined,
+        },
       });
+
+      if (loginId !== currentLoginId) return;
+
       isAuthenticated = true;
       error = "";
       refreshKey++;
       saveState();
     } catch (e) {
-      if (!silent) error = e as string;
+      if (loginId === currentLoginId && !silent) error = e as string;
     } finally {
-      loading = false;
+      if (loginId === currentLoginId) loading = false;
     }
   }
 
@@ -241,10 +351,10 @@
 </script>
 
 <main
-  class="h-screen bg-gray-950 text-white flex flex-col font-sans overflow-hidden"
+  class="h-[100dvh] bg-gray-950 text-white flex flex-col font-sans overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
 >
   {#if !isAuthenticated}
-    <div class="flex items-center justify-center flex-1">
+    <div class="flex items-center justify-center flex-1 p-4">
       <div
         class="w-full max-w-sm bg-gray-900 p-6 rounded-xl shadow-2xl border border-gray-800"
       >
@@ -256,19 +366,202 @@
           </div>{/if}
         <div class="space-y-3">
           <div>
-            <label
-              for="profileSelect"
+            <div
               class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-              >Profile</label
             >
-            <select
-              id="profileSelect"
-              bind:value={selectedProfile}
-              class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500"
-            >
-              {#each visibleProfiles as p}<option value={p}>{p}</option>{/each}
-            </select>
+              Login Method
+            </div>
+            <div class="flex gap-2" role="group" aria-label="Login Method">
+              <button
+                onclick={() => switchAuthType("profile")}
+                class="flex-1 py-1.5 rounded text-xs font-semibold transition {authType ===
+                'profile'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
+                >Profile</button
+              >
+              <button
+                onclick={() => switchAuthType("manual")}
+                class="flex-1 py-1.5 rounded text-xs font-semibold transition {authType ===
+                'manual'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
+                >API Keys</button
+              >
+              <button
+                onclick={() => switchAuthType("sso")}
+                class="flex-1 py-1.5 rounded text-xs font-semibold transition {authType ===
+                'sso'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
+                >AWS SSO</button
+              >
+            </div>
           </div>
+
+          {#if authType === "profile"}
+            <div>
+              <label
+                for="profileSelect"
+                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                >Profile</label
+              >
+              <select
+                id="profileSelect"
+                bind:value={selectedProfile}
+                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500"
+              >
+                {#each visibleProfiles as p}<option value={p}>{p}</option
+                  >{/each}
+              </select>
+            </div>
+          {:else if authType === "manual"}
+            <div>
+              <label
+                for="akInput"
+                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                >Access Key ID</label
+              >
+              <input
+                id="akInput"
+                type="text"
+                bind:value={accessKeyId}
+                placeholder="AKIAIOSFODNN7EXAMPLE"
+                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+              />
+            </div>
+            <div>
+              <label
+                for="skInput"
+                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                >Secret Access Key</label
+              >
+              <input
+                id="skInput"
+                type="password"
+                bind:value={secretAccessKey}
+                placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+              />
+            </div>
+            <div>
+              <label class="flex items-center gap-2 cursor-pointer mt-2 mb-1">
+                <input
+                  type="checkbox"
+                  bind:checked={saveProfileChecked}
+                  class="accent-blue-500 rounded bg-gray-900 border-gray-700"
+                />
+                <span class="text-xs text-gray-300"
+                  >Save as Profile in ~/.aws</span
+                >
+              </label>
+              {#if saveProfileChecked}
+                <input
+                  type="text"
+                  bind:value={saveProfileName}
+                  placeholder="Profile name (e.g. prod-admin)"
+                  class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                />
+              {/if}
+            </div>
+            <div class="mt-2">
+              <label
+                for="stInput"
+                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                >Session Token <span class="text-[10px] opacity-70"
+                  >(Optional)</span
+                ></label
+              >
+              <textarea
+                id="stInput"
+                bind:value={sessionToken}
+                rows="2"
+                placeholder="IQoJb3JpZ2luX2VjEBs..."
+                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono resize-none"
+              ></textarea>
+            </div>
+          {:else if authType === "sso"}
+            <div
+              class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
+            >
+              <strong>SSO Web Login:</strong> This will create an AWS SSO
+              profile in your <code>~/.aws/config</code> and execute
+              <code>aws sso login</code>, which securely opens your web browser
+              to authenticate.
+            </div>
+            <div>
+              <label
+                for="ssoProfileInput"
+                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                >Profile Name</label
+              >
+              <input
+                id="ssoProfileInput"
+                type="text"
+                bind:value={ssoProfileName}
+                placeholder="my-sso-admin"
+                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+              />
+            </div>
+            <div>
+              <label
+                for="ssoUrlInput"
+                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                >Start URL</label
+              >
+              <input
+                id="ssoUrlInput"
+                type="text"
+                bind:value={ssoStartUrl}
+                placeholder="https://d-12345.awsapps.com/start"
+                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+              />
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2">
+              <div class="flex-1">
+                <label
+                  for="ssoRegInput"
+                  class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                  >SSO Region</label
+                >
+                <input
+                  id="ssoRegInput"
+                  type="text"
+                  bind:value={ssoRegion}
+                  placeholder="us-east-1"
+                  class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                />
+              </div>
+              <div class="flex-1">
+                <label
+                  for="ssoAccInput"
+                  class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                  >Account ID</label
+                >
+                <input
+                  id="ssoAccInput"
+                  type="text"
+                  bind:value={ssoAccountId}
+                  placeholder="123456789012"
+                  class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                />
+              </div>
+            </div>
+            <div>
+              <label
+                for="ssoRoleInput"
+                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                >Role Name</label
+              >
+              <input
+                id="ssoRoleInput"
+                type="text"
+                bind:value={ssoRoleName}
+                placeholder="AdministratorAccess"
+                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+              />
+            </div>
+          {/if}
           <div>
             <label
               for="regionSelect"
@@ -292,15 +585,16 @@
       </div>
     </div>
   {:else}
-    <!-- Top Bar -->
     <header
-      class="flex items-center px-3 py-1.5 bg-gray-900 border-b border-gray-800 shrink-0"
+      class="flex items-center px-2 sm:px-3 py-1.5 bg-gray-900 border-b border-gray-800 shrink-0"
     >
-      <nav class="flex gap-1 flex-1 min-w-0 overflow-x-auto">
+      <nav
+        class="flex gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-hide snap-x"
+      >
         {#each enabledServices as svc}
           <button
             onclick={() => switchTab(svc.id)}
-            class="px-3 py-1.5 rounded text-xs font-semibold transition shrink-0 {activeId ===
+            class="px-3 py-1.5 rounded text-xs font-semibold transition shrink-0 snap-start {activeId ===
             svc.id
               ? 'bg-blue-600 text-white shadow'
               : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'}"
@@ -309,13 +603,22 @@
         {/each}
       </nav>
       <div class="flex items-center gap-1.5 ml-2 shrink-0">
-        <select
-          bind:value={selectedProfile}
-          onchange={() => login()}
-          class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
-        >
-          {#each visibleProfiles as p}<option value={p}>{p}</option>{/each}
-        </select>
+        {#if authType === "profile"}
+          <select
+            bind:value={selectedProfile}
+            onchange={() => login()}
+            class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
+          >
+            {#each visibleProfiles as p}<option value={p}>{p}</option>{/each}
+          </select>
+        {:else}
+          <div
+            class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono border border-gray-700"
+            title="Logged in with API Keys"
+          >
+            🔑 Custom Keys
+          </div>
+        {/if}
         <select
           bind:value={region}
           onchange={() => login()}
@@ -350,40 +653,46 @@
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div
-        class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
+        class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4"
         onclick={(e) => {
           if (e.target === e.currentTarget) showSettings = false;
         }}
       >
         <div
-          class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-xl flex overflow-hidden"
-          style="height: 480px;"
+          class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-xl flex flex-col sm:flex-row overflow-hidden"
+          style="height: 480px; max-height: 90vh;"
         >
           <!-- Left tabs -->
           <div
-            class="w-36 bg-gray-950 border-r border-gray-800 flex flex-col py-2 shrink-0"
+            class="w-full sm:w-36 bg-gray-950 border-b sm:border-b-0 sm:border-r border-gray-800 flex sm:flex-col p-2 sm:py-2 shrink-0 overflow-x-auto scrollbar-hide"
           >
             {#each [["profiles", "Profiles"], ["regions", "Regions"], ["services", "Services"]] as const as [key, label]}
               <button
                 onclick={() => (settingsTab = key)}
-                class="px-4 py-2.5 text-left text-xs font-semibold transition {settingsTab ===
+                class="px-4 py-2.5 text-left text-xs font-semibold transition whitespace-nowrap {settingsTab ===
                 key
-                  ? 'bg-gray-800 text-blue-400 border-r-2 border-blue-500'
-                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-900'}"
+                  ? 'bg-gray-800 text-blue-400 border-b-2 sm:border-b-0 sm:border-r-2 border-blue-500'
+                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-900 border-b-2 border-transparent sm:border-transparent'}"
               >
                 {label}
               </button>
             {/each}
-            <div class="flex-1"></div>
+            <div class="hidden sm:block flex-1"></div>
             <button
               onclick={() => (showSettings = false)}
-              class="px-4 py-2 text-xs text-gray-600 hover:text-gray-400 transition"
+              class="hidden sm:block px-4 py-2 text-xs text-gray-600 hover:text-gray-400 transition text-left"
               >Close</button
             >
           </div>
 
           <!-- Right content -->
-          <div class="flex-1 p-4 overflow-auto">
+          <div class="flex-1 p-3 sm:p-4 overflow-auto relative">
+            <!-- Mobile Close Button (top right inside) -->
+            <button
+              onclick={() => (showSettings = false)}
+              class="absolute top-3 right-3 sm:hidden w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 text-gray-400 hover:text-white"
+              >✕</button
+            >
             {#if settingsTab === "profiles"}
               <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
                 Profiles — show, hide & reorder
@@ -531,14 +840,16 @@
       </div>
     {/if}
 
-    <!-- Active Service Content -->
-    <div class="flex-1 overflow-auto p-3">
-      {#if activeService}
-        {#key refreshKey}
-          {@const Comp = activeService.component}
-          <Comp />
-        {/key}
-      {/if}
+    <!-- Dynamic Content -->
+    <div class="flex-1 overflow-hidden relative">
+      <div class="absolute inset-0">
+        {#if activeService}
+          {#key refreshKey}
+            {@const Comp = activeService.component}
+            <Comp />
+          {/key}
+        {/if}
+      </div>
     </div>
   {/if}
 </main>

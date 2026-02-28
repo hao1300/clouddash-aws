@@ -14,28 +14,32 @@
     } = $props();
 </script>
 
-<div class="flex h-full bg-gray-950 text-white overflow-hidden">
+<div
+    class="flex flex-col md:flex-row h-full bg-gray-950 text-white overflow-hidden"
+>
     <!-- Sidebar -->
     <aside
-        class="w-56 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0"
+        class="w-full md:w-56 bg-gray-900 border-b md:border-b-0 md:border-r border-gray-800 flex flex-col shrink-0"
     >
         {#if title}
             <div
-                class="px-4 py-3 border-b border-gray-800 font-bold text-gray-200 truncate"
+                class="px-4 py-2 md:py-3 border-b border-gray-800 font-bold text-gray-200 truncate hidden md:block"
             >
                 {title}
             </div>
         {/if}
-        <nav class="flex-1 overflow-y-auto py-2">
-            <ul class="space-y-0.5">
+        <nav
+            class="md:flex-1 w-full overflow-x-auto md:overflow-y-auto py-2 px-2 md:px-0 scrollbar-hide"
+        >
+            <ul class="flex md:flex-col gap-1 md:gap-0 md:space-y-0.5">
                 {#each tabs as tab}
-                    <li>
+                    <li class="shrink-0 md:shrink">
                         <button
                             onclick={() => (activeTab = tab.id)}
-                            class="w-full text-left px-4 py-1.5 text-sm transition-colors {activeTab ===
+                            class="w-full text-left px-3 md:px-4 py-1.5 text-[13px] md:text-sm rounded md:rounded-none transition-colors whitespace-nowrap {activeTab ===
                             tab.id
-                                ? 'bg-blue-600/10 text-blue-400 border-l-2 border-blue-500 font-medium'
-                                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border-l-2 border-transparent'}"
+                                ? 'bg-blue-600/20 text-blue-400 md:border-l-2 border-transparent md:border-blue-500 font-medium'
+                                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 md:border-l-2 border-transparent md:border-transparent'}"
                         >
                             {tab.label}
                         </button>

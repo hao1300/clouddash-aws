@@ -26,7 +26,7 @@ tokio = { version = "1", features = ["full"] }
 dirs = "5.0"
 
 # Credential resolution + S3 proxy (S3 doesn't support browser CORS)
-aws-config = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio", "behavior-version-latest"] }
+aws-config = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio", "behavior-version-latest", "sso"] }
 aws-credential-types = { version = "1.2", default-features = false, features = ["hardcoded-credentials"] }
 aws-sdk-s3 = { version = "1.15", default-features = false, features = ["rustls", "rt-tokio"] }
 base64 = "0.22.1"

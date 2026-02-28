@@ -15,8 +15,12 @@ impl Default for SharedConfig {
 
 #[derive(Deserialize)]
 pub struct AuthPayload {
-    pub profile: String,
+    pub auth_type: Option<String>,
+    pub profile: Option<String>,
     pub region: String,
+    pub access_key_id: Option<String>,
+    pub secret_access_key: Option<String>,
+    pub session_token: Option<String>,
 }
 
 #[tauri::command]
@@ -72,11 +76,27 @@ pub async fn authenticate(
         .or_default_provider()
         .or_else(Region::new("us-east-1"));
 
-    let sdk_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
-        .profile_name(&payload.profile)
-        .region(region_provider)
-        .load()
-        .await;
+    let mut config_loader = aws_config::defaults(aws_config::BehaviorVersion::latest())
+        .region(region_provider);
+
+    if payload.auth_type.as_deref() == Some("manual") {
+        let ak = payload.access_key_id.filter(|s| !s.is_empty()).ok_or("Access Key ID is required for manual login")?;
+        let sk = payload.secret_access_key.filter(|s| !s.is_empty()).ok_or("Secret Access Key is required for manual login")?;
+        let token = payload.session_token.filter(|s| !s.is_empty());
+
+        let creds = aws_credential_types::Credentials::new(
+            ak, sk, token, None, "manual"
+        );
+        config_loader = config_loader.credentials_provider(creds);
+    } else {
+        if let Some(prof) = payload.profile {
+            if !prof.is_empty() {
+                config_loader = config_loader.profile_name(&prof);
+            }
+        }
+    }
+
+    let sdk_config = config_loader.load().await;
 
     let mut cfg = state.0.write().await;
     *cfg = Some(sdk_config);
@@ -107,4 +127,128 @@ pub async fn get_credentials(
         "session_token": creds.session_token(),
         "region": sdk.region().map(|r| r.as_ref()),
     }))
+}
+
+#[tauri::command]
+pub fn save_profile(name: String, access_key: String, secret_key: String, session_token: Option<String>, region: Option<String>) -> Result<(), String> {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let home = dirs::home_dir().ok_or("Could not find home directory")?;
+    let aws_dir = home.join(".aws");
+
+    if !aws_dir.exists() {
+        std::fs::create_dir_all(&aws_dir).map_err(|e| e.to_string())?;
+    }
+
+    let cred_path = aws_dir.join("credentials");
+    
+    let profile_header = if name == "default" {
+        "[default]".to_string()
+    } else {
+        format!("[{}]", name)
+    };
+
+    let mut buf = String::new();
+    buf.push_str(&format!("\n{}\n", profile_header));
+    buf.push_str(&format!("aws_access_key_id = {}\n", access_key));
+    buf.push_str(&format!("aws_secret_access_key = {}\n", secret_key));
+    
+    if let Some(token) = session_token {
+        if !token.is_empty() {
+            buf.push_str(&format!("aws_session_token = {}\n", token));
+        }
+    }
+
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&cred_path)
+        .map_err(|e| e.to_string())?;
+
+    file.write_all(buf.as_bytes()).map_err(|e| e.to_string())?;
+
+    // Optionally save region to ~/.aws/config
+    if let Some(reg) = region {
+        if !reg.is_empty() {
+            let cfg_path = aws_dir.join("config");
+            let mut cfg_file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&cfg_path)
+                .map_err(|e| e.to_string())?;
+            
+            let cfg_header = if name == "default" {
+                "[default]".to_string()
+            } else {
+                format!("[profile {}]", name)
+            };
+            
+            let mut cfg_buf = String::new();
+            cfg_buf.push_str(&format!("\n{}\n", cfg_header));
+            cfg_buf.push_str(&format!("region = {}\n", reg));
+            
+            cfg_file.write_all(cfg_buf.as_bytes()).map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn save_sso_profile(
+    name: String,
+    start_url: String,
+    sso_region: String,
+    account_id: String,
+    role_name: String,
+    region: String,
+) -> Result<(), String> {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let home = dirs::home_dir().ok_or("Could not find home directory")?;
+    let aws_dir = home.join(".aws");
+
+    if !aws_dir.exists() {
+        std::fs::create_dir_all(&aws_dir).map_err(|e| e.to_string())?;
+    }
+
+    let cfg_path = aws_dir.join("config");
+    let mut cfg_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&cfg_path)
+        .map_err(|e| e.to_string())?;
+
+    let cfg_header = if name == "default" {
+        "[default]".to_string()
+    } else {
+        format!("[profile {}]", name)
+    };
+
+    let mut cfg_buf = String::new();
+    cfg_buf.push_str(&format!("\n{}\n", cfg_header));
+    cfg_buf.push_str(&format!("sso_start_url = {}\n", start_url));
+    cfg_buf.push_str(&format!("sso_region = {}\n", sso_region));
+    cfg_buf.push_str(&format!("sso_account_id = {}\n", account_id));
+    cfg_buf.push_str(&format!("sso_role_name = {}\n", role_name));
+    cfg_buf.push_str(&format!("region = {}\n", region));
+
+    cfg_file.write_all(cfg_buf.as_bytes()).map_err(|e| e.to_string())?;
+
+    // Invoke aws cli to pop the browser window
+    let output = tokio::process::Command::new("aws")
+        .args(&["sso", "login", "--profile", &name])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to launch 'aws sso login' process: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(format!("aws sso login failed: {} - {}", stdout, stderr));
+    }
+
+    Ok(())
 }

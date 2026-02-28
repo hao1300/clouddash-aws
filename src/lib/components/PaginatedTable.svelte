@@ -94,10 +94,10 @@
 <div class="flex flex-col h-full">
     <!-- Toolbar -->
     <div
-        class="flex items-center justify-between p-3 border-b border-gray-800 bg-gray-900/50 shrink-0 gap-3"
+        class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 border-b border-gray-800 bg-gray-900/50 shrink-0 gap-3"
     >
         <!-- Filter -->
-        <div class="relative w-64 shrink-0">
+        <div class="relative w-full sm:w-64 shrink-0">
             <span
                 class="absolute inset-y-0 left-2.5 flex items-center text-gray-500"
                 >🔍</span
@@ -118,7 +118,7 @@
         </div>
 
         <!-- Right Actions -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 justify-end">
             {#if headerActionsSnippet}
                 {@render headerActionsSnippet()}
             {/if}
@@ -128,7 +128,7 @@
                 class="bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1 disabled:opacity-50"
             >
                 <span class={loading ? "animate-spin" : ""}>⟳</span>
-                Refresh
+                <span class="hidden sm:inline">Refresh</span>
             </button>
         </div>
     </div>

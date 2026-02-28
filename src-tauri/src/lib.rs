@@ -10,6 +10,8 @@ pub fn run() {
             state::list_profiles,
             state::authenticate,
             state::get_credentials,
+            state::save_profile,
+            state::save_sso_profile,
             s3::s3,
         ])
         .run(tauri::generate_context!())
