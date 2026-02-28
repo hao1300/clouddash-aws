@@ -122,14 +122,6 @@
             {#if headerActionsSnippet}
                 {@render headerActionsSnippet()}
             {/if}
-            <button
-                onclick={onRefresh}
-                disabled={loading}
-                class="bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1 disabled:opacity-50"
-            >
-                <span class={loading ? "animate-spin" : ""}>⟳</span>
-                <span class="hidden sm:inline">Refresh</span>
-            </button>
         </div>
     </div>
 

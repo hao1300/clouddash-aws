@@ -4,10 +4,12 @@
     let {
         open = $bindable(false),
         title = "",
+        maxWidth = "max-w-lg",
         children,
     }: {
         open?: boolean;
         title?: string;
+        maxWidth?: string;
         children: Snippet;
     } = $props();
 
@@ -28,7 +30,7 @@
         onkeydown={handleKeydown}
     >
         <div
-            class="bg-gray-900 rounded-xl border border-gray-800 shadow-2xl flex flex-col w-full max-w-lg max-h-[90vh] overflow-hidden"
+            class="bg-gray-900 rounded-xl border border-gray-800 shadow-2xl flex flex-col w-full {maxWidth} max-h-[90vh] overflow-hidden"
         >
             <!-- Header -->
             <div

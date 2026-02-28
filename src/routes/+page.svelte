@@ -349,6 +349,54 @@
     }
     saveState();
   }
+
+  // --- Drag-and-drop reorder ---
+  let dragIdx = $state(-1);
+  let dragOverIdx = $state(-1);
+
+  function handleDragStart(e: DragEvent, idx: number) {
+    dragIdx = idx;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(idx));
+    }
+  }
+
+  function handleDragOver(e: DragEvent, idx: number) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    dragOverIdx = idx;
+  }
+
+  function handleDrop(
+    e: DragEvent,
+    kind: "profile" | "region" | "service",
+    toIdx: number,
+  ) {
+    e.preventDefault();
+    if (dragIdx < 0 || dragIdx === toIdx) {
+      dragIdx = -1;
+      dragOverIdx = -1;
+      return;
+    }
+    function reorder<T>(arr: T[]): T[] {
+      const copy = [...arr];
+      const [moved] = copy.splice(dragIdx, 1);
+      copy.splice(toIdx, 0, moved);
+      return copy;
+    }
+    if (kind === "profile") profileOrder = reorder(profileOrder);
+    else if (kind === "region") regionOrder = reorder(regionOrder);
+    else serviceOrder = reorder(serviceOrder);
+    saveState();
+    dragIdx = -1;
+    dragOverIdx = -1;
+  }
+
+  function handleDragEnd() {
+    dragIdx = -1;
+    dragOverIdx = -1;
+  }
 </script>
 
 <main
@@ -658,8 +706,8 @@
         {error}
       </div>{/if}
 
-    <Modal bind:open={showSettings} title="Settings">
-      <div class="flex -m-5 min-h-[380px]">
+    <Modal bind:open={showSettings} title="Settings" maxWidth="max-w-xl">
+      <div class="flex -m-5" style="height: 420px;">
         <!-- Left vertical tabs -->
         <div
           class="w-32 bg-gray-950 border-r border-gray-800 flex flex-col py-2 shrink-0"
@@ -685,23 +733,25 @@
             </h3>
             <div class="space-y-1">
               {#each profileOrder as id, idx}
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
-                  class="flex items-center gap-2 px-3 py-2 rounded border border-gray-800 bg-gray-800/30 hover:bg-gray-800/60 transition"
+                  draggable="true"
+                  ondragstart={(e) => handleDragStart(e, idx)}
+                  ondragover={(e) => handleDragOver(e, idx)}
+                  ondrop={(e) => handleDrop(e, "profile", idx)}
+                  ondragend={handleDragEnd}
+                  class="flex items-center gap-2 px-3 py-2 rounded border transition cursor-grab active:cursor-grabbing {dragOverIdx ===
+                  idx
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-gray-800 bg-gray-800/30 hover:bg-gray-800/60'} {dragIdx ===
+                  idx
+                    ? 'opacity-40'
+                    : ''}"
                 >
-                  <div class="flex flex-col gap-0.5">
-                    <button
-                      onclick={() => moveProfile(idx, -1)}
-                      disabled={idx === 0}
-                      class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
-                      >▲</button
-                    >
-                    <button
-                      onclick={() => moveProfile(idx, 1)}
-                      disabled={idx === profileOrder.length - 1}
-                      class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
-                      >▼</button
-                    >
-                  </div>
+                  <span
+                    class="text-gray-600 text-sm select-none"
+                    title="Drag to reorder">⠿</span
+                  >
                   <span class="flex-1 text-sm font-mono text-gray-200"
                     >{id}</span
                   >
@@ -731,23 +781,25 @@
             </h3>
             <div class="space-y-1">
               {#each regionOrder as id, idx}
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
-                  class="flex items-center gap-2 px-3 py-1.5 rounded border border-gray-800 bg-gray-800/30 hover:bg-gray-800/60 transition"
+                  draggable="true"
+                  ondragstart={(e) => handleDragStart(e, idx)}
+                  ondragover={(e) => handleDragOver(e, idx)}
+                  ondrop={(e) => handleDrop(e, "region", idx)}
+                  ondragend={handleDragEnd}
+                  class="flex items-center gap-2 px-3 py-1.5 rounded border transition cursor-grab active:cursor-grabbing {dragOverIdx ===
+                  idx
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-gray-800 bg-gray-800/30 hover:bg-gray-800/60'} {dragIdx ===
+                  idx
+                    ? 'opacity-40'
+                    : ''}"
                 >
-                  <div class="flex flex-col gap-0.5">
-                    <button
-                      onclick={() => moveRegion(idx, -1)}
-                      disabled={idx === 0}
-                      class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
-                      >▲</button
-                    >
-                    <button
-                      onclick={() => moveRegion(idx, 1)}
-                      disabled={idx === regionOrder.length - 1}
-                      class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
-                      >▼</button
-                    >
-                  </div>
+                  <span
+                    class="text-gray-600 text-sm select-none"
+                    title="Drag to reorder">⠿</span
+                  >
                   <span class="flex-1 text-sm font-mono text-gray-200"
                     >{id}</span
                   >
@@ -779,23 +831,25 @@
               {#each serviceOrder as id, idx}
                 {@const svc = services.find((s) => s.id === id)}
                 {#if svc}
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <div
-                    class="flex items-center gap-2 px-3 py-2 rounded border border-gray-800 bg-gray-800/30 hover:bg-gray-800/60 transition"
+                    draggable="true"
+                    ondragstart={(e) => handleDragStart(e, idx)}
+                    ondragover={(e) => handleDragOver(e, idx)}
+                    ondrop={(e) => handleDrop(e, "service", idx)}
+                    ondragend={handleDragEnd}
+                    class="flex items-center gap-2 px-3 py-2 rounded border transition cursor-grab active:cursor-grabbing {dragOverIdx ===
+                    idx
+                      ? 'border-blue-500 bg-blue-500/10'
+                      : 'border-gray-800 bg-gray-800/30 hover:bg-gray-800/60'} {dragIdx ===
+                    idx
+                      ? 'opacity-40'
+                      : ''}"
                   >
-                    <div class="flex flex-col gap-0.5">
-                      <button
-                        onclick={() => moveService(idx, -1)}
-                        disabled={idx === 0}
-                        class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
-                        >▲</button
-                      >
-                      <button
-                        onclick={() => moveService(idx, 1)}
-                        disabled={idx === serviceOrder.length - 1}
-                        class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
-                        >▼</button
-                      >
-                    </div>
+                    <span
+                      class="text-gray-600 text-sm select-none"
+                      title="Drag to reorder">⠿</span
+                    >
                     <span class="flex-1 text-sm text-gray-200">{svc.label}</span
                     >
                     <button
