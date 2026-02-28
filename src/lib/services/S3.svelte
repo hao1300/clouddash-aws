@@ -4,6 +4,8 @@
         S3Client,
         ListBucketsCommand,
         ListObjectsV2Command,
+        GetObjectCommand,
+        DeleteObjectCommand,
     } from "@aws-sdk/client-s3";
     import { getAwsCredentials } from "./aws-creds";
 
@@ -15,9 +17,17 @@
     // Object browsing
     let selectedBucket = $state("");
     let objects = $state<any[]>([]);
+    let commonPrefixes = $state<string[]>([]);
     let objNextToken = $state<string | undefined>(undefined);
     let objLoading = $state(false);
     let prefix = $state("");
+    let prefixHistory = $state<string[]>([]);
+
+    // File preview
+    let previewKey = $state("");
+    let previewContent = $state("");
+    let previewLoading = $state(false);
+    let previewType = $state(""); // "text" | "image" | "other"
 
     onMount(async () => {
         try {
@@ -55,11 +65,34 @@
         }
     }
 
+    function navigateToPrefix(newPrefix: string) {
+        prefixHistory = [...prefixHistory, prefix];
+        prefix = newPrefix;
+        objects = [];
+        commonPrefixes = [];
+        objNextToken = undefined;
+        loadObjects();
+    }
+
+    function goBack() {
+        if (prefixHistory.length > 0) {
+            prefix = prefixHistory.pop()!;
+            prefixHistory = [...prefixHistory];
+            objects = [];
+            commonPrefixes = [];
+            objNextToken = undefined;
+            loadObjects();
+        }
+    }
+
     async function browseBucket(name: string) {
         selectedBucket = name;
         prefix = "";
+        prefixHistory = [];
         objects = [];
+        commonPrefixes = [];
         objNextToken = undefined;
+        previewKey = "";
         await loadObjects();
     }
 
@@ -72,21 +105,110 @@
                 new ListObjectsV2Command({
                     Bucket: selectedBucket,
                     Prefix: prefix || undefined,
+                    Delimiter: "/",
                     MaxKeys: 100,
                     ContinuationToken: append ? objNextToken : undefined,
                 }),
             );
-            const newItems = (resp.Contents ?? []).map((o) => ({
-                key: o.Key ?? "",
-                size: o.Size ?? 0,
-                last_modified: o.LastModified?.toISOString() ?? null,
-            }));
+            const newItems = (resp.Contents ?? [])
+                .filter((o) => o.Key !== prefix)
+                .map((o) => ({
+                    key: o.Key ?? "",
+                    size: o.Size ?? 0,
+                    last_modified: o.LastModified?.toISOString() ?? null,
+                    name: (o.Key ?? "").slice(prefix.length),
+                }));
+            const newPrefixes = (resp.CommonPrefixes ?? []).map(
+                (p) => p.Prefix ?? "",
+            );
             objects = append ? [...objects, ...newItems] : newItems;
+            if (!append) commonPrefixes = newPrefixes;
+            else commonPrefixes = [...commonPrefixes, ...newPrefixes];
             objNextToken = resp.NextContinuationToken;
         } catch (e) {
             error = String(e);
         } finally {
             objLoading = false;
+        }
+    }
+
+    async function previewFile(key: string) {
+        if (!client) return;
+        const ext = key.split(".").pop()?.toLowerCase() ?? "";
+        const textExts = [
+            "txt",
+            "json",
+            "csv",
+            "xml",
+            "yml",
+            "yaml",
+            "md",
+            "log",
+            "html",
+            "css",
+            "js",
+            "ts",
+            "py",
+            "rs",
+            "toml",
+            "ini",
+            "cfg",
+            "env",
+            "sh",
+            "bat",
+        ];
+        const imageExts = [
+            "png",
+            "jpg",
+            "jpeg",
+            "gif",
+            "webp",
+            "svg",
+            "ico",
+            "bmp",
+        ];
+
+        previewKey = key;
+        previewContent = "";
+        previewType = textExts.includes(ext)
+            ? "text"
+            : imageExts.includes(ext)
+              ? "image"
+              : "other";
+
+        if (previewType === "text") {
+            try {
+                previewLoading = true;
+                const resp = await client.send(
+                    new GetObjectCommand({ Bucket: selectedBucket, Key: key }),
+                );
+                const body = await resp.Body?.transformToString();
+                previewContent = body ?? "(empty)";
+            } catch (e) {
+                previewContent = String(e);
+            } finally {
+                previewLoading = false;
+            }
+        }
+    }
+
+    async function downloadFile(key: string) {
+        if (!client) return;
+        try {
+            error = "";
+            const resp = await client.send(
+                new GetObjectCommand({ Bucket: selectedBucket, Key: key }),
+            );
+            const blob = await resp.Body?.transformToByteArray();
+            if (!blob) return;
+            const url = URL.createObjectURL(new Blob([blob]));
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = key.split("/").pop() ?? key;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            error = String(e);
         }
     }
 
@@ -103,43 +225,120 @@
         {error}
     </div>{/if}
 
-{#if selectedBucket}
+{#if previewKey}
+    <!-- File Preview -->
+    <div class="mb-3">
+        <div class="flex items-center gap-2 mb-2">
+            <button
+                onclick={() => {
+                    previewKey = "";
+                }}
+                class="text-xs text-blue-400 hover:underline">← Back</button
+            >
+            <span class="text-sm text-gray-300 font-mono truncate"
+                >{previewKey}</span
+            >
+            <button
+                onclick={() => downloadFile(previewKey)}
+                class="ml-auto bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-xs font-bold"
+                >Download</button
+            >
+        </div>
+        {#if previewLoading}
+            <div class="flex justify-center py-8">
+                <div
+                    class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
+                ></div>
+            </div>
+        {:else if previewType === "text"}
+            <pre
+                class="bg-gray-900 p-3 rounded-lg border border-gray-800 text-xs text-gray-300 overflow-auto max-h-[60vh] whitespace-pre-wrap break-all">{previewContent}</pre>
+        {:else}
+            <div
+                class="bg-gray-900 p-6 rounded-lg border border-gray-800 text-center text-gray-500 text-sm"
+            >
+                <p class="mb-3">Binary file — click Download to save.</p>
+                <button
+                    onclick={() => downloadFile(previewKey)}
+                    class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-xs font-bold text-white"
+                    >Download File</button
+                >
+            </div>
+        {/if}
+    </div>
+{:else if selectedBucket}
+    <!-- Object Browser -->
     <div class="flex items-center gap-2 mb-3">
+        <button
+            onclick={() => {
+                if (prefix && prefixHistory.length > 0) goBack();
+                else {
+                    selectedBucket = "";
+                    objects = [];
+                }
+            }}
+            class="text-xs text-blue-400 hover:underline">←</button
+        >
         <button
             onclick={() => {
                 selectedBucket = "";
                 objects = [];
+                prefix = "";
+                prefixHistory = [];
             }}
-            class="text-xs text-blue-400 hover:underline">← Buckets</button
+            class="text-xs text-gray-500 hover:text-gray-300">Buckets</button
         >
-        <span class="text-sm text-gray-400 font-mono">{selectedBucket}</span>
         <span class="text-gray-600">/</span>
-        <input
-            bind:value={prefix}
-            placeholder="prefix/"
-            class="flex-1 bg-gray-900 text-xs p-1.5 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-        />
-        <button
-            onclick={() => loadObjects()}
-            class="bg-gray-800 hover:bg-gray-700 px-3 py-1.5 text-xs rounded border border-gray-700"
-            >Go</button
+        <span class="text-sm text-gray-400 font-mono truncate"
+            >{selectedBucket}/{prefix}</span
         >
     </div>
     <div
         class="bg-gray-900 rounded-lg border border-gray-800 divide-y divide-gray-800"
     >
+        {#if prefix}
+            <button
+                onclick={goBack}
+                class="p-2 flex items-center gap-2 text-xs text-gray-400 hover:bg-gray-800/50 w-full text-left"
+            >
+                <span class="text-blue-400">📁</span> ..
+            </button>
+        {/if}
+        {#each commonPrefixes as cp}
+            <button
+                onclick={() => navigateToPrefix(cp)}
+                class="p-2 flex items-center gap-2 text-xs hover:bg-gray-800/50 transition w-full text-left"
+            >
+                <span class="text-blue-400">📁</span>
+                <span class="text-gray-200 font-mono"
+                    >{cp.slice(prefix.length)}</span
+                >
+            </button>
+        {/each}
         {#each objects as obj}
-            <div class="p-2 flex justify-between items-center text-xs">
-                <span class="text-gray-200 truncate font-mono">{obj.key}</span>
-                <span class="text-gray-500 shrink-0 ml-2"
+            <div
+                class="p-2 flex items-center gap-2 text-xs hover:bg-gray-800/50 transition group"
+            >
+                <span class="text-gray-500">📄</span>
+                <button
+                    onclick={() => previewFile(obj.key)}
+                    class="text-gray-200 font-mono truncate flex-1 text-left hover:text-blue-400"
+                    >{obj.name}</button
+                >
+                <span class="text-gray-600 shrink-0"
                     >{formatSize(obj.size)}</span
+                >
+                <button
+                    onclick={() => downloadFile(obj.key)}
+                    class="text-blue-400 hover:text-blue-300 opacity-0 group-hover:opacity-100 transition shrink-0"
+                    title="Download">⬇</button
                 >
             </div>
         {/each}
-        {#if !objLoading && objects.length === 0}<div
+        {#if !objLoading && objects.length === 0 && commonPrefixes.length === 0}<div
                 class="p-6 text-center text-gray-600 text-sm"
             >
-                No objects found.
+                Empty.
             </div>{/if}
     </div>
     {#if objLoading}<div class="flex justify-center py-3">
@@ -153,6 +352,7 @@
             >Load More</button
         >{/if}
 {:else}
+    <!-- Bucket List -->
     <div
         class="bg-gray-900 rounded-lg border border-gray-800 divide-y divide-gray-800"
     >
@@ -162,16 +362,7 @@
                 class="p-3 flex justify-between items-center hover:bg-gray-800/50 transition w-full text-left"
             >
                 <div class="flex items-center gap-2 min-w-0">
-                    <svg
-                        class="w-4 h-4 text-blue-400 shrink-0"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                        ><path
-                            fill-rule="evenodd"
-                            d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"
-                            clip-rule="evenodd"
-                        ></path></svg
-                    >
+                    <span class="text-blue-400">🪣</span>
                     <span class="text-sm text-gray-200 truncate">{b.name}</span>
                 </div>
                 <span class="text-xs text-gray-500 shrink-0 ml-2"
