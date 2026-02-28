@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tpl",
+  "productName": "AWS Console",
   "version": "0.1.0",
   "identifier": "com.hao13.tpl",
   "build": {
@@ -12,9 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "tpl",
-        "width": 800,
-        "height": 600
+        "title": "AWS Console",
+        "width": 1280,
+        "height": 860
       }
     ],
     "security": {
