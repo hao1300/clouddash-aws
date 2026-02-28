@@ -25,10 +25,11 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 dirs = "5.0"
 
-# Only what's needed for credential resolution
+# Credential resolution + S3 proxy (S3 doesn't support browser CORS)
 aws-config = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio", "behavior-version-latest"] }
 aws-credential-types = { version = "1.2", default-features = false, features = ["hardcoded-credentials"] }
-tauri-plugin-http = "2.5.7"
+aws-sdk-s3 = { version = "1.15", default-features = false, features = ["rustls", "rt-tokio"] }
+base64 = "0.22.1"
 
 [profile.release]
 opt-level = "s"       # Optimize for binary size

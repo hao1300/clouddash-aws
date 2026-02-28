@@ -1,24 +1,16 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import {
-        S3Client,
-        ListBucketsCommand,
-        ListObjectsV2Command,
-        GetObjectCommand,
-        DeleteObjectCommand,
-    } from "@aws-sdk/client-s3";
-    import { getAwsCredentials } from "./aws-creds";
+    import { invoke } from "@tauri-apps/api/core";
 
     let buckets = $state<any[]>([]);
     let loading = $state(false);
     let error = $state("");
-    let client: S3Client | null = null;
 
     // Object browsing
     let selectedBucket = $state("");
     let objects = $state<any[]>([]);
     let commonPrefixes = $state<string[]>([]);
-    let objNextToken = $state<string | undefined>(undefined);
+    let objNextToken = $state<string | null>(null);
     let objLoading = $state(false);
     let prefix = $state("");
     let prefixHistory = $state<string[]>([]);
@@ -27,37 +19,19 @@
     let previewKey = $state("");
     let previewContent = $state("");
     let previewLoading = $state(false);
-    let previewType = $state(""); // "text" | "image" | "other"
+    let previewType = $state(""); // "text" | "binary"
 
-    onMount(async () => {
-        try {
-            const creds = await getAwsCredentials();
-            client = new S3Client({
-                region: creds.region || "us-east-1",
-                credentials: {
-                    accessKeyId: creds.access_key_id,
-                    secretAccessKey: creds.secret_access_key,
-                    ...(creds.session_token
-                        ? { sessionToken: creds.session_token }
-                        : {}),
-                },
-            });
-            await loadBuckets();
-        } catch (e) {
-            error = String(e);
-        }
-    });
+    onMount(() => loadBuckets());
 
     async function loadBuckets() {
-        if (!client) return;
         try {
             loading = true;
             error = "";
-            const resp = await client.send(new ListBucketsCommand({}));
-            buckets = (resp.Buckets ?? []).map((b) => ({
-                name: b.Name ?? "Unknown",
-                creation_date: b.CreationDate?.toISOString() ?? null,
-            }));
+            const resp: any = await invoke("s3", {
+                action: "list_buckets",
+                params: {},
+            });
+            buckets = resp.items;
         } catch (e) {
             error = String(e);
         } finally {
@@ -70,7 +44,7 @@
         prefix = newPrefix;
         objects = [];
         commonPrefixes = [];
-        objNextToken = undefined;
+        objNextToken = null;
         loadObjects();
     }
 
@@ -80,7 +54,7 @@
             prefixHistory = [...prefixHistory];
             objects = [];
             commonPrefixes = [];
-            objNextToken = undefined;
+            objNextToken = null;
             loadObjects();
         }
     }
@@ -91,40 +65,31 @@
         prefixHistory = [];
         objects = [];
         commonPrefixes = [];
-        objNextToken = undefined;
+        objNextToken = null;
         previewKey = "";
         await loadObjects();
     }
 
     async function loadObjects(append = false) {
-        if (!client) return;
         try {
             objLoading = true;
             error = "";
-            const resp = await client.send(
-                new ListObjectsV2Command({
-                    Bucket: selectedBucket,
-                    Prefix: prefix || undefined,
-                    Delimiter: "/",
-                    MaxKeys: 100,
-                    ContinuationToken: append ? objNextToken : undefined,
-                }),
-            );
-            const newItems = (resp.Contents ?? [])
-                .filter((o) => o.Key !== prefix)
-                .map((o) => ({
-                    key: o.Key ?? "",
-                    size: o.Size ?? 0,
-                    last_modified: o.LastModified?.toISOString() ?? null,
-                    name: (o.Key ?? "").slice(prefix.length),
-                }));
-            const newPrefixes = (resp.CommonPrefixes ?? []).map(
-                (p) => p.Prefix ?? "",
-            );
+            const resp: any = await invoke("s3", {
+                action: "list_objects",
+                params: {
+                    bucket: selectedBucket,
+                    prefix: prefix,
+                    delimiter: "/",
+                    next_token: append ? objNextToken : null,
+                },
+            });
+            const newItems = resp.items.map((o: any) => ({
+                ...o,
+                name: o.key.slice(prefix.length),
+            }));
             objects = append ? [...objects, ...newItems] : newItems;
-            if (!append) commonPrefixes = newPrefixes;
-            else commonPrefixes = [...commonPrefixes, ...newPrefixes];
-            objNextToken = resp.NextContinuationToken;
+            if (!append) commonPrefixes = resp.common_prefixes ?? [];
+            objNextToken = resp.next_token;
         } catch (e) {
             error = String(e);
         } finally {
@@ -133,83 +98,53 @@
     }
 
     async function previewFile(key: string) {
-        if (!client) return;
-        const ext = key.split(".").pop()?.toLowerCase() ?? "";
-        const textExts = [
-            "txt",
-            "json",
-            "csv",
-            "xml",
-            "yml",
-            "yaml",
-            "md",
-            "log",
-            "html",
-            "css",
-            "js",
-            "ts",
-            "py",
-            "rs",
-            "toml",
-            "ini",
-            "cfg",
-            "env",
-            "sh",
-            "bat",
-        ];
-        const imageExts = [
-            "png",
-            "jpg",
-            "jpeg",
-            "gif",
-            "webp",
-            "svg",
-            "ico",
-            "bmp",
-        ];
-
         previewKey = key;
         previewContent = "";
-        previewType = textExts.includes(ext)
-            ? "text"
-            : imageExts.includes(ext)
-              ? "image"
-              : "other";
-
-        if (previewType === "text") {
-            try {
-                previewLoading = true;
-                const resp = await client.send(
-                    new GetObjectCommand({ Bucket: selectedBucket, Key: key }),
-                );
-                const body = await resp.Body?.transformToString();
-                previewContent = body ?? "(empty)";
-            } catch (e) {
-                previewContent = String(e);
-            } finally {
-                previewLoading = false;
-            }
+        previewLoading = true;
+        try {
+            const resp: any = await invoke("s3", {
+                action: "get_object",
+                params: { bucket: selectedBucket, key },
+            });
+            previewType = resp.type;
+            previewContent = resp.content;
+        } catch (e) {
+            previewContent = String(e);
+            previewType = "text";
+        } finally {
+            previewLoading = false;
         }
     }
 
-    async function downloadFile(key: string) {
-        if (!client) return;
-        try {
-            error = "";
-            const resp = await client.send(
-                new GetObjectCommand({ Bucket: selectedBucket, Key: key }),
-            );
-            const blob = await resp.Body?.transformToByteArray();
-            if (!blob) return;
-            const url = URL.createObjectURL(new Blob([blob]));
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = key.split("/").pop() ?? key;
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (e) {
-            error = String(e);
-        }
+    function downloadFile(key: string) {
+        // Trigger get_object and download
+        invoke("s3", {
+            action: "get_object",
+            params: { bucket: selectedBucket, key },
+        })
+            .then((resp: any) => {
+                let blob: Blob;
+                if (resp.type === "binary") {
+                    const binary = atob(resp.content);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++)
+                        bytes[i] = binary.charCodeAt(i);
+                    blob = new Blob([bytes], { type: resp.content_type });
+                } else {
+                    blob = new Blob([resp.content], {
+                        type: resp.content_type || "text/plain",
+                    });
+                }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = key.split("/").pop() ?? key;
+                a.click();
+                URL.revokeObjectURL(url);
+            })
+            .catch((e) => {
+                error = String(e);
+            });
     }
 
     function formatSize(b: number) {
