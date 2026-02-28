@@ -9,31 +9,58 @@
     } from "@aws-sdk/client-dynamodb";
     import { unmarshall } from "@aws-sdk/util-dynamodb";
     import { getAwsCredentials } from "./aws-creds";
+    import ServiceLayout from "$lib/components/ServiceLayout.svelte";
+    import PaginatedTable from "$lib/components/PaginatedTable.svelte";
 
-    type Tab = "tables" | "scan" | "query";
-    let tab = $state<Tab>("tables");
     let client: DynamoDBClient | null = $state(null);
+    let error = $state("");
+    let actionMsg = $state("");
 
-    // Tables
+    // --- Service Layout State ---
+    const tabs = [
+        { id: "tables", label: "Tables" },
+        { id: "scan", label: "Scan" },
+        { id: "query", label: "Query" },
+    ];
+    let activeTab = $state("tables");
+
+    // --- Pagination Shared Helpers ---
+    function pushToken(history: any[], currentNextToken?: any) {
+        if (!currentNextToken) return;
+        // Compare stringified JSON for DynamoDB LastEvaluatedKey
+        if (
+            JSON.stringify(history[history.length - 1]) !==
+            JSON.stringify(currentNextToken)
+        ) {
+            history.push(currentNextToken);
+        }
+    }
+    function popToken(history: any[]) {
+        history.pop(); // discard current
+        return history.length > 0 ? history[history.length - 1] : undefined;
+    }
+
+    // --- Tables ---
     let tables = $state<any[]>([]);
-    let tablesToken = $state<string | undefined>(undefined);
     let tablesLoading = $state(false);
+    let tablesTokenMap = $state<string[]>([]);
+    let tablesCurrentToken = $state<string | undefined>(undefined);
 
-    // Scan / Query shared
+    // --- Scan / Query shared ---
     let tableName = $state("");
     let results = $state<any[]>([]);
-    let resultToken = $state<Record<string, any> | undefined>(undefined);
     let resultLoading = $state(false);
-    let error = $state("");
+    let resultTokenMap = $state<Record<string, any>[]>([]);
+    let resultCurrentToken = $state<Record<string, any> | undefined>(undefined);
 
     // Scan params
     let scanFilter = $state("");
-    let scanValues = $state("{}");
+    let scanValues = $state(""); // Changed to string for input
 
     // Query params
     let queryKeyCond = $state("");
     let queryFilter = $state("");
-    let queryValues = $state("{}");
+    let queryValues = $state("");
     let queryIndex = $state("");
 
     onMount(async () => {
@@ -55,15 +82,17 @@
         }
     });
 
-    async function loadTables(append = false) {
+    // --- Tables API ---
+    async function loadTables(token?: string) {
         if (!client) return;
         try {
             tablesLoading = true;
             error = "";
+            actionMsg = "";
             const resp = await client.send(
                 new ListTablesCommand({
                     Limit: 100,
-                    ExclusiveStartTableName: append ? tablesToken : undefined,
+                    ExclusiveStartTableName: token,
                 }),
             );
             const names = resp.TableNames ?? [];
@@ -90,8 +119,9 @@
                     });
                 }
             }
-            tables = append ? [...tables, ...details] : details;
-            tablesToken = resp.LastEvaluatedTableName;
+            tables = details;
+            pushToken(tablesTokenMap, resp.LastEvaluatedTableName);
+            tablesCurrentToken = resp.LastEvaluatedTableName;
         } catch (e) {
             error = String(e);
         } finally {
@@ -99,18 +129,22 @@
         }
     }
 
-    async function runScan(append = false) {
+    // --- Scan API ---
+    async function runScan(token?: Record<string, any>) {
         if (!client || !tableName) return;
         try {
+            if (!token) {
+                resultTokenMap = [];
+                results = [];
+            }
             resultLoading = true;
             error = "";
+            actionMsg = "";
             let exprVals: Record<string, any> | undefined;
-            try {
+            if (scanValues.trim()) {
                 const parsed = JSON.parse(scanValues);
                 if (Object.keys(parsed).length)
                     exprVals = marshalValues(parsed);
-            } catch {
-                /* ignore */
             }
 
             const resp = await client.send(
@@ -119,12 +153,14 @@
                     Limit: 25,
                     FilterExpression: scanFilter || undefined,
                     ExpressionAttributeValues: exprVals,
-                    ExclusiveStartKey: append ? resultToken : undefined,
+                    ExclusiveStartKey: token,
                 }),
             );
-            const items = (resp.Items ?? []).map((i) => unmarshall(i));
-            results = append ? [...results, ...items] : items;
-            resultToken = resp.LastEvaluatedKey;
+            results = (resp.Items ?? []).map((i) => unmarshall(i));
+            pushToken(resultTokenMap, resp.LastEvaluatedKey);
+            resultCurrentToken = resp.LastEvaluatedKey;
+            if (results.length === 0)
+                actionMsg = "Scan completed. No results found.";
         } catch (e) {
             error = String(e);
         } finally {
@@ -132,18 +168,22 @@
         }
     }
 
-    async function runQuery(append = false) {
+    // --- Query API ---
+    async function runQuery(token?: Record<string, any>) {
         if (!client || !tableName || !queryKeyCond) return;
         try {
+            if (!token) {
+                resultTokenMap = [];
+                results = [];
+            }
             resultLoading = true;
             error = "";
+            actionMsg = "";
             let exprVals: Record<string, any> | undefined;
-            try {
+            if (queryValues.trim()) {
                 const parsed = JSON.parse(queryValues);
                 if (Object.keys(parsed).length)
                     exprVals = marshalValues(parsed);
-            } catch {
-                /* ignore */
             }
 
             const resp = await client.send(
@@ -153,13 +193,15 @@
                     FilterExpression: queryFilter || undefined,
                     IndexName: queryIndex || undefined,
                     ExpressionAttributeValues: exprVals,
-                    ExclusiveStartKey: append ? resultToken : undefined,
+                    ExclusiveStartKey: token,
                     Limit: 25,
                 }),
             );
-            const items = (resp.Items ?? []).map((i) => unmarshall(i));
-            results = append ? [...results, ...items] : items;
-            resultToken = resp.LastEvaluatedKey;
+            results = (resp.Items ?? []).map((i) => unmarshall(i));
+            pushToken(resultTokenMap, resp.LastEvaluatedKey);
+            resultCurrentToken = resp.LastEvaluatedKey;
+            if (results.length === 0)
+                actionMsg = "Query completed. No results found.";
         } catch (e) {
             error = String(e);
         } finally {
@@ -180,236 +222,205 @@
         return out;
     }
 
-    function formatBytes(b: number) {
-        if (b === 0) return "0 B";
+    function formatBytes(b: number | string) {
+        const num = Number(b);
+        if (num === 0 || isNaN(num)) return "0 B";
         const k = 1024;
         const s = ["B", "KB", "MB", "GB", "TB"];
-        const i = Math.floor(Math.log(b) / Math.log(k));
-        return parseFloat((b / Math.pow(k, i)).toFixed(1)) + " " + s[i];
+        const i = Math.floor(Math.log(num) / Math.log(k));
+        return parseFloat((num / Math.pow(k, i)).toFixed(1)) + " " + s[i];
     }
 
-    let allColumns = $derived([
-        ...new Set(results.flatMap((r) => Object.keys(r))),
-    ]);
+    let allColumns = $derived(
+        [...new Set(results.flatMap((r) => Object.keys(r)))].map((k) => ({
+            key: k,
+            label: k,
+            format: (val: any) =>
+                typeof val === "object"
+                    ? JSON.stringify(val)
+                    : String(val ?? ""),
+        })),
+    );
 </script>
 
-<!-- Sub-tabs -->
-<div class="flex gap-1 mb-3">
-    {#each ["tables", "scan", "query"] as Tab[] as t}
-        <button
-            onclick={() => {
-                tab = t;
-                results = [];
-                resultToken = undefined;
-                error = "";
-            }}
-            class="px-3 py-1 rounded text-xs font-semibold transition {tab === t
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-400 hover:bg-gray-800'}"
-            >{t.charAt(0).toUpperCase() + t.slice(1)}</button
+<ServiceLayout title="DynamoDB" {tabs} bind:activeTab>
+    {#if error}<div
+            class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
-    {/each}
-</div>
+            {error}
+        </div>{/if}
+    {#if actionMsg}<div
+            class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30"
+        >
+            {actionMsg}
+        </div>{/if}
 
-{#if error}<div class="bg-red-500/20 text-red-300 p-2 rounded text-xs mb-2">
-        {error}
-    </div>{/if}
-
-{#if tab === "tables"}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {#each tables as t}
-            <button
-                onclick={() => {
-                    tableName = t.name;
-                    tab = "scan";
+    <div class="h-full {error || actionMsg ? 'pt-8' : ''}">
+        {#if activeTab === "tables"}
+            <PaginatedTable
+                items={tables}
+                loading={tablesLoading}
+                hasNext={!!tablesCurrentToken}
+                hasPrev={tablesTokenMap.length > 0}
+                onNext={() => loadTables(tablesCurrentToken)}
+                onPrev={() => loadTables(popToken(tablesTokenMap))}
+                onRefresh={() => {
+                    tablesTokenMap = [];
+                    loadTables();
                 }}
-                class="bg-gray-900 p-3 rounded-lg border border-gray-800 text-left hover:border-blue-500/50 transition"
+                columns={[
+                    { key: "name", label: "Table Name" },
+                    {
+                        key: "status",
+                        label: "Status",
+                        format: (v) =>
+                            v === "ACTIVE" ? "🟢 ACTIVE" : `⚪ ${v}`,
+                    },
+                    {
+                        key: "item_count",
+                        label: "Item Count",
+                        format: (v) => Number(v).toLocaleString(),
+                    },
+                    { key: "size_bytes", label: "Size", format: formatBytes },
+                ]}
             >
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-sm font-semibold text-gray-100 truncate"
-                        >{t.name}</span
+                {#snippet actionsSnippet(item)}
+                    <button
+                        onclick={() => {
+                            tableName = item.name;
+                            activeTab = "scan";
+                        }}
+                        class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition"
+                        >Scan</button
                     >
-                    <span
-                        class="shrink-0 ml-2 px-2 py-0.5 rounded-full text-xs font-bold {t.status ===
-                        'ACTIVE'
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-yellow-500/20 text-yellow-400'}"
-                        >{t.status}</span
+                    <button
+                        onclick={() => {
+                            tableName = item.name;
+                            activeTab = "query";
+                        }}
+                        class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition ml-1"
+                        >Query</button
                     >
-                </div>
-                <div class="flex justify-between text-xs">
-                    <span class="text-gray-500">Items</span><span
-                        class="text-gray-300"
-                        >{t.item_count?.toLocaleString()}</span
-                    >
-                </div>
-                <div class="flex justify-between text-xs mt-1">
-                    <span class="text-gray-500">Size</span><span
-                        class="text-gray-300">{formatBytes(t.size_bytes)}</span
-                    >
-                </div>
-            </button>
-        {/each}
-        {#if !tablesLoading && tables.length === 0}<div
-                class="col-span-full text-gray-600 text-center py-16 text-sm"
-            >
-                No DynamoDB tables found.
-            </div>{/if}
-    </div>
-    {#if tablesLoading}<div class="flex justify-center py-4">
-            <div
-                class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-            ></div>
-        </div>{/if}
-    {#if tablesToken && !tablesLoading}<button
-            onclick={() => loadTables(true)}
-            class="w-full mt-2 py-2 text-xs font-semibold text-blue-400 bg-gray-900 rounded border border-gray-800 hover:bg-gray-800 transition"
-            >Load More</button
-        >{/if}
-{:else if tab === "scan"}
-    <div class="space-y-2 mb-3">
-        <div class="flex gap-2">
-            <input
-                bind:value={tableName}
-                placeholder="Table name"
-                class="flex-1 bg-gray-900 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-            />
-            <button
-                onclick={() => runScan()}
-                disabled={!tableName || resultLoading}
-                class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-xs font-bold transition"
-                >Scan</button
-            >
-        </div>
-        <input
-            bind:value={scanFilter}
-            placeholder="Filter expression (optional), e.g. #s = :status"
-            class="w-full bg-gray-900 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-        />
-        <input
-            bind:value={scanValues}
-            placeholder={'Expression values JSON, e.g. {":status": "active"}'}
-            class="w-full bg-gray-900 text-xs p-2 rounded border border-gray-700 text-gray-300 font-mono outline-none focus:border-blue-500"
-        />
-    </div>
-
-    {#if results.length > 0}
-        <div class="overflow-auto border border-gray-800 rounded-lg">
-            <table class="w-full text-xs">
-                <thead class="bg-gray-900 sticky top-0"
-                    ><tr
-                        >{#each allColumns as col}<th
-                                class="px-3 py-2 text-left text-gray-400 font-semibold border-b border-gray-800"
-                                >{col}</th
-                            >{/each}</tr
-                    ></thead
+                {/snippet}
+            </PaginatedTable>
+        {:else if activeTab === "scan"}
+            <div class="h-full flex flex-col p-4 bg-gray-950">
+                <div
+                    class="space-y-3 mb-4 shrink-0 bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
                 >
-                <tbody>
-                    {#each results as row}
-                        <tr
-                            class="border-b border-gray-800/50 hover:bg-gray-900/50"
+                    <div class="flex gap-2">
+                        <input
+                            bind:value={tableName}
+                            placeholder="Table name"
+                            class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
+                        />
+                        <button
+                            onclick={() => runScan()}
+                            disabled={!tableName || resultLoading}
+                            class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-6 py-2 rounded text-xs font-bold transition flex items-center gap-2"
                         >
-                            {#each allColumns as col}<td
-                                    class="px-3 py-2 text-gray-300 truncate max-w-[200px]"
-                                    >{typeof row[col] === "object"
-                                        ? JSON.stringify(row[col])
-                                        : (row[col] ?? "")}</td
-                                >{/each}
-                        </tr>
-                    {/each}
-                </tbody>
-            </table>
-        </div>
-        <div class="text-xs text-gray-500 mt-1">
-            {results.length} items loaded
-        </div>
-    {/if}
-    {#if resultLoading}<div class="flex justify-center py-4">
-            <div
-                class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-            ></div>
-        </div>{/if}
-    {#if resultToken && !resultLoading}<button
-            onclick={() => runScan(true)}
-            class="w-full mt-2 py-2 text-xs font-semibold text-blue-400 bg-gray-900 rounded border border-gray-800 hover:bg-gray-800 transition"
-            >Load More</button
-        >{/if}
-{:else if tab === "query"}
-    <div class="space-y-2 mb-3">
-        <div class="flex gap-2">
-            <input
-                bind:value={tableName}
-                placeholder="Table name"
-                class="flex-1 bg-gray-900 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-            />
-            <input
-                bind:value={queryIndex}
-                placeholder="Index (optional)"
-                class="w-40 bg-gray-900 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-            />
-            <button
-                onclick={() => runQuery()}
-                disabled={!tableName || !queryKeyCond || resultLoading}
-                class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-xs font-bold transition"
-                >Query</button
-            >
-        </div>
-        <input
-            bind:value={queryKeyCond}
-            placeholder="Key condition, e.g. pk = :pk"
-            class="w-full bg-gray-900 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-        />
-        <input
-            bind:value={queryFilter}
-            placeholder="Filter expression (optional)"
-            class="w-full bg-gray-900 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-        />
-        <input
-            bind:value={queryValues}
-            placeholder={'Expression values JSON, e.g. {":pk": "user-123"}'}
-            class="w-full bg-gray-900 text-xs p-2 rounded border border-gray-700 text-gray-300 font-mono outline-none focus:border-blue-500"
-        />
-    </div>
+                            {#if resultLoading}<span class="animate-spin"
+                                    >⟳</span
+                                >{/if} Let's Scan
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input
+                            bind:value={scanFilter}
+                            placeholder="Filter expression (optional) e.g. #s = :status"
+                            class="bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
+                        />
+                        <input
+                            bind:value={scanValues}
+                            placeholder="Expression JSON (e.g. &quot;:status&quot;: &quot;active&quot;)"
+                            class="bg-black font-mono text-xs p-2 rounded border border-gray-700 text-green-400 outline-none focus:border-blue-500"
+                        />
+                    </div>
+                </div>
 
-    {#if results.length > 0}
-        <div class="overflow-auto border border-gray-800 rounded-lg">
-            <table class="w-full text-xs">
-                <thead class="bg-gray-900 sticky top-0"
-                    ><tr
-                        >{#each allColumns as col}<th
-                                class="px-3 py-2 text-left text-gray-400 font-semibold border-b border-gray-800"
-                                >{col}</th
-                            >{/each}</tr
-                    ></thead
+                <div
+                    class="flex-1 min-h-0 bg-gray-900 rounded-lg border border-gray-800 flex flex-col shadow-sm overflow-hidden"
                 >
-                <tbody>
-                    {#each results as row}
-                        <tr
-                            class="border-b border-gray-800/50 hover:bg-gray-900/50"
+                    <PaginatedTable
+                        items={results}
+                        loading={resultLoading}
+                        hasNext={!!resultCurrentToken}
+                        hasPrev={resultTokenMap.length > 0}
+                        onNext={() => runScan(resultCurrentToken)}
+                        onPrev={() => runScan(popToken(resultTokenMap))}
+                        onRefresh={() => {
+                            resultTokenMap = [];
+                            runScan();
+                        }}
+                        columns={allColumns}
+                    />
+                </div>
+            </div>
+        {:else if activeTab === "query"}
+            <div class="h-full flex flex-col p-4 bg-gray-950">
+                <div
+                    class="space-y-3 mb-4 shrink-0 bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                >
+                    <div class="flex gap-2">
+                        <input
+                            bind:value={tableName}
+                            placeholder="Table name"
+                            class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
+                        />
+                        <input
+                            bind:value={queryIndex}
+                            placeholder="Index Name (optional)"
+                            class="w-48 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
+                        />
+                        <button
+                            onclick={() => runQuery()}
+                            disabled={!tableName ||
+                                !queryKeyCond ||
+                                resultLoading}
+                            class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-6 py-2 rounded text-xs font-bold transition flex items-center gap-2"
                         >
-                            {#each allColumns as col}<td
-                                    class="px-3 py-2 text-gray-300 truncate max-w-[200px]"
-                                    >{typeof row[col] === "object"
-                                        ? JSON.stringify(row[col])
-                                        : (row[col] ?? "")}</td
-                                >{/each}
-                        </tr>
-                    {/each}
-                </tbody>
-            </table>
-        </div>
-        <div class="text-xs text-gray-500 mt-1">
-            {results.length} items loaded
-        </div>
-    {/if}
-    {#if resultLoading}<div class="flex justify-center py-4">
-            <div
-                class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-            ></div>
-        </div>{/if}
-    {#if resultToken && !resultLoading}<button
-            onclick={() => runQuery(true)}
-            class="w-full mt-2 py-2 text-xs font-semibold text-blue-400 bg-gray-900 rounded border border-gray-800 hover:bg-gray-800 transition"
-            >Load More</button
-        >{/if}
-{/if}
+                            {#if resultLoading}<span class="animate-spin"
+                                    >⟳</span
+                                >{/if} Run Query
+                        </button>
+                    </div>
+                    <div class="flex gap-2">
+                        <input
+                            bind:value={queryKeyCond}
+                            placeholder="Key condition e.g. pk = :pk"
+                            class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
+                        />
+                        <input
+                            bind:value={queryFilter}
+                            placeholder="Filter expression (optional)"
+                            class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
+                        />
+                    </div>
+                    <input
+                        bind:value={queryValues}
+                        placeholder="Expression JSON (e.g. &quot;:pk&quot;: &quot;user-123&quot;)"
+                        class="w-full bg-black font-mono text-xs p-2 rounded border border-gray-700 text-green-400 outline-none focus:border-blue-500"
+                    />
+                </div>
+
+                <div
+                    class="flex-1 min-h-0 bg-gray-900 rounded-lg border border-gray-800 flex flex-col shadow-sm overflow-hidden"
+                >
+                    <PaginatedTable
+                        items={results}
+                        loading={resultLoading}
+                        hasNext={!!resultCurrentToken}
+                        hasPrev={resultTokenMap.length > 0}
+                        onNext={() => runQuery(resultCurrentToken)}
+                        onPrev={() => runQuery(popToken(resultTokenMap))}
+                        onRefresh={() => {
+                            resultTokenMap = [];
+                            runQuery();
+                        }}
+                        columns={allColumns}
+                    />
+                </div>
+            </div>
+        {/if}
+    </div>
+</ServiceLayout>

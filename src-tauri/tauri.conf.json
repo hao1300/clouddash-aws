@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "AWS Console",
-        "width": 1280,
-        "height": 860
+        "width": 1400,
+        "height": 900
       }
     ],
     "security": {

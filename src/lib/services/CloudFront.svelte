@@ -10,21 +10,38 @@
         GetMetricDataCommand,
     } from "@aws-sdk/client-cloudwatch";
     import { getAwsCredentials } from "./aws-creds";
+    import ServiceLayout from "$lib/components/ServiceLayout.svelte";
+    import PaginatedTable from "$lib/components/PaginatedTable.svelte";
 
-    let items = $state<any[]>([]);
-    let nextMarker = $state<string | undefined>(undefined);
-    let hasMore = $state(false);
-    let loading = $state(false);
-    let error = $state("");
     let cfClient: CloudFrontClient | null = null;
     let cwClient: CloudWatchClient | null = null;
+    let error = $state("");
+    let loading = $state(false);
 
-    // Detail view
+    // --- Service Layout State ---
+    const tabs = [{ id: "distributions", label: "Distributions" }];
+    let activeTab = $state("distributions");
+
+    // --- Pagination Shared Helpers ---
+    function pushToken(history: string[], currentNextToken?: string) {
+        if (!currentNextToken) return;
+        if (history[history.length - 1] !== currentNextToken)
+            history.push(currentNextToken);
+    }
+    function popToken(history: string[]) {
+        history.pop();
+        return history.length > 0 ? history[history.length - 1] : undefined;
+    }
+
+    // --- Distributions ---
+    let items = $state<any[]>([]);
+    let tokenMap = $state<string[]>([]);
+    let currentToken = $state<string | undefined>(undefined);
+
+    // --- Detail View ---
     let selectedDist = $state<any>(null);
-    let distDetail = $state<any>(null);
-    let detailLoading = $state(false);
 
-    // Metrics
+    // --- Metrics ---
     let metricsData = $state<any>(null);
     let metricsLoading = $state(false);
     let metricPeriod = $state(3600); // 1 hour
@@ -50,19 +67,17 @@
         }
     });
 
-    async function load(append = false) {
+    // --- Distributions API ---
+    async function load(token?: string) {
         if (!cfClient) return;
         try {
             loading = true;
             error = "";
             const resp = await cfClient.send(
-                new ListDistributionsCommand({
-                    MaxItems: 50,
-                    Marker: append ? nextMarker : undefined,
-                }),
+                new ListDistributionsCommand({ MaxItems: 50, Marker: token }),
             );
             const list = resp.DistributionList;
-            const newItems = (list?.Items ?? []).map((d) => ({
+            items = (list?.Items ?? []).map((d) => ({
                 id: d.Id ?? "",
                 domain: d.DomainName ?? "",
                 status: d.Status ?? "",
@@ -73,9 +88,8 @@
                 httpVersion: d.HttpVersion ?? "",
                 origins: d.Origins?.Items?.map((o) => o.DomainName ?? "") ?? [],
             }));
-            items = append ? [...items, ...newItems] : newItems;
-            hasMore = list?.IsTruncated ?? false;
-            nextMarker = list?.NextMarker;
+            pushToken(tokenMap, list?.NextMarker);
+            currentToken = list?.NextMarker;
         } catch (e) {
             error = String(e);
         } finally {
@@ -89,6 +103,7 @@
         await loadMetrics(dist.id);
     }
 
+    // --- Metrics API ---
     async function loadMetrics(distId: string) {
         if (!cwClient) return;
         try {
@@ -104,7 +119,7 @@
                 "4xxErrorRate",
                 "5xxErrorRate",
             ];
-            const queries = metrics.map((m, i) => ({
+            const queries = metrics.map((m) => ({
                 Id: m.toLowerCase().replace(/[^a-z0-9]/g, ""),
                 MetricStat: {
                     Metric: {
@@ -142,7 +157,7 @@
             }
             metricsData = result;
         } catch (e) {
-            /* metrics may not be available for all dists */ metricsData = {};
+            metricsData = {};
         } finally {
             metricsLoading = false;
         }
@@ -162,193 +177,268 @@
         const i = Math.floor(Math.log(b) / Math.log(k));
         return parseFloat((b / Math.pow(k, i)).toFixed(1)) + " " + s[i];
     }
+
+    const columns = [
+        {
+            key: "id",
+            label: "ID",
+            onClick: (item: any) => viewDistribution(item),
+        },
+        { key: "domain", label: "Domain Name" },
+        {
+            key: "enabled",
+            label: "State",
+            format: (v: boolean) => (v ? "🟢 Enabled" : "🔴 Disabled"),
+        },
+        { key: "status", label: "Status" },
+        { key: "comment", label: "Comment", format: (v: string) => v || "-" },
+    ];
 </script>
 
-{#if error}<div class="bg-red-500/20 text-red-300 p-2 rounded text-xs mb-2">
-        {error}
-    </div>{/if}
-
-{#if selectedDist}
-    <!-- Distribution Detail -->
-    <div class="flex items-center gap-2 mb-3">
-        <button
-            onclick={() => {
-                selectedDist = null;
-                metricsData = null;
-            }}
-            class="text-xs text-blue-400 hover:underline"
-            >← Distributions</button
+<ServiceLayout title="CloudFront" {tabs} bind:activeTab>
+    {#if error}<div
+            class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30 shadow"
         >
-        <span class="font-mono text-sm text-gray-300">{selectedDist.id}</span>
-    </div>
-
-    <!-- Info Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
-        <div class="bg-gray-900 p-2.5 rounded-lg border border-gray-800">
-            <div class="text-xs text-gray-500 mb-1">Domain</div>
-            <div class="text-sm text-gray-200 font-mono truncate">
-                {selectedDist.domain}
-            </div>
-        </div>
-        <div class="bg-gray-900 p-2.5 rounded-lg border border-gray-800">
-            <div class="text-xs text-gray-500 mb-1">Status</div>
-            <div
-                class="text-sm {selectedDist.enabled
-                    ? 'text-green-400'
-                    : 'text-red-400'}"
-            >
-                {selectedDist.status} ({selectedDist.enabled
-                    ? "Enabled"
-                    : "Disabled"})
-            </div>
-        </div>
-        <div class="bg-gray-900 p-2.5 rounded-lg border border-gray-800">
-            <div class="text-xs text-gray-500 mb-1">Price Class</div>
-            <div class="text-sm text-gray-200">{selectedDist.priceClass}</div>
-        </div>
-        <div class="bg-gray-900 p-2.5 rounded-lg border border-gray-800">
-            <div class="text-xs text-gray-500 mb-1">HTTP Version</div>
-            <div class="text-sm text-gray-200">{selectedDist.httpVersion}</div>
-        </div>
-    </div>
-
-    <!-- Aliases -->
-    {#if selectedDist.aliases.length > 0}
-        <div class="bg-gray-900 p-3 rounded-lg border border-gray-800 mb-3">
-            <div class="text-xs text-gray-500 mb-2">
-                Alternate Domain Names (CNAMEs)
-            </div>
-            <div class="flex flex-wrap gap-2">
-                {#each selectedDist.aliases as alias}
-                    <span
-                        class="bg-blue-900/30 text-blue-300 px-2 py-0.5 rounded text-xs font-mono"
-                        >{alias}</span
-                    >
-                {/each}
-            </div>
-        </div>
-    {/if}
-
-    <!-- Origins -->
-    {#if selectedDist.origins.length > 0}
-        <div class="bg-gray-900 p-3 rounded-lg border border-gray-800 mb-3">
-            <div class="text-xs text-gray-500 mb-2">Origins</div>
-            {#each selectedDist.origins as origin}
-                <div class="text-xs text-gray-300 font-mono">{origin}</div>
-            {/each}
-        </div>
-    {/if}
-
-    <!-- Metrics -->
-    <div class="flex items-center gap-2 mb-2">
-        <span class="text-xs text-gray-500">Metrics</span>
-        <select
-            bind:value={metricPeriod}
-            onchange={() => loadMetrics(selectedDist.id)}
-            class="bg-gray-900 text-xs p-1 rounded border border-gray-700 text-gray-300"
-        >
-            <option value={3600}>1 hour</option>
-            <option value={14400}>4 hours</option>
-            <option value={86400}>24 hours</option>
-            <option value={604800}>7 days</option>
-        </select>
-    </div>
-    {#if metricsLoading}
-        <div class="flex justify-center py-4">
-            <div
-                class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-            ></div>
-        </div>
-    {:else if metricsData}
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-            <div
-                class="bg-gray-900 p-3 rounded-lg border border-gray-800 text-center"
-            >
-                <div class="text-xs text-gray-500">Requests</div>
-                <div class="text-xl font-bold text-blue-400">
-                    {formatNum(metricsData.requests?.total ?? 0)}
-                </div>
-            </div>
-            <div
-                class="bg-gray-900 p-3 rounded-lg border border-gray-800 text-center"
-            >
-                <div class="text-xs text-gray-500">Bytes Downloaded</div>
-                <div class="text-xl font-bold text-green-400">
-                    {formatBytes(metricsData.bytesdownloaded?.total ?? 0)}
-                </div>
-            </div>
-            <div
-                class="bg-gray-900 p-3 rounded-lg border border-gray-800 text-center"
-            >
-                <div class="text-xs text-gray-500">4xx Error Rate</div>
-                <div class="text-xl font-bold text-yellow-400">
-                    {(metricsData["4xxerrorrate"]?.avg ?? 0).toFixed(2)}%
-                </div>
-            </div>
-            <div
-                class="bg-gray-900 p-3 rounded-lg border border-gray-800 text-center"
-            >
-                <div class="text-xs text-gray-500">5xx Error Rate</div>
-                <div class="text-xl font-bold text-red-400">
-                    {(metricsData["5xxerrorrate"]?.avg ?? 0).toFixed(2)}%
-                </div>
-            </div>
-        </div>
-    {/if}
-{:else}
-    <!-- Distribution List -->
-    <div class="grid grid-cols-1 gap-3">
-        {#each items as d}
-            <button
-                onclick={() => viewDistribution(d)}
-                class="bg-gray-900 p-3 rounded-lg border border-gray-800 text-left hover:border-blue-500/30 transition w-full"
-            >
-                <div class="flex justify-between items-center mb-2">
-                    <div class="flex items-center gap-2">
-                        <span
-                            class="font-mono text-xs text-blue-300 bg-blue-900/30 px-1.5 py-0.5 rounded"
-                            >{d.id}</span
-                        >
-                        <span
-                            class="w-2 h-2 rounded-full {d.enabled
-                                ? 'bg-green-500'
-                                : 'bg-red-500'}"
-                        ></span>
-                    </div>
-                    <span class="text-xs text-gray-500">{d.status}</span>
-                </div>
-                <div class="text-xs text-gray-300 font-mono mb-1">
-                    {d.domain}
-                </div>
-                {#if d.aliases.length > 0}
-                    <div class="flex flex-wrap gap-1 mt-1">
-                        {#each d.aliases as alias}
-                            <span
-                                class="bg-blue-900/20 text-blue-400 px-1.5 py-0.5 rounded text-xs"
-                                >{alias}</span
-                            >
-                        {/each}
-                    </div>
-                {/if}
-                {#if d.comment}<div class="text-xs text-gray-600 mt-1 truncate">
-                        {d.comment}
-                    </div>{/if}
-            </button>
-        {/each}
-        {#if !loading && items.length === 0}<div
-                class="text-gray-600 text-center py-16 text-sm"
-            >
-                No CloudFront distributions found.
-            </div>{/if}
-    </div>
-    {#if loading}<div class="flex justify-center py-4">
-            <div
-                class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-            ></div>
+            {error}
         </div>{/if}
-    {#if hasMore && !loading}<button
-            onclick={() => load(true)}
-            class="w-full mt-2 py-2 text-xs font-semibold text-blue-400 bg-gray-900 rounded border border-gray-800 hover:bg-gray-800 transition"
-            >Load More</button
-        >{/if}
-{/if}
+
+    <div class="h-full {error ? 'pt-8' : ''}">
+        {#if selectedDist}
+            <!-- Distribution Detail -->
+            <div class="h-full flex flex-col p-4 bg-gray-950 overflow-auto">
+                <div
+                    class="flex items-center gap-3 mb-6 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm shrink-0"
+                >
+                    <button
+                        onclick={() => {
+                            selectedDist = null;
+                            metricsData = null;
+                        }}
+                        class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
+                        >← Back to Distributions</button
+                    >
+                    <span
+                        class="text-sm font-bold text-gray-200 truncate flex-1"
+                        >{selectedDist.id}
+                        <span class="text-gray-500 font-normal ml-2"
+                            >{selectedDist.domain}</span
+                        ></span
+                    >
+                </div>
+
+                <!-- Info Cards -->
+                <div
+                    class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 shrink-0"
+                >
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            Status
+                        </div>
+                        <div
+                            class="text-base font-bold {selectedDist.enabled
+                                ? 'text-green-400'
+                                : 'text-red-400'}"
+                        >
+                            {selectedDist.status} ({selectedDist.enabled
+                                ? "Enabled"
+                                : "Disabled"})
+                        </div>
+                    </div>
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            Price Class
+                        </div>
+                        <div class="text-base font-bold text-gray-200">
+                            {selectedDist.priceClass}
+                        </div>
+                    </div>
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            HTTP Version
+                        </div>
+                        <div class="text-base font-bold text-gray-200">
+                            {selectedDist.httpVersion}
+                        </div>
+                    </div>
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            Origins Count
+                        </div>
+                        <div class="text-base font-bold text-gray-200">
+                            {selectedDist.origins.length}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aliases & Origins -->
+                <div
+                    class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 shrink-0"
+                >
+                    {#if selectedDist.aliases.length > 0}
+                        <div
+                            class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                        >
+                            <h3
+                                class="text-xs text-gray-400 uppercase tracking-widest font-bold mb-3 border-b border-gray-800 pb-2"
+                            >
+                                Alternate Domain Names (CNAMEs)
+                            </h3>
+                            <div class="flex flex-wrap gap-2">
+                                {#each selectedDist.aliases as alias}
+                                    <span
+                                        class="bg-blue-900/30 text-blue-300 px-2.5 py-1 rounded text-xs font-mono border border-blue-800/50"
+                                        >{alias}</span
+                                    >
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+
+                    {#if selectedDist.origins.length > 0}
+                        <div
+                            class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                        >
+                            <h3
+                                class="text-xs text-gray-400 uppercase tracking-widest font-bold mb-3 border-b border-gray-800 pb-2"
+                            >
+                                Origins
+                            </h3>
+                            <div class="space-y-1">
+                                {#each selectedDist.origins as origin}
+                                    <div
+                                        class="text-xs text-gray-300 font-mono flex items-center gap-2"
+                                    >
+                                        <span class="text-gray-600">↳</span>
+                                        {origin}
+                                    </div>
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+                </div>
+
+                <!-- Metrics -->
+                <div
+                    class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm shrink-0 mb-4"
+                >
+                    <div
+                        class="flex items-center justify-between mb-4 border-b border-gray-800 pb-3"
+                    >
+                        <h3
+                            class="text-xs text-gray-400 uppercase tracking-widest font-bold"
+                        >
+                            Metrics Dashboard
+                        </h3>
+                        <select
+                            bind:value={metricPeriod}
+                            onchange={() => loadMetrics(selectedDist.id)}
+                            class="bg-gray-950 text-xs px-3 py-1.5 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 shadow-inner"
+                        >
+                            <option value={3600}>Last 1 hour</option>
+                            <option value={14400}>Last 4 hours</option>
+                            <option value={86400}>Last 24 hours</option>
+                            <option value={604800}>Last 7 days</option>
+                        </select>
+                    </div>
+
+                    {#if metricsLoading}
+                        <div class="flex justify-center py-8 text-gray-500">
+                            <span class="animate-spin text-2xl mr-3">⟳</span> Fetching
+                            metrics...
+                        </div>
+                    {:else if metricsData}
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div
+                                class="bg-gray-950 p-4 rounded border border-gray-800/50 text-center"
+                            >
+                                <div
+                                    class="text-xs text-gray-500 uppercase font-semibold mb-1 tracking-wider"
+                                >
+                                    Requests
+                                </div>
+                                <div class="text-2xl font-bold text-blue-400">
+                                    {formatNum(
+                                        metricsData.requests?.total ?? 0,
+                                    )}
+                                </div>
+                            </div>
+                            <div
+                                class="bg-gray-950 p-4 rounded border border-gray-800/50 text-center"
+                            >
+                                <div
+                                    class="text-xs text-gray-500 uppercase font-semibold mb-1 tracking-wider"
+                                >
+                                    Bytes Downloaded
+                                </div>
+                                <div class="text-2xl font-bold text-green-400">
+                                    {formatBytes(
+                                        metricsData.bytesdownloaded?.total ?? 0,
+                                    )}
+                                </div>
+                            </div>
+                            <div
+                                class="bg-gray-950 p-4 rounded border border-gray-800/50 text-center"
+                            >
+                                <div
+                                    class="text-xs text-gray-500 uppercase font-semibold mb-1 tracking-wider"
+                                >
+                                    4xx Error Rate
+                                </div>
+                                <div class="text-2xl font-bold text-yellow-500">
+                                    {(
+                                        metricsData["4xxerrorrate"]?.avg ?? 0
+                                    ).toFixed(2)}%
+                                </div>
+                            </div>
+                            <div
+                                class="bg-gray-950 p-4 rounded border border-gray-800/50 text-center"
+                            >
+                                <div
+                                    class="text-xs text-gray-500 uppercase font-semibold mb-1 tracking-wider"
+                                >
+                                    5xx Error Rate
+                                </div>
+                                <div class="text-2xl font-bold text-red-500">
+                                    {(
+                                        metricsData["5xxerrorrate"]?.avg ?? 0
+                                    ).toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+                    {/if}
+                </div>
+            </div>
+        {:else}
+            <!-- Distribution List -->
+            <PaginatedTable
+                {items}
+                {loading}
+                hasNext={!!currentToken}
+                hasPrev={tokenMap.length > 0}
+                onNext={() => load(currentToken)}
+                onPrev={() => load(popToken(tokenMap))}
+                onRefresh={() => {
+                    tokenMap = [];
+                    load();
+                }}
+                {columns}
+            />
+        {/if}
+    </div>
+</ServiceLayout>

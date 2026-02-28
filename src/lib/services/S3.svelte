@@ -1,27 +1,49 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
+    import ServiceLayout from "$lib/components/ServiceLayout.svelte";
+    import PaginatedTable from "$lib/components/PaginatedTable.svelte";
 
-    let buckets = $state<any[]>([]);
-    let loading = $state(false);
+    // --- Service Layout State ---
+    const tabs = [{ id: "buckets", label: "Buckets" }];
+    let activeTab = $state("buckets");
+
+    // --- Shared State ---
     let error = $state("");
+    let loading = $state(false);
 
-    // Object browsing
+    // --- Buckets ---
+    let buckets = $state<any[]>([]);
+
+    // --- Object Browsing ---
     let selectedBucket = $state("");
-    let objects = $state<any[]>([]);
-    let commonPrefixes = $state<string[]>([]);
-    let objNextToken = $state<string | null>(null);
     let objLoading = $state(false);
+    let objects = $state<any[]>([]);
     let prefix = $state("");
     let prefixHistory = $state<string[]>([]);
 
-    // File preview
+    // Pagination for current prefix
+    let objTokenMap = $state<string[]>([]);
+    let objCurrentToken = $state<string | undefined>(undefined);
+
+    // --- File Preview ---
     let previewKey = $state("");
     let previewContent = $state("");
     let previewLoading = $state(false);
-    let previewType = $state(""); // "text" | "binary"
+    let previewType = $state("");
 
     onMount(() => loadBuckets());
+
+    // --- Pagination Shared Helpers ---
+    function pushToken(history: string[], currentNextToken?: string) {
+        if (!currentNextToken) return;
+        if (history[history.length - 1] !== currentNextToken)
+            history.push(currentNextToken);
+    }
+    function popToken(history: string[]) {
+        history.pop();
+        return history.length > 0 ? history[history.length - 1] : undefined;
+    }
 
     async function loadBuckets() {
         try {
@@ -31,7 +53,7 @@
                 action: "list_buckets",
                 params: {},
             });
-            buckets = resp.items;
+            buckets = resp.items || [];
         } catch (e) {
             error = String(e);
         } finally {
@@ -39,38 +61,34 @@
         }
     }
 
-    function navigateToPrefix(newPrefix: string) {
-        prefixHistory = [...prefixHistory, prefix];
-        prefix = newPrefix;
-        objects = [];
-        commonPrefixes = [];
-        objNextToken = null;
-        loadObjects();
-    }
-
-    function goBack() {
-        if (prefixHistory.length > 0) {
-            prefix = prefixHistory.pop()!;
-            prefixHistory = [...prefixHistory];
-            objects = [];
-            commonPrefixes = [];
-            objNextToken = null;
-            loadObjects();
-        }
-    }
-
     async function browseBucket(name: string) {
         selectedBucket = name;
         prefix = "";
         prefixHistory = [];
-        objects = [];
-        commonPrefixes = [];
-        objNextToken = null;
+        objTokenMap = [];
         previewKey = "";
         await loadObjects();
     }
 
-    async function loadObjects(append = false) {
+    function navigateToPrefix(newPrefix: string) {
+        prefixHistory = [...prefixHistory, prefix];
+        prefix = newPrefix;
+        objTokenMap = [];
+        loadObjects();
+    }
+
+    function goBackPrefix() {
+        if (prefixHistory.length > 0) {
+            prefix = prefixHistory.pop()!;
+            prefixHistory = [...prefixHistory];
+            objTokenMap = [];
+            loadObjects();
+        } else {
+            selectedBucket = "";
+        }
+    }
+
+    async function loadObjects(token?: string) {
         try {
             objLoading = true;
             error = "";
@@ -78,18 +96,38 @@
                 action: "list_objects",
                 params: {
                     bucket: selectedBucket,
-                    prefix: prefix,
+                    prefix,
                     delimiter: "/",
-                    next_token: append ? objNextToken : null,
+                    next_token: token || null,
                 },
             });
-            const newItems = resp.items.map((o: any) => ({
-                ...o,
-                name: o.key.slice(prefix.length),
-            }));
-            objects = append ? [...objects, ...newItems] : newItems;
-            if (!append) commonPrefixes = resp.common_prefixes ?? [];
-            objNextToken = resp.next_token;
+            const newItems: any[] = [];
+            // Add folders (common prefixes) only on the first page
+            if (!token) {
+                const cps = resp.common_prefixes || [];
+                for (const cp of cps) {
+                    newItems.push({
+                        type: "folder",
+                        key: cp,
+                        name: cp.slice(prefix.length),
+                        size: null,
+                        lastModified: null,
+                    });
+                }
+            }
+            // Add files
+            for (const o of resp.items || []) {
+                newItems.push({
+                    type: "file",
+                    key: o.key,
+                    name: o.key.slice(prefix.length),
+                    size: o.size,
+                    lastModified: o.last_modified,
+                });
+            }
+            objects = newItems;
+            pushToken(objTokenMap, resp.next_token);
+            objCurrentToken = resp.next_token;
         } catch (e) {
             error = String(e);
         } finally {
@@ -101,6 +139,7 @@
         previewKey = key;
         previewContent = "";
         previewLoading = true;
+        error = "";
         try {
             const resp: any = await invoke("s3", {
                 action: "get_object",
@@ -109,6 +148,7 @@
             previewType = resp.type;
             previewContent = resp.content;
         } catch (e) {
+            error = String(e);
             previewContent = String(e);
             previewType = "text";
         } finally {
@@ -117,7 +157,6 @@
     }
 
     function downloadFile(key: string) {
-        // Trigger get_object and download
         invoke("s3", {
             action: "get_object",
             params: { bucket: selectedBucket, key },
@@ -147,175 +186,176 @@
             });
     }
 
-    function formatSize(b: number) {
+    function formatSize(b: number | null) {
+        if (b === null || b === undefined) return "-";
         if (b === 0) return "0 B";
         const k = 1024;
         const s = ["B", "KB", "MB", "GB", "TB"];
         const i = Math.floor(Math.log(b) / Math.log(k));
         return parseFloat((b / Math.pow(k, i)).toFixed(1)) + " " + s[i];
     }
+
+    const bucketColumns = [
+        {
+            key: "name",
+            label: "Bucket Name",
+            format: (v: string) => `🪣 ${v}`,
+            onClick: (item: any) => browseBucket(item.name),
+        },
+        {
+            key: "creation_date",
+            label: "Creation Date",
+            format: (v: string) => (v ? new Date(v).toLocaleString() : "-"),
+        },
+    ];
+
+    const objectColumns = [
+        {
+            key: "name",
+            label: "Name",
+            format: (v: string, item: any) =>
+                `${item.type === "folder" ? "📁" : "📄"} ${v}`,
+            onClick: (item: any) =>
+                item.type === "folder"
+                    ? navigateToPrefix(item.key)
+                    : previewFile(item.key),
+        },
+        { key: "size", label: "Size", format: (v: number) => formatSize(v) },
+        {
+            key: "lastModified",
+            label: "Last Modified",
+            format: (v: string) => (v ? new Date(v).toLocaleString() : "-"),
+        },
+    ];
 </script>
 
-{#if error}<div class="bg-red-500/20 text-red-300 p-2 rounded text-xs mb-2">
-        {error}
-    </div>{/if}
+<ServiceLayout title="S3" {tabs} bind:activeTab>
+    {#if error}<div
+            class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30 shadow"
+        >
+            {error}
+        </div>{/if}
 
-{#if previewKey}
-    <!-- File Preview -->
-    <div class="mb-3">
-        <div class="flex items-center gap-2 mb-2">
-            <button
-                onclick={() => {
-                    previewKey = "";
-                }}
-                class="text-xs text-blue-400 hover:underline">← Back</button
-            >
-            <span class="text-sm text-gray-300 font-mono truncate"
-                >{previewKey}</span
-            >
-            <button
-                onclick={() => downloadFile(previewKey)}
-                class="ml-auto bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-xs font-bold"
-                >Download</button
-            >
-        </div>
-        {#if previewLoading}
-            <div class="flex justify-center py-8">
+    <div class="h-full {error ? 'pt-8' : ''}">
+        {#if previewKey}
+            <!-- Preview View -->
+            <div class="h-full flex flex-col p-4 bg-gray-950">
                 <div
-                    class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-                ></div>
-            </div>
-        {:else if previewType === "text"}
-            <pre
-                class="bg-gray-900 p-3 rounded-lg border border-gray-800 text-xs text-gray-300 overflow-auto max-h-[60vh] whitespace-pre-wrap break-all">{previewContent}</pre>
-        {:else}
-            <div
-                class="bg-gray-900 p-6 rounded-lg border border-gray-800 text-center text-gray-500 text-sm"
-            >
-                <p class="mb-3">Binary file — click Download to save.</p>
-                <button
-                    onclick={() => downloadFile(previewKey)}
-                    class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-xs font-bold text-white"
-                    >Download File</button
+                    class="flex items-center gap-3 mb-4 shrink-0 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm"
                 >
-            </div>
-        {/if}
-    </div>
-{:else if selectedBucket}
-    <!-- Object Browser -->
-    <div class="flex items-center gap-2 mb-3">
-        <button
-            onclick={() => {
-                if (prefix && prefixHistory.length > 0) goBack();
-                else {
-                    selectedBucket = "";
-                    objects = [];
-                }
-            }}
-            class="text-xs text-blue-400 hover:underline">←</button
-        >
-        <button
-            onclick={() => {
-                selectedBucket = "";
-                objects = [];
-                prefix = "";
-                prefixHistory = [];
-            }}
-            class="text-xs text-gray-500 hover:text-gray-300">Buckets</button
-        >
-        <span class="text-gray-600">/</span>
-        <span class="text-sm text-gray-400 font-mono truncate"
-            >{selectedBucket}/{prefix}</span
-        >
-    </div>
-    <div
-        class="bg-gray-900 rounded-lg border border-gray-800 divide-y divide-gray-800"
-    >
-        {#if prefix}
-            <button
-                onclick={goBack}
-                class="p-2 flex items-center gap-2 text-xs text-gray-400 hover:bg-gray-800/50 w-full text-left"
-            >
-                <span class="text-blue-400">📁</span> ..
-            </button>
-        {/if}
-        {#each commonPrefixes as cp}
-            <button
-                onclick={() => navigateToPrefix(cp)}
-                class="p-2 flex items-center gap-2 text-xs hover:bg-gray-800/50 transition w-full text-left"
-            >
-                <span class="text-blue-400">📁</span>
-                <span class="text-gray-200 font-mono"
-                    >{cp.slice(prefix.length)}</span
-                >
-            </button>
-        {/each}
-        {#each objects as obj}
-            <div
-                class="p-2 flex items-center gap-2 text-xs hover:bg-gray-800/50 transition group"
-            >
-                <span class="text-gray-500">📄</span>
-                <button
-                    onclick={() => previewFile(obj.key)}
-                    class="text-gray-200 font-mono truncate flex-1 text-left hover:text-blue-400"
-                    >{obj.name}</button
-                >
-                <span class="text-gray-600 shrink-0"
-                    >{formatSize(obj.size)}</span
-                >
-                <button
-                    onclick={() => downloadFile(obj.key)}
-                    class="text-blue-400 hover:text-blue-300 opacity-0 group-hover:opacity-100 transition shrink-0"
-                    title="Download">⬇</button
-                >
-            </div>
-        {/each}
-        {#if !objLoading && objects.length === 0 && commonPrefixes.length === 0}<div
-                class="p-6 text-center text-gray-600 text-sm"
-            >
-                Empty.
-            </div>{/if}
-    </div>
-    {#if objLoading}<div class="flex justify-center py-3">
-            <div
-                class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-            ></div>
-        </div>{/if}
-    {#if objNextToken && !objLoading}<button
-            onclick={() => loadObjects(true)}
-            class="w-full mt-2 py-2 text-xs font-semibold text-blue-400 bg-gray-900 rounded border border-gray-800 hover:bg-gray-800 transition"
-            >Load More</button
-        >{/if}
-{:else}
-    <!-- Bucket List -->
-    <div
-        class="bg-gray-900 rounded-lg border border-gray-800 divide-y divide-gray-800"
-    >
-        {#each buckets as b}
-            <button
-                onclick={() => browseBucket(b.name)}
-                class="p-3 flex justify-between items-center hover:bg-gray-800/50 transition w-full text-left"
-            >
-                <div class="flex items-center gap-2 min-w-0">
-                    <span class="text-blue-400">🪣</span>
-                    <span class="text-sm text-gray-200 truncate">{b.name}</span>
+                    <button
+                        onclick={() => (previewKey = "")}
+                        class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
+                        >← Back to Bucket</button
+                    >
+                    <span
+                        class="text-sm font-mono text-gray-200 truncate flex-1"
+                        >{previewKey}</span
+                    >
+                    <button
+                        onclick={() => downloadFile(previewKey)}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow"
+                        >⬇ Download</button
+                    >
                 </div>
-                <span class="text-xs text-gray-500 shrink-0 ml-2"
-                    >{b.creation_date
-                        ? new Date(b.creation_date).toLocaleDateString()
-                        : ""}</span
+
+                <div
+                    class="flex-1 overflow-auto bg-gray-900 rounded-lg border border-gray-800 text-sm shadow-inner p-4 relative"
                 >
-            </button>
-        {/each}
-        {#if !loading && buckets.length === 0}<div
-                class="p-8 text-center text-gray-600 text-sm"
+                    {#if previewLoading}
+                        <div
+                            class="h-full flex items-center justify-center text-gray-500"
+                        >
+                            <span class="animate-spin text-2xl mr-3">⟳</span> Loading
+                            preview...
+                        </div>
+                    {:else if previewType === "text"}
+                        <pre
+                            class="text-gray-300 whitespace-pre-wrap break-all font-mono text-xs">{previewContent}</pre>
+                    {:else}
+                        <div
+                            class="h-full flex flex-col items-center justify-center text-gray-500 space-y-4"
+                        >
+                            <span class="text-4xl">📦</span>
+                            <p>Binary file preview not supported.</p>
+                            <button
+                                onclick={() => downloadFile(previewKey)}
+                                class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold shadow transition"
+                                >Download File</button
+                            >
+                        </div>
+                    {/if}
+                </div>
+            </div>
+        {:else if selectedBucket}
+            <!-- Object Browser View -->
+            <div class="h-full flex flex-col bg-gray-950 overflow-hidden">
+                <div
+                    class="flex items-center gap-2 p-3 bg-gray-900 border-b border-gray-800 shrink-0"
+                >
+                    <button
+                        onclick={goBackPrefix}
+                        class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
+                        title="Go Up/Back">← Back</button
+                    >
+                    <span class="text-gray-600 ml-1">/</span>
+                    <button
+                        onclick={() => browseBucket(selectedBucket)}
+                        class="text-sm font-bold text-gray-300 hover:text-white transition"
+                        >🪣 {selectedBucket}</button
+                    >
+                    {#if prefix}
+                        <span class="text-gray-600">/</span>
+                        <span class="text-sm font-mono text-blue-300 truncate"
+                            >{prefix}</span
+                        >
+                    {/if}
+                </div>
+
+                <div class="flex-1 min-h-0 bg-gray-950">
+                    <PaginatedTable
+                        items={objects}
+                        loading={objLoading}
+                        hasNext={!!objCurrentToken}
+                        hasPrev={objTokenMap.length > 0}
+                        onNext={() => loadObjects(objCurrentToken)}
+                        onPrev={() => loadObjects(popToken(objTokenMap))}
+                        onRefresh={() => {
+                            objTokenMap = [];
+                            loadObjects();
+                        }}
+                        columns={objectColumns}
+                    >
+                        {#snippet actionsSnippet(item)}
+                            <div class="flex justify-end gap-2">
+                                {#if item.type !== "folder"}
+                                    <button
+                                        onclick={() => downloadFile(item.key)}
+                                        class="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs transition"
+                                        >⬇</button
+                                    >
+                                {/if}
+                            </div>
+                        {/snippet}
+                    </PaginatedTable>
+                </div>
+            </div>
+        {:else}
+            <!-- Bucket List View -->
+            <PaginatedTable
+                items={buckets}
+                {loading}
+                hasNext={false}
+                hasPrev={false}
+                onRefresh={() => loadBuckets()}
+                columns={bucketColumns}
             >
-                No S3 buckets found.
-            </div>{/if}
+                {#snippet headerActionsSnippet()}
+                    <span class="text-xs text-gray-500 italic mr-2"
+                        >List limit 1000</span
+                    >
+                {/snippet}
+            </PaginatedTable>
+        {/if}
     </div>
-    {#if loading}<div class="flex justify-center py-4">
-            <div
-                class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-            ></div>
-        </div>{/if}
-{/if}
+</ServiceLayout>

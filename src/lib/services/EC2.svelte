@@ -9,13 +9,33 @@
         TerminateInstancesCommand,
     } from "@aws-sdk/client-ec2";
     import { getAwsCredentials } from "./aws-creds";
+    import ServiceLayout from "$lib/components/ServiceLayout.svelte";
+    import PaginatedTable from "$lib/components/PaginatedTable.svelte";
 
     let items = $state<any[]>([]);
-    let nextToken = $state<string | undefined>(undefined);
     let loading = $state(false);
     let error = $state("");
     let actionMsg = $state("");
     let client: EC2Client | null = null;
+
+    // --- Service Layout State ---
+    const tabs = [{ id: "instances", label: "Instances" }];
+    let activeTab = $state("instances");
+
+    // --- Pagination Shared Helpers ---
+    function pushToken(history: string[], currentNextToken?: string) {
+        if (!currentNextToken) return;
+        if (history[history.length - 1] !== currentNextToken) {
+            history.push(currentNextToken);
+        }
+    }
+    function popToken(history: string[]) {
+        history.pop();
+        return history.length > 0 ? history[history.length - 1] : undefined;
+    }
+
+    let tokenMap = $state<string[]>([]);
+    let currentToken = $state<string | undefined>(undefined);
 
     onMount(async () => {
         try {
@@ -36,15 +56,16 @@
         }
     });
 
-    async function load(append = false) {
+    async function load(token?: string) {
         if (!client) return;
         try {
             loading = true;
             error = "";
+            actionMsg = "";
             const resp = await client.send(
                 new DescribeInstancesCommand({
                     MaxResults: 50,
-                    NextToken: append ? nextToken : undefined,
+                    NextToken: token,
                 }),
             );
             const newItems: any[] = [];
@@ -63,8 +84,9 @@
                     });
                 }
             }
-            items = append ? [...items, ...newItems] : newItems;
-            nextToken = resp.NextToken;
+            items = newItems;
+            pushToken(tokenMap, resp.NextToken);
+            currentToken = resp.NextToken;
         } catch (e) {
             error = String(e);
         } finally {
@@ -109,129 +131,92 @@
                     new TerminateInstancesCommand({ InstanceIds: [id] }),
                 );
             actionMsg = `${labels[action]} request sent for ${id}`;
-            setTimeout(() => load(), 2000);
+            setTimeout(() => load(currentToken), 2000); // Reload current page
         } catch (e) {
             error = String(e);
         }
     }
 
-    function stateColor(s: string) {
-        if (s === "running") return "bg-green-500";
-        if (s === "stopped") return "bg-red-500";
-        if (s === "terminated") return "bg-gray-600";
-        return "bg-yellow-500";
-    }
-
-    function stateBg(s: string) {
-        if (s === "running") return "bg-green-500/10 border-green-500/30";
-        if (s === "stopped") return "bg-red-500/10 border-red-500/30";
-        if (s === "terminated") return "bg-gray-500/10 border-gray-500/30";
-        return "bg-yellow-500/10 border-yellow-500/30";
-    }
+    const columns = [
+        { key: "name", label: "Name" },
+        { key: "id", label: "Instance ID" },
+        {
+            key: "state",
+            label: "State",
+            format: (v: string) => {
+                if (v === "running") return "🟢 running";
+                if (v === "stopped") return "🔴 stopped";
+                if (v === "terminated") return "⚫ terminated";
+                return `🟡 ${v}`;
+            },
+        },
+        { key: "instance_type", label: "Instance Type" },
+        { key: "public_ip", label: "Public IP" },
+        { key: "private_ip", label: "Private IP" },
+        { key: "az", label: "Availability Zone" },
+    ];
 </script>
 
-{#if error}<div class="bg-red-500/20 text-red-300 p-2 rounded text-xs mb-2">
-        {error}
-    </div>{/if}
-{#if actionMsg}<div
-        class="bg-blue-500/20 text-blue-300 p-2 rounded text-xs mb-2"
-    >
-        {actionMsg}
-    </div>{/if}
-
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-    {#each items as i}
-        <div
-            class="bg-gray-900 p-3 rounded-lg border border-gray-800 {stateBg(
-                i.state,
-            )}"
+<ServiceLayout title="EC2" {tabs} bind:activeTab>
+    {#if error}<div
+            class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
-            <div class="flex justify-between items-center mb-2">
-                <div class="min-w-0">
-                    {#if i.name}<div
-                            class="text-sm font-semibold text-gray-100 truncate"
-                        >
-                            {i.name}
-                        </div>{/if}
-                    <span class="font-mono text-xs text-blue-300">{i.id}</span>
-                </div>
-                <span
-                    class="w-2.5 h-2.5 rounded-full shrink-0 ml-2 {stateColor(
-                        i.state,
-                    )}"
-                ></span>
-            </div>
-            <div class="space-y-1 text-xs mb-3">
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Type</span><span
-                        class="text-gray-300">{i.instance_type}</span
-                    >
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">State</span><span
-                        class="text-gray-300 uppercase">{i.state}</span
-                    >
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Public IP</span><span
-                        class="text-gray-300 font-mono">{i.public_ip}</span
-                    >
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Private IP</span><span
-                        class="text-gray-300 font-mono">{i.private_ip}</span
-                    >
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">AZ</span><span
-                        class="text-gray-300">{i.az}</span
-                    >
-                </div>
-            </div>
-            <!-- Action buttons -->
-            <div class="flex gap-1.5 flex-wrap">
-                {#if i.state === "stopped"}
-                    <button
-                        onclick={() => instanceAction(i.id, "start")}
-                        class="bg-green-600/80 hover:bg-green-500 px-2.5 py-1 rounded text-xs font-semibold transition"
-                        >Start</button
-                    >
-                {/if}
-                {#if i.state === "running"}
-                    <button
-                        onclick={() => instanceAction(i.id, "stop")}
-                        class="bg-yellow-600/80 hover:bg-yellow-500 px-2.5 py-1 rounded text-xs font-semibold transition"
-                        >Stop</button
-                    >
-                    <button
-                        onclick={() => instanceAction(i.id, "reboot")}
-                        class="bg-blue-600/80 hover:bg-blue-500 px-2.5 py-1 rounded text-xs font-semibold transition"
-                        >Reboot</button
-                    >
-                {/if}
-                {#if i.state !== "terminated"}
-                    <button
-                        onclick={() => instanceAction(i.id, "terminate")}
-                        class="bg-red-600/80 hover:bg-red-500 px-2.5 py-1 rounded text-xs font-semibold transition"
-                        >Terminate</button
-                    >
-                {/if}
-            </div>
-        </div>
-    {/each}
-    {#if !loading && items.length === 0}<div
-            class="col-span-full text-gray-600 text-center py-16 text-sm"
-        >
-            No EC2 instances found.
+            {error}
         </div>{/if}
-</div>
-{#if loading}<div class="flex justify-center py-4">
-        <div
-            class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-        ></div>
-    </div>{/if}
-{#if nextToken && !loading}<button
-        onclick={() => load(true)}
-        class="w-full mt-2 py-2 text-xs font-semibold text-blue-400 bg-gray-900 rounded border border-gray-800 hover:bg-gray-800 transition"
-        >Load More</button
-    >{/if}
+    {#if actionMsg}<div
+            class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30"
+        >
+            {actionMsg}
+        </div>{/if}
+
+    <div class="h-full {error || actionMsg ? 'pt-8' : ''}">
+        {#if activeTab === "instances"}
+            <PaginatedTable
+                {items}
+                {loading}
+                hasNext={!!currentToken}
+                hasPrev={tokenMap.length > 0}
+                onNext={() => load(currentToken)}
+                onPrev={() => load(popToken(tokenMap))}
+                onRefresh={() => {
+                    tokenMap = [];
+                    load();
+                }}
+                {columns}
+            >
+                {#snippet actionsSnippet(item)}
+                    <div class="flex gap-1 justify-end">
+                        {#if item.state === "stopped"}
+                            <button
+                                onclick={() => instanceAction(item.id, "start")}
+                                class="text-green-400 hover:text-green-300 bg-green-900/40 hover:bg-green-800/60 px-2 py-1 rounded text-xs transition"
+                                >Start</button
+                            >
+                        {/if}
+                        {#if item.state === "running"}
+                            <button
+                                onclick={() => instanceAction(item.id, "stop")}
+                                class="text-yellow-400 hover:text-yellow-300 bg-yellow-900/40 hover:bg-yellow-800/60 px-2 py-1 rounded text-xs transition"
+                                >Stop</button
+                            >
+                            <button
+                                onclick={() =>
+                                    instanceAction(item.id, "reboot")}
+                                class="text-blue-400 hover:text-blue-300 bg-blue-900/40 hover:bg-blue-800/60 px-2 py-1 rounded text-xs transition drop-shadow"
+                                >Reboot</button
+                            >
+                        {/if}
+                        {#if item.state !== "terminated"}
+                            <button
+                                onclick={() =>
+                                    instanceAction(item.id, "terminate")}
+                                class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
+                                >Terminate</button
+                            >
+                        {/if}
+                    </div>
+                {/snippet}
+            </PaginatedTable>
+        {/if}
+    </div>
+</ServiceLayout>
