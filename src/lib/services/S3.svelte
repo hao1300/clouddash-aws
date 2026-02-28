@@ -1,6 +1,14 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { invoke } from "@tauri-apps/api/core";
+    import {
+        S3Client,
+        ListBucketsCommand,
+        ListObjectsV2Command,
+        GetObjectCommand,
+        GetBucketLocationCommand,
+    } from "@aws-sdk/client-s3";
+    import { fetch } from "@tauri-apps/plugin-http";
+    import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
 
@@ -11,6 +19,7 @@
     // --- Shared State ---
     let error = $state("");
     let loading = $state(false);
+    let s3Client: S3Client | null = null;
 
     // --- Buckets ---
     let buckets = $state<any[]>([]);
@@ -32,7 +41,104 @@
     let previewLoading = $state(false);
     let previewType = $state("");
 
-    onMount(() => loadBuckets());
+    function makeS3Client(region: string, creds: any): S3Client {
+        return new S3Client({
+            region,
+            credentials: {
+                accessKeyId: creds.access_key_id,
+                secretAccessKey: creds.secret_access_key,
+                ...(creds.session_token
+                    ? { sessionToken: creds.session_token }
+                    : {}),
+            },
+            requestHandler: {
+                handle: async (request: any) => {
+                    const proto =
+                        request.protocol?.replace(/:$/, "") || "https";
+                    let url = request.hostname
+                        ? `${proto}://${request.hostname}${request.port ? ":" + request.port : ""}${request.path}`
+                        : request.path;
+
+                    // Append query parameters from Smithy request
+                    if (
+                        request.query &&
+                        Object.keys(request.query).length > 0
+                    ) {
+                        const qs = Object.entries(request.query)
+                            .map(([k, v]) => {
+                                if (Array.isArray(v)) {
+                                    return v
+                                        .map(
+                                            (vi) =>
+                                                `${encodeURIComponent(k)}=${encodeURIComponent(String(vi))}`,
+                                        )
+                                        .join("&");
+                                }
+                                return `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`;
+                            })
+                            .join("&");
+                        url += (url.includes("?") ? "&" : "?") + qs;
+                    }
+
+                    const headers: Record<string, string> = {};
+                    if (request.headers) {
+                        for (const [key, value] of Object.entries(
+                            request.headers,
+                        )) {
+                            headers[key] = String(value);
+                        }
+                    }
+
+                    // Don't send body for GET/HEAD - it breaks SigV4
+                    const hasBody =
+                        request.method !== "GET" &&
+                        request.method !== "HEAD" &&
+                        request.body != null;
+
+                    const resp = await fetch(url, {
+                        method: request.method,
+                        headers,
+                        body: hasBody ? request.body : undefined,
+                    });
+
+                    const respHeaders: Record<string, string> = {};
+                    resp.headers.forEach((value: string, key: string) => {
+                        respHeaders[key] = value;
+                    });
+
+                    const bodyBytes = new Uint8Array(await resp.arrayBuffer());
+
+                    // Create a ReadableStream so Smithy's transformToByteArray() works
+                    const bodyStream = new ReadableStream({
+                        start(controller) {
+                            controller.enqueue(bodyBytes);
+                            controller.close();
+                        },
+                    });
+
+                    return {
+                        response: new (
+                            await import("@smithy/protocol-http")
+                        ).HttpResponse({
+                            statusCode: resp.status,
+                            headers: respHeaders,
+                            body: bodyStream,
+                        }),
+                    };
+                },
+            } as any,
+        });
+    }
+
+    onMount(async () => {
+        try {
+            const creds = await getAwsCredentials();
+            s3Client = makeS3Client(creds.region || "us-east-1", creds);
+            await loadBuckets();
+        } catch (e) {
+            error = String(e);
+        }
+    });
 
     // --- Pagination Shared Helpers ---
     function pushToken(history: string[], currentNextToken?: string) {
@@ -45,15 +151,34 @@
         return history.length > 0 ? history[history.length - 1] : undefined;
     }
 
+    async function clientForBucket(bucket: string): Promise<S3Client> {
+        if (!s3Client) throw new Error("S3 not initialized");
+        try {
+            const loc = await s3Client.send(
+                new GetBucketLocationCommand({ Bucket: bucket }),
+            );
+            let region = loc.LocationConstraint || "us-east-1";
+            if (!region) region = "us-east-1";
+
+            const creds = await getAwsCredentials();
+            return makeS3Client(region, creds);
+        } catch {
+            return s3Client;
+        }
+    }
+
     async function loadBuckets() {
+        if (!s3Client) return;
         try {
             loading = true;
             error = "";
-            const resp: any = await invoke("s3", {
-                action: "list_buckets",
-                params: {},
-            });
-            buckets = resp.items || [];
+            const resp = await s3Client.send(new ListBucketsCommand({}));
+            buckets = (resp.Buckets || []).map((b) => ({
+                name: b.Name || "Unknown",
+                creation_date: b.CreationDate
+                    ? b.CreationDate.toISOString()
+                    : null,
+            }));
         } catch (e) {
             error = String(e);
         } finally {
@@ -92,42 +217,49 @@
         try {
             objLoading = true;
             error = "";
-            const resp: any = await invoke("s3", {
-                action: "list_objects",
-                params: {
-                    bucket: selectedBucket,
-                    prefix,
-                    delimiter: "/",
-                    next_token: token || null,
-                },
-            });
+
+            const bc = await clientForBucket(selectedBucket);
+            const resp = await bc.send(
+                new ListObjectsV2Command({
+                    Bucket: selectedBucket,
+                    Prefix: prefix || undefined,
+                    Delimiter: "/",
+                    MaxKeys: 100,
+                    ContinuationToken: token || undefined,
+                }),
+            );
+
             const newItems: any[] = [];
             // Add folders (common prefixes) only on the first page
             if (!token) {
-                const cps = resp.common_prefixes || [];
+                const cps = resp.CommonPrefixes || [];
                 for (const cp of cps) {
                     newItems.push({
                         type: "folder",
-                        key: cp,
-                        name: cp.slice(prefix.length),
+                        key: cp.Prefix || "",
+                        name: (cp.Prefix || "").slice(prefix.length),
                         size: null,
                         lastModified: null,
                     });
                 }
             }
             // Add files
-            for (const o of resp.items || []) {
+            for (const o of resp.Contents || []) {
+                const key = o.Key || "";
+                if (!key || key === prefix) continue;
                 newItems.push({
                     type: "file",
-                    key: o.key,
-                    name: o.key.slice(prefix.length),
-                    size: o.size,
-                    lastModified: o.last_modified,
+                    key,
+                    name: key.slice(prefix.length),
+                    size: o.Size ?? 0,
+                    lastModified: o.LastModified
+                        ? o.LastModified.toISOString()
+                        : null,
                 });
             }
             objects = newItems;
-            pushToken(objTokenMap, resp.next_token);
-            objCurrentToken = resp.next_token;
+            pushToken(objTokenMap, resp.NextContinuationToken || undefined);
+            objCurrentToken = resp.NextContinuationToken || undefined;
         } catch (e) {
             error = String(e);
         } finally {
@@ -141,12 +273,38 @@
         previewLoading = true;
         error = "";
         try {
-            const resp: any = await invoke("s3", {
-                action: "get_object",
-                params: { bucket: selectedBucket, key },
-            });
-            previewType = resp.type;
-            previewContent = resp.content;
+            const bc = await clientForBucket(selectedBucket);
+            const resp = await bc.send(
+                new GetObjectCommand({
+                    Bucket: selectedBucket,
+                    Key: key,
+                }),
+            );
+            const contentType = resp.ContentType || "application/octet-stream";
+            const body = resp.Body;
+
+            if (!body) {
+                previewContent = "(empty)";
+                previewType = "text";
+                return;
+            }
+
+            const bytes = await body.transformToByteArray();
+            const isText =
+                contentType.startsWith("text/") ||
+                contentType.includes("json") ||
+                contentType.includes("xml") ||
+                contentType.includes("yaml") ||
+                contentType.includes("javascript") ||
+                contentType.includes("csv");
+
+            if (isText) {
+                previewType = "text";
+                previewContent = new TextDecoder().decode(bytes);
+            } else {
+                previewType = "binary";
+                previewContent = "";
+            }
         } catch (e) {
             error = String(e);
             previewContent = String(e);
@@ -156,34 +314,30 @@
         }
     }
 
-    function downloadFile(key: string) {
-        invoke("s3", {
-            action: "get_object",
-            params: { bucket: selectedBucket, key },
-        })
-            .then((resp: any) => {
-                let blob: Blob;
-                if (resp.type === "binary") {
-                    const binary = atob(resp.content);
-                    const bytes = new Uint8Array(binary.length);
-                    for (let i = 0; i < binary.length; i++)
-                        bytes[i] = binary.charCodeAt(i);
-                    blob = new Blob([bytes], { type: resp.content_type });
-                } else {
-                    blob = new Blob([resp.content], {
-                        type: resp.content_type || "text/plain",
-                    });
-                }
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = key.split("/").pop() ?? key;
-                a.click();
-                URL.revokeObjectURL(url);
-            })
-            .catch((e) => {
-                error = String(e);
-            });
+    async function downloadFile(key: string) {
+        try {
+            const bc = await clientForBucket(selectedBucket);
+            const resp = await bc.send(
+                new GetObjectCommand({
+                    Bucket: selectedBucket,
+                    Key: key,
+                }),
+            );
+            const contentType = resp.ContentType || "application/octet-stream";
+            const body = resp.Body;
+            if (!body) return;
+
+            const bytes = await body.transformToByteArray();
+            const blob = new Blob([bytes], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = key.split("/").pop() ?? key;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            error = String(e);
+        }
     }
 
     function formatSize(b: number | null) {

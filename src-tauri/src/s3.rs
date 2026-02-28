@@ -24,17 +24,28 @@ async fn client_for_bucket(base: &Client, sdk: &aws_config::SdkConfig, bucket: &
 /// S3 gateway — proxied through Rust because S3 endpoints don't support browser CORS.
 #[tauri::command]
 pub async fn s3(action: String, params: Value, config: tauri::State<'_, SharedConfig>) -> Result<Value, String> {
-    let guard = config.0.read().await;
+    let guard_fut = config.0.read();
+    let guard = tokio::time::timeout(std::time::Duration::from_secs(5), guard_fut)
+        .await
+        .map_err(|_| "S3 Backend deadlock: Timed out waiting for AWS Config lock.".to_string())?;
+        
     let sdk = guard.as_ref().ok_or("Not authenticated")?;
     let client = Client::new(sdk);
 
     match action.as_str() {
         "list_buckets" => {
-            let resp = client.list_buckets().send().await.map_err(|e| format!("ListBuckets: {e}"))?;
+            let fut = client.list_buckets().send();
+            let resp = tokio::time::timeout(std::time::Duration::from_secs(15), fut)
+                .await
+                .map_err(|_| "S3 list_buckets timed out after 15 seconds. Is network accessible?".to_string())?
+                .map_err(|e| format!("ListBuckets: {e}"))?;
+                
             let items: Vec<Value> = resp.buckets().iter().map(|b| json!({
                 "name": b.name().unwrap_or("Unknown"),
                 "creation_date": b.creation_date().map(|d| d.to_string()),
             })).collect();
+            
+            println!("S3: Successfully fetched {} buckets. Sending to WebView.", items.len());
             Ok(json!({ "items": items }))
         }
 
@@ -44,14 +55,20 @@ pub async fn s3(action: String, params: Value, config: tauri::State<'_, SharedCo
             let delimiter = params.get("delimiter").and_then(|v| v.as_str());
             let token = params.get("next_token").and_then(|v| v.as_str());
 
-            let bc = client_for_bucket(&client, sdk, bucket).await?;
+            let bc = tokio::time::timeout(std::time::Duration::from_secs(5), client_for_bucket(&client, sdk, bucket))
+                .await
+                .map_err(|_| "S3 region lookup timed out".to_string())??;
 
             let mut req = bc.list_objects_v2().bucket(bucket).max_keys(100);
             if !prefix.is_empty() { req = req.prefix(prefix); }
             if let Some(d) = delimiter { if !d.is_empty() { req = req.delimiter(d); } }
             if let Some(t) = token { req = req.continuation_token(t); }
 
-            let resp = req.send().await.map_err(|e| format!("ListObjectsV2: {e}"))?;
+            let fut = req.send();
+            let resp = tokio::time::timeout(std::time::Duration::from_secs(15), fut)
+                .await
+                .map_err(|_| "S3 list_objects timed out after 15 seconds.".to_string())?
+                .map_err(|e| format!("ListObjectsV2: {e}"))?;
 
             let items: Vec<Value> = resp.contents().iter()
                 .filter(|o| { let k = o.key().unwrap_or(""); !k.is_empty() && k != prefix })
@@ -72,9 +89,15 @@ pub async fn s3(action: String, params: Value, config: tauri::State<'_, SharedCo
             let bucket = params.get("bucket").and_then(|v| v.as_str()).ok_or("bucket required")?;
             let key = params.get("key").and_then(|v| v.as_str()).ok_or("key required")?;
 
-            let bc = client_for_bucket(&client, sdk, bucket).await?;
+            let bc = tokio::time::timeout(std::time::Duration::from_secs(5), client_for_bucket(&client, sdk, bucket))
+                .await
+                .map_err(|_| "S3 region lookup timed out".to_string())??;
 
-            let resp = bc.get_object().bucket(bucket).key(key).send().await.map_err(|e| format!("GetObject: {e}"))?;
+            let fut = bc.get_object().bucket(bucket).key(key).send();
+            let resp = tokio::time::timeout(std::time::Duration::from_secs(30), fut)
+                .await
+                .map_err(|_| "S3 get_object timed out after 30 seconds.".to_string())?
+                .map_err(|e| format!("GetObject: {e}"))?;
             let content_type = resp.content_type().unwrap_or("application/octet-stream").to_string();
             let body = resp.body.collect().await.map_err(|e| format!("read body: {e}"))?;
             let bytes = body.into_bytes();
