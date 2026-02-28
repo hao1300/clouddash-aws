@@ -205,7 +205,9 @@
     <div class="h-full {error ? 'pt-8' : ''}">
         {#if selectedDist}
             <!-- Distribution Detail -->
-            <div class="h-full flex flex-col p-4 bg-gray-950 overflow-auto">
+            <div
+                class="h-full flex flex-col p-4 pr-1 bg-gray-950 overflow-auto"
+            >
                 <div
                     class="flex items-center gap-3 mb-6 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm shrink-0"
                 >

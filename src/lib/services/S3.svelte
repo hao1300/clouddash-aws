@@ -239,7 +239,7 @@
     <div class="h-full {error ? 'pt-8' : ''}">
         {#if previewKey}
             <!-- Preview View -->
-            <div class="h-full flex flex-col p-4 bg-gray-950">
+            <div class="h-full flex flex-col p-4 pr-1 bg-gray-950">
                 <div
                     class="flex items-center gap-3 mb-4 shrink-0 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm"
                 >
@@ -260,7 +260,7 @@
                 </div>
 
                 <div
-                    class="flex-1 overflow-auto bg-gray-900 rounded-lg border border-gray-800 text-sm shadow-inner p-4 relative"
+                    class="flex-1 overflow-auto bg-gray-900 rounded-lg border border-gray-800 text-sm shadow-inner p-4 pr-1 relative"
                 >
                     {#if previewLoading}
                         <div

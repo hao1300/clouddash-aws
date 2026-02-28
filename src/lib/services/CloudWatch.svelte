@@ -44,9 +44,22 @@
 
     // --- Alarms ---
     let alarms = $state<any[]>([]);
+    let filteredAlarms = $derived.by(() => {
+        let res = alarms;
+        if (hideAutoScaling) {
+            res = res.filter(
+                (a) =>
+                    !a.name.startsWith("TargetTracking-") &&
+                    !a.name.includes("AutoScaling"),
+            );
+        }
+        return res;
+    });
     let alarmsLoading = $state(false);
     let alarmsTokenMap = $state<string[]>([]);
     let alarmsCurrentToken = $state<string | undefined>(undefined);
+    let hideAutoScaling = $state(true);
+    let selectedAlarm = $state<any>(null);
 
     // --- Dashboards ---
     let dashboards = $state<any[]>([]);
@@ -72,6 +85,11 @@
 
     onMount(async () => {
         try {
+            const storedHide = localStorage.getItem("cw_hideAutoScaling");
+            if (storedHide !== null) {
+                hideAutoScaling = storedHide === "true";
+            }
+
             const creds = await getAwsCredentials();
             const config = {
                 region: creds.region || "us-east-1",
@@ -93,6 +111,10 @@
         }
     });
 
+    $effect(() => {
+        localStorage.setItem("cw_hideAutoScaling", String(hideAutoScaling));
+    });
+
     // --- Alarms API ---
     async function loadAlarms(token?: string) {
         if (!cwClient) return;
@@ -103,7 +125,7 @@
             const resp = await cwClient.send(
                 new DescribeAlarmsCommand({ MaxRecords: 50, NextToken: token }),
             );
-            alarms = (resp.MetricAlarms ?? []).map((a) => ({
+            let fetched = (resp.MetricAlarms ?? []).map((a) => ({
                 name: a.AlarmName ?? "Unknown",
                 state: a.StateValue ?? "UNKNOWN",
                 description: a.AlarmDescription ?? null,
@@ -112,6 +134,15 @@
                 condition: `${a.ComparisonOperator} ${a.Threshold}`,
                 updated: a.StateUpdatedTimestamp?.toISOString(),
             }));
+
+            // Sort by state (ALARM first, then others)
+            fetched.sort((a, b) => {
+                if (a.state === "ALARM" && b.state !== "ALARM") return -1;
+                if (a.state !== "ALARM" && b.state === "ALARM") return 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            alarms = fetched;
             pushToken(alarmsTokenMap, resp.NextToken);
             alarmsCurrentToken = resp.NextToken;
         } catch (e) {
@@ -269,41 +300,162 @@
 
     <div class="h-full {error || actionMsg ? 'pt-8' : ''}">
         {#if activeTab === "alarms"}
-            <PaginatedTable
-                items={alarms}
-                loading={alarmsLoading}
-                hasNext={!!alarmsCurrentToken}
-                hasPrev={alarmsTokenMap.length > 0}
-                onNext={() => loadAlarms(alarmsCurrentToken)}
-                onPrev={() => loadAlarms(popToken(alarmsTokenMap))}
-                onRefresh={() => {
-                    alarmsTokenMap = [];
-                    loadAlarms();
-                }}
-                columns={[
-                    {
-                        key: "state",
-                        label: "State",
-                        format: (v) =>
-                            v === "ALARM"
-                                ? "🔴 ALARM"
-                                : v === "OK"
-                                  ? "🟢 OK"
-                                  : `⚪ ${v}`,
-                    },
-                    { key: "name", label: "Alarm Name" },
-                    { key: "metric", label: "Metric" },
-                    { key: "condition", label: "Condition" },
-                    {
-                        key: "updated",
-                        label: "Last Updated",
-                        format: (v) => (v ? new Date(v).toLocaleString() : "-"),
-                    },
-                ]}
-            />
+            {#if selectedAlarm}
+                <div
+                    class="h-full flex flex-col p-4 pr-1 bg-gray-950 overflow-auto text-sm"
+                >
+                    <div
+                        class="flex items-center gap-3 mb-6 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm shrink-0"
+                    >
+                        <button
+                            onclick={() => {
+                                selectedAlarm = null;
+                            }}
+                            class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
+                            >← Back to Alarms</button
+                        >
+                        <span
+                            class="text-sm font-bold text-gray-200 truncate flex-1"
+                            >{selectedAlarm.name}</span
+                        >
+                    </div>
+
+                    <div
+                        class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 shrink-0"
+                    >
+                        <div
+                            class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                        >
+                            <div
+                                class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                            >
+                                State
+                            </div>
+                            <div
+                                class="text-base font-bold {selectedAlarm.state ===
+                                'ALARM'
+                                    ? 'text-red-400'
+                                    : selectedAlarm.state === 'OK'
+                                      ? 'text-green-400'
+                                      : 'text-yellow-400'}"
+                            >
+                                {selectedAlarm.state}
+                            </div>
+                        </div>
+                        <div
+                            class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                        >
+                            <div
+                                class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                            >
+                                Namespace
+                            </div>
+                            <div class="text-base font-bold text-gray-200">
+                                {selectedAlarm.namespace}
+                            </div>
+                        </div>
+                        <div
+                            class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                        >
+                            <div
+                                class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                            >
+                                Metric Name
+                            </div>
+                            <div class="text-base font-bold text-gray-200">
+                                {selectedAlarm.metric}
+                            </div>
+                        </div>
+                        <div
+                            class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                        >
+                            <div
+                                class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                            >
+                                Condition
+                            </div>
+                            <div class="text-base font-bold text-gray-200">
+                                {selectedAlarm.condition}
+                            </div>
+                        </div>
+                    </div>
+
+                    {#if selectedAlarm.description}
+                        <div
+                            class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm shrink-0"
+                        >
+                            <h3
+                                class="text-xs text-gray-400 uppercase tracking-widest font-bold mb-2"
+                            >
+                                Description
+                            </h3>
+                            <p
+                                class="text-sm text-gray-300 whitespace-pre-wrap"
+                            >
+                                {selectedAlarm.description}
+                            </p>
+                        </div>
+                    {/if}
+                </div>
+            {:else}
+                <PaginatedTable
+                    items={filteredAlarms}
+                    loading={alarmsLoading}
+                    hasNext={!!alarmsCurrentToken}
+                    hasPrev={alarmsTokenMap.length > 0}
+                    onNext={() => loadAlarms(alarmsCurrentToken)}
+                    onPrev={() => loadAlarms(popToken(alarmsTokenMap))}
+                    onRefresh={() => {
+                        alarmsTokenMap = [];
+                        loadAlarms();
+                    }}
+                    columns={[
+                        {
+                            key: "name",
+                            label: "Alarm Name",
+                            onClick: (item) => {
+                                selectedAlarm = item;
+                            },
+                        },
+                        {
+                            key: "state",
+                            label: "State",
+                            format: (v) =>
+                                v === "ALARM"
+                                    ? "🔴 ALARM"
+                                    : v === "OK"
+                                      ? "🟢 OK"
+                                      : `⚪ ${v}`,
+                        },
+                        { key: "metric", label: "Metric" },
+                        { key: "condition", label: "Condition" },
+                        {
+                            key: "updated",
+                            label: "Last Updated",
+                            format: (v) =>
+                                v ? new Date(v).toLocaleString() : "-",
+                        },
+                    ]}
+                >
+                    {#snippet headerActionsSnippet()}
+                        <label
+                            class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 hover:text-white transition mr-2 bg-gray-950 px-3 py-1.5 rounded border border-gray-800"
+                        >
+                            <input
+                                type="checkbox"
+                                bind:checked={hideAutoScaling}
+                                class="rounded border-gray-600 text-blue-500 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <span class="select-none font-medium text-xs"
+                                >Hide Auto-Scaling</span
+                            >
+                        </label>
+                    {/snippet}
+                </PaginatedTable>
+            {/if}
         {:else if activeTab === "dashboards"}
             {#if selectedDash}
-                <div class="p-4 h-full flex flex-col pt-2">
+                <div class="p-4 pr-1 h-full flex flex-col pt-2">
                     <div class="mb-3 flex items-center gap-2 shrink-0">
                         <button
                             onclick={() => (selectedDash = "")}
@@ -350,7 +502,7 @@
                 </PaginatedTable>
             {/if}
         {:else if activeTab === "logs"}
-            <div class="h-full flex flex-col p-4 bg-gray-950">
+            <div class="h-full flex flex-col p-4 pr-1 bg-gray-950">
                 <!-- Log Groups + Insights Query -->
                 <div
                     class="space-y-3 mb-4 shrink-0 bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"

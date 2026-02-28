@@ -21,6 +21,7 @@
     // --- Service Layout State ---
     const tabs = [{ id: "instances", label: "Instances" }];
     let activeTab = $state("instances");
+    let selectedInstance = $state<any>(null);
 
     // --- Pagination Shared Helpers ---
     function pushToken(history: string[], currentNextToken?: string) {
@@ -138,7 +139,13 @@
     }
 
     const columns = [
-        { key: "name", label: "Name" },
+        {
+            key: "name",
+            label: "Name",
+            onClick: (item: any) => {
+                selectedInstance = item;
+            },
+        },
         { key: "id", label: "Instance ID" },
         {
             key: "state",
@@ -170,7 +177,90 @@
         </div>{/if}
 
     <div class="h-full {error || actionMsg ? 'pt-8' : ''}">
-        {#if activeTab === "instances"}
+        {#if selectedInstance}
+            <div
+                class="h-full flex flex-col p-4 pr-1 bg-gray-950 overflow-auto text-sm"
+            >
+                <div
+                    class="flex items-center gap-3 mb-6 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm shrink-0"
+                >
+                    <button
+                        onclick={() => {
+                            selectedInstance = null;
+                        }}
+                        class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
+                        >← Back to Instances</button
+                    >
+                    <span
+                        class="text-sm font-bold text-gray-200 truncate flex-1"
+                        >{selectedInstance.name || "Unnamed"}
+                        <span class="text-gray-500 font-normal ml-2"
+                            >{selectedInstance.id}</span
+                        ></span
+                    >
+                </div>
+
+                <div
+                    class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 shrink-0"
+                >
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            Instance State
+                        </div>
+                        <div
+                            class="text-base font-bold capitalize {selectedInstance.state ===
+                            'running'
+                                ? 'text-green-400'
+                                : selectedInstance.state === 'stopped'
+                                  ? 'text-red-400'
+                                  : 'text-yellow-400'}"
+                        >
+                            {selectedInstance.state}
+                        </div>
+                    </div>
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            Instance Type
+                        </div>
+                        <div class="text-base font-bold text-gray-200">
+                            {selectedInstance.instance_type}
+                        </div>
+                    </div>
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            Public IP
+                        </div>
+                        <div class="text-base font-bold text-gray-200">
+                            {selectedInstance.public_ip}
+                        </div>
+                    </div>
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            Private IP
+                        </div>
+                        <div class="text-base font-bold text-gray-200">
+                            {selectedInstance.private_ip}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {:else if activeTab === "instances"}
             <PaginatedTable
                 {items}
                 {loading}

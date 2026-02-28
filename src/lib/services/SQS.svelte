@@ -250,7 +250,7 @@
 
     <div class="h-full {error || actionMsg ? 'pt-8' : ''}">
         {#if selectedQueue}
-            <div class="h-full flex flex-col bg-gray-950 p-4">
+            <div class="h-full flex flex-col bg-gray-950 p-4 pr-1">
                 <!-- Header & Actions -->
                 <div
                     class="flex items-center gap-3 mb-4 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm shrink-0"

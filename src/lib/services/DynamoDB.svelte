@@ -45,6 +45,7 @@
     let tablesLoading = $state(false);
     let tablesTokenMap = $state<string[]>([]);
     let tablesCurrentToken = $state<string | undefined>(undefined);
+    let tableSchemas = $state<Record<string, any>>({});
 
     // --- Scan / Query shared ---
     let tableName = $state("");
@@ -62,6 +63,51 @@
     let queryFilter = $state("");
     let queryValues = $state("");
     let queryIndex = $state("");
+
+    // Schema UI Helpers
+    let partitionKeyInput = $state("");
+    let sortKeyInput = $state("");
+    let activeSchema = $derived(tableSchemas[tableName] || null);
+
+    // Watchers for keys
+    $effect(() => {
+        if (activeTab === "query" && activeSchema) {
+            let pkName = "",
+                skName = "";
+            let schemaRef = activeSchema.KeySchema;
+
+            // if index selected, use its schema
+            if (queryIndex) {
+                const idx = activeSchema.GlobalSecondaryIndexes?.find(
+                    (i: any) => i.IndexName === queryIndex,
+                );
+                if (idx) schemaRef = idx.KeySchema;
+            }
+
+            const pk = schemaRef?.find((k: any) => k.KeyType === "HASH");
+            const sk = schemaRef?.find((k: any) => k.KeyType === "RANGE");
+            if (pk) pkName = pk.AttributeName;
+            if (sk) skName = sk.AttributeName;
+
+            let condition = "";
+            let vals: Record<string, any> = {};
+
+            if (pkName && partitionKeyInput) {
+                condition = `${pkName} = :pk`;
+                vals[":pk"] = partitionKeyInput;
+            }
+            if (skName && sortKeyInput) {
+                // simple exact match for ease
+                condition += ` AND ${skName} = :sk`;
+                vals[":sk"] = sortKeyInput;
+            }
+
+            queryKeyCond = condition;
+            queryValues = Object.keys(vals).length
+                ? JSON.stringify(vals, null, 2)
+                : "";
+        }
+    });
 
     onMount(async () => {
         try {
@@ -103,13 +149,15 @@
                         new DescribeTableCommand({ TableName: name }),
                     );
                     const t = desc.Table;
-                    if (t)
+                    if (t) {
+                        tableSchemas[t.TableName ?? name] = t;
                         details.push({
                             name: t.TableName ?? name,
                             status: t.TableStatus ?? "UNKNOWN",
                             item_count: t.ItemCount ?? 0,
                             size_bytes: t.TableSizeBytes ?? 0,
                         });
+                    }
                 } catch {
                     details.push({
                         name,
@@ -269,7 +317,14 @@
                     loadTables();
                 }}
                 columns={[
-                    { key: "name", label: "Table Name" },
+                    {
+                        key: "name",
+                        label: "Table Name",
+                        onClick: (item) => {
+                            tableName = item.name;
+                            activeTab = "scan";
+                        },
+                    },
                     {
                         key: "status",
                         label: "Status",
@@ -304,7 +359,7 @@
                 {/snippet}
             </PaginatedTable>
         {:else if activeTab === "scan"}
-            <div class="h-full flex flex-col p-4 bg-gray-950">
+            <div class="h-full flex flex-col p-4 pr-1 bg-gray-950">
                 <div
                     class="space-y-3 mb-4 shrink-0 bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
                 >
@@ -357,7 +412,7 @@
                 </div>
             </div>
         {:else if activeTab === "query"}
-            <div class="h-full flex flex-col p-4 bg-gray-950">
+            <div class="h-full flex flex-col p-4 pr-1 bg-gray-950">
                 <div
                     class="space-y-3 mb-4 shrink-0 bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
                 >
@@ -367,11 +422,25 @@
                             placeholder="Table name"
                             class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
                         />
-                        <input
-                            bind:value={queryIndex}
-                            placeholder="Index Name (optional)"
-                            class="w-48 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-                        />
+                        {#if activeSchema?.GlobalSecondaryIndexes}
+                            <select
+                                bind:value={queryIndex}
+                                class="w-48 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
+                            >
+                                <option value="">[Base Table]</option>
+                                {#each activeSchema.GlobalSecondaryIndexes as idx}
+                                    <option value={idx.IndexName}
+                                        >{idx.IndexName}</option
+                                    >
+                                {/each}
+                            </select>
+                        {:else}
+                            <input
+                                bind:value={queryIndex}
+                                placeholder="Index Name (optional)"
+                                class="w-48 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
+                            />
+                        {/if}
                         <button
                             onclick={() => runQuery()}
                             disabled={!tableName ||
@@ -384,23 +453,118 @@
                                 >{/if} Run Query
                         </button>
                     </div>
+
+                    <!-- Schema Introspection UI -->
+                    {#if activeSchema}
+                        <div
+                            class="flex gap-4 items-center bg-gray-950 p-3 rounded border border-gray-800"
+                        >
+                            <div class="text-xs font-bold text-gray-400 w-24">
+                                Query Keys:
+                            </div>
+
+                            <div class="flex-1 flex gap-2">
+                                {#if queryIndex && activeSchema.GlobalSecondaryIndexes}
+                                    <!-- Use GSI Schema -->
+                                    {@const gsi =
+                                        activeSchema.GlobalSecondaryIndexes.find(
+                                            (i: any) =>
+                                                i.IndexName === queryIndex,
+                                        )}
+                                    {@const pk = gsi?.KeySchema?.find(
+                                        (k: any) => k.KeyType === "HASH",
+                                    )}
+                                    {@const sk = gsi?.KeySchema?.find(
+                                        (k: any) => k.KeyType === "RANGE",
+                                    )}
+
+                                    {#if pk}
+                                        <div class="flex-1">
+                                            <div
+                                                class="text-[10px] text-gray-500 mb-1"
+                                            >
+                                                Partition Key ({pk.AttributeName})
+                                            </div>
+                                            <input
+                                                bind:value={partitionKeyInput}
+                                                placeholder="Exact match..."
+                                                class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-blue-300 outline-none focus:border-blue-500"
+                                            />
+                                        </div>
+                                    {/if}
+                                    {#if sk}
+                                        <div class="flex-1">
+                                            <div
+                                                class="text-[10px] text-gray-500 mb-1"
+                                            >
+                                                Sort Key ({sk.AttributeName})
+                                            </div>
+                                            <input
+                                                bind:value={sortKeyInput}
+                                                placeholder="Exact match (optional)..."
+                                                class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-blue-300 outline-none focus:border-blue-500"
+                                            />
+                                        </div>
+                                    {/if}
+                                {:else}
+                                    <!-- Use Base Schema -->
+                                    {@const pk = activeSchema.KeySchema?.find(
+                                        (k: any) => k.KeyType === "HASH",
+                                    )}
+                                    {@const sk = activeSchema.KeySchema?.find(
+                                        (k: any) => k.KeyType === "RANGE",
+                                    )}
+
+                                    {#if pk}
+                                        <div class="flex-1">
+                                            <div
+                                                class="text-[10px] text-gray-500 mb-1"
+                                            >
+                                                Partition Key ({pk.AttributeName})
+                                            </div>
+                                            <input
+                                                bind:value={partitionKeyInput}
+                                                placeholder="Exact match..."
+                                                class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-blue-300 outline-none focus:border-blue-500"
+                                            />
+                                        </div>
+                                    {/if}
+                                    {#if sk}
+                                        <div class="flex-1">
+                                            <div
+                                                class="text-[10px] text-gray-500 mb-1"
+                                            >
+                                                Sort Key ({sk.AttributeName})
+                                            </div>
+                                            <input
+                                                bind:value={sortKeyInput}
+                                                placeholder="Exact match (optional)..."
+                                                class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-blue-300 outline-none focus:border-blue-500"
+                                            />
+                                        </div>
+                                    {/if}
+                                {/if}
+                            </div>
+                        </div>
+                    {/if}
+
                     <div class="flex gap-2">
                         <input
-                            bind:value={queryKeyCond}
-                            placeholder="Key condition e.g. pk = :pk"
-                            class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-                        />
-                        <input
                             bind:value={queryFilter}
-                            placeholder="Filter expression (optional)"
+                            placeholder="Filter expression (optional) e.g. status = :st"
                             class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
                         />
                     </div>
-                    <input
+
+                    <div class="text-xs text-gray-500 font-bold mb-1 mt-2">
+                        Generated / Custom JSON Key Expressions:
+                    </div>
+                    <textarea
                         bind:value={queryValues}
-                        placeholder="Expression JSON (e.g. &quot;:pk&quot;: &quot;user-123&quot;)"
-                        class="w-full bg-black font-mono text-xs p-2 rounded border border-gray-700 text-green-400 outline-none focus:border-blue-500"
-                    />
+                        rows="3"
+                        placeholder="Expression JSON"
+                        class="w-full bg-black font-mono text-xs p-2 rounded border border-gray-700 text-green-400 outline-none focus:border-blue-500 resize-none drop-shadow-inner"
+                    ></textarea>
                 </div>
 
                 <div
