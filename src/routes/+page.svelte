@@ -351,7 +351,7 @@
 </script>
 
 <main
-  class="h-[100dvh] bg-gray-950 text-white flex flex-col font-sans overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+  class="absolute inset-0 bg-gray-950 text-white flex flex-col font-sans overflow-hidden pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]"
 >
   {#if !isAuthenticated}
     <div class="flex items-center justify-center flex-1 p-4">
@@ -586,34 +586,23 @@
     </div>
   {:else}
     <header
-      class="flex items-center px-2 sm:px-3 py-1.5 bg-gray-900 border-b border-gray-800 shrink-0"
+      class="flex flex-col sm:flex-row sm:items-center bg-gray-900 border-b border-gray-800 shrink-0"
     >
-      <nav
-        class="flex gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-hide snap-x"
+      <!-- Profile/Region Controls (Top on mobile, Right on desktop) -->
+      <div
+        class="flex items-center gap-1.5 sm:ml-auto w-full sm:w-auto order-1 sm:order-2 shrink-0 border-b sm:border-0 border-gray-800 px-2 sm:px-3 py-1.5 overflow-x-auto scrollbar-hide"
       >
-        {#each enabledServices as svc}
-          <button
-            onclick={() => switchTab(svc.id)}
-            class="px-3 py-1.5 rounded text-xs font-semibold transition shrink-0 snap-start {activeId ===
-            svc.id
-              ? 'bg-blue-600 text-white shadow'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'}"
-            >{svc.label}</button
-          >
-        {/each}
-      </nav>
-      <div class="flex items-center gap-1.5 ml-2 shrink-0">
         {#if authType === "profile"}
           <select
             bind:value={selectedProfile}
             onchange={() => login()}
-            class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
+            class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500 shrink-0 max-w-[120px] sm:max-w-none"
           >
             {#each visibleProfiles as p}<option value={p}>{p}</option>{/each}
           </select>
         {:else}
           <div
-            class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono border border-gray-700"
+            class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono border border-gray-700 shrink-0"
             title="Logged in with API Keys"
           >
             🔑 Custom Keys
@@ -622,13 +611,13 @@
         <select
           bind:value={region}
           onchange={() => login()}
-          class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
+          class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500 shrink-0 max-w-[100px] sm:max-w-none"
         >
           {#each visibleRegions as r}<option value={r}>{r}</option>{/each}
         </select>
         <button
           onclick={() => refreshKey++}
-          class="bg-gray-800 hover:bg-gray-700 px-2 py-1.5 rounded text-xs font-semibold border border-gray-700 transition"
+          class="bg-gray-800 hover:bg-gray-700 px-2 py-1.5 rounded text-xs font-semibold border border-gray-700 transition shrink-0 ml-auto sm:ml-0"
           >⟳</button
         >
         <button
@@ -636,9 +625,29 @@
             showSettings = true;
             settingsTab = "profiles";
           }}
-          class="px-2.5 py-1.5 rounded text-xs transition text-gray-500 hover:text-gray-300 hover:bg-gray-800"
+          class="px-2.5 py-1.5 rounded text-xs transition text-gray-500 hover:text-gray-300 hover:bg-gray-800 shrink-0"
           title="Settings">⚙</button
         >
+      </div>
+
+      <!-- Services List (Bottom on mobile, Left on desktop) -->
+      <div
+        class="flex items-center min-w-0 flex-1 order-2 sm:order-1 px-2 sm:px-3 py-1.5"
+      >
+        <nav
+          class="flex gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-hide snap-x"
+        >
+          {#each enabledServices as svc}
+            <button
+              onclick={() => switchTab(svc.id)}
+              class="px-3 py-1.5 rounded flex-none text-xs font-semibold transition shrink-0 snap-start {activeId ===
+              svc.id
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'}"
+              >{svc.label}</button
+            >
+          {/each}
+        </nav>
       </div>
     </header>
 
