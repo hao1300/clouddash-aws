@@ -83,3 +83,28 @@ pub async fn authenticate(
 
     Ok("Authenticated successfully".into())
 }
+
+#[tauri::command]
+pub async fn get_credentials(
+    config: tauri::State<'_, SharedConfig>,
+) -> Result<serde_json::Value, String> {
+    let guard = config.0.read().await;
+    let sdk = guard.as_ref().ok_or("Not authenticated")?;
+
+    let provider = sdk
+        .credentials_provider()
+        .ok_or("No credentials provider configured")?;
+
+    use aws_credential_types::provider::ProvideCredentials;
+    let creds = provider
+        .provide_credentials()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({
+        "access_key_id": creds.access_key_id(),
+        "secret_access_key": creds.secret_access_key(),
+        "session_token": creds.session_token(),
+        "region": sdk.region().map(|r| r.as_ref()),
+    }))
+}

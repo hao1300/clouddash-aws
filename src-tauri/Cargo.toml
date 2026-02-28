@@ -25,14 +25,9 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 dirs = "5.0"
 
-# AWS SDKs optimized for size with Rustls
+# Only what's needed for credential resolution
 aws-config = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio", "behavior-version-latest"] }
-aws-sdk-ec2 = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
-aws-sdk-s3 = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
-aws-sdk-cloudwatch = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
-aws-sdk-dynamodb = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
-aws-sdk-sqs = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
-aws-sdk-cloudfront = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio"] }
+aws-credential-types = { version = "1.2", default-features = false, features = ["hardcoded-credentials"] }
 
 [profile.release]
 opt-level = "s"       # Optimize for binary size
