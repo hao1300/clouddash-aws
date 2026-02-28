@@ -196,22 +196,26 @@
     }
 
     // --- Logs API ---
-    async function loadLogGroups(token?: string) {
+    async function loadLogGroups() {
         if (!logsClient) return;
         try {
             lgLoading = true;
             error = "";
             actionMsg = "";
-            const resp = await logsClient.send(
-                new DescribeLogGroupsCommand({ limit: 50, nextToken: token }),
-            );
-            logGroups = (resp.logGroups ?? []).map((g) => ({
-                name: g.logGroupName ?? "",
-                storedBytes: g.storedBytes ?? 0,
-                retentionDays: g.retentionInDays ?? "Never expire",
-            }));
-            pushToken(lgTokenMap, resp.nextToken);
-            lgCurrentToken = resp.nextToken;
+            logGroups = [];
+            let nextToken: string | undefined = undefined;
+            do {
+                const resp: any = await logsClient.send(
+                    new DescribeLogGroupsCommand({ limit: 50, nextToken }),
+                );
+                const page = (resp.logGroups ?? []).map((g: any) => ({
+                    name: g.logGroupName ?? "",
+                    storedBytes: g.storedBytes ?? 0,
+                    retentionDays: g.retentionInDays ?? "Never expire",
+                }));
+                logGroups = [...logGroups, ...page];
+                nextToken = resp.nextToken;
+            } while (nextToken);
         } catch (e) {
             error = String(e);
         } finally {
@@ -513,18 +517,15 @@
                                 bind:value={selectedLogGroup}
                                 class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
                             >
-                                <option value="">Select log group...</option>
+                                <option value=""
+                                    >Select log group...{lgLoading
+                                        ? " (loading...)"
+                                        : ` (${logGroups.length})`}</option
+                                >
                                 {#each logGroups as g}<option value={g.name}
                                         >{g.name}</option
                                     >{/each}
                             </select>
-                            <button
-                                onclick={() => loadLogGroups(lgCurrentToken)}
-                                disabled={lgLoading || !lgCurrentToken}
-                                title="Load more log groups"
-                                class="bg-gray-800 hover:bg-gray-700 border border-gray-700 disabled:opacity-30 px-3 py-1.5 rounded text-xs transition"
-                                >More</button
-                            >
                         </div>
                         <select
                             bind:value={timeRange}

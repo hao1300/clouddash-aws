@@ -65,48 +65,59 @@
     });
 
     // --- Queues API ---
-    async function loadQueues(token?: string) {
+    async function loadQueues() {
         if (!client) return;
         try {
             loading = true;
             error = "";
             actionMsg = "";
-            const resp = await client.send(
-                new ListQueuesCommand({ MaxResults: 50, NextToken: token }),
-            );
-            const newItems: any[] = [];
-            for (const url of resp.QueueUrls ?? []) {
-                const name = url.split("/").pop() ?? url;
-                let msgsAvail = "N/A",
-                    msgsFlight = "N/A";
-                try {
-                    const attrs = await client.send(
-                        new GetQueueAttributesCommand({
-                            QueueUrl: url,
-                            AttributeNames: [
-                                "ApproximateNumberOfMessages",
-                                "ApproximateNumberOfMessagesNotVisible",
-                            ],
-                        }),
-                    );
-                    msgsAvail =
-                        attrs.Attributes?.ApproximateNumberOfMessages ?? "N/A";
-                    msgsFlight =
-                        attrs.Attributes
-                            ?.ApproximateNumberOfMessagesNotVisible ?? "N/A";
-                } catch {
-                    /* skip */
-                }
-                newItems.push({
-                    name,
-                    url,
-                    messages_available: msgsAvail,
-                    messages_in_flight: msgsFlight,
-                });
-            }
-            queues = newItems;
-            pushToken(tokenMap, resp.NextToken);
-            currentToken = resp.NextToken;
+            queues = [];
+            let nextToken: string | undefined = undefined;
+            do {
+                const resp: any = await client.send(
+                    new ListQueuesCommand({
+                        MaxResults: 50,
+                        NextToken: nextToken,
+                    }),
+                );
+                const pageUrls = resp.QueueUrls ?? [];
+                // Fetch attributes in parallel for this page
+                const pageItems = await Promise.all(
+                    pageUrls.map(async (url: string) => {
+                        const name = url.split("/").pop() ?? url;
+                        let msgsAvail = "N/A",
+                            msgsFlight = "N/A";
+                        try {
+                            const attrs = await client!.send(
+                                new GetQueueAttributesCommand({
+                                    QueueUrl: url,
+                                    AttributeNames: [
+                                        "ApproximateNumberOfMessages",
+                                        "ApproximateNumberOfMessagesNotVisible",
+                                    ],
+                                }),
+                            );
+                            msgsAvail =
+                                attrs.Attributes?.ApproximateNumberOfMessages ??
+                                "N/A";
+                            msgsFlight =
+                                attrs.Attributes
+                                    ?.ApproximateNumberOfMessagesNotVisible ??
+                                "N/A";
+                        } catch {
+                            /* skip */
+                        }
+                        return {
+                            name,
+                            url,
+                            messages_available: msgsAvail,
+                            messages_in_flight: msgsFlight,
+                        };
+                    }),
+                );
+                queues = [...queues, ...pageItems];
+                nextToken = resp.NextToken;
+            } while (nextToken);
         } catch (e) {
             error = String(e);
         } finally {
@@ -374,14 +385,9 @@
             <PaginatedTable
                 items={queues}
                 {loading}
-                hasNext={!!currentToken}
-                hasPrev={tokenMap.length > 0}
-                onNext={() => loadQueues(currentToken)}
-                onPrev={() => loadQueues(popToken(tokenMap))}
-                onRefresh={() => {
-                    tokenMap = [];
-                    loadQueues();
-                }}
+                hasNext={false}
+                hasPrev={false}
+                onRefresh={() => loadQueues()}
                 columns={queueColumns}
             />
         {/if}

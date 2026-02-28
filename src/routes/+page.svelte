@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
   import { services, type ServiceDef } from "$lib/services/registry";
+  import Modal from "$lib/components/Modal.svelte";
 
   const STORAGE_KEY = "aws_console_state";
 
@@ -657,88 +658,157 @@
         {error}
       </div>{/if}
 
-    <!-- Settings Modal -->
-    {#if showSettings}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div
-        class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4"
-        onclick={(e) => {
-          if (e.target === e.currentTarget) showSettings = false;
-        }}
-      >
+    <Modal bind:open={showSettings} title="Settings">
+      <div class="flex -m-5 min-h-[380px]">
+        <!-- Left vertical tabs -->
         <div
-          class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-xl flex flex-col sm:flex-row overflow-hidden"
-          style="height: 480px; max-height: 90vh;"
+          class="w-32 bg-gray-950 border-r border-gray-800 flex flex-col py-2 shrink-0"
         >
-          <!-- Left tabs -->
-          <div
-            class="w-full sm:w-36 bg-gray-950 border-b sm:border-b-0 sm:border-r border-gray-800 flex sm:flex-col p-2 sm:py-2 shrink-0 overflow-x-auto scrollbar-hide"
-          >
-            {#each [["profiles", "Profiles"], ["regions", "Regions"], ["services", "Services"]] as const as [key, label]}
-              <button
-                onclick={() => (settingsTab = key)}
-                class="px-4 py-2.5 text-left text-xs font-semibold transition whitespace-nowrap {settingsTab ===
-                key
-                  ? 'bg-gray-800 text-blue-400 border-b-2 sm:border-b-0 sm:border-r-2 border-blue-500'
-                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-900 border-b-2 border-transparent sm:border-transparent'}"
-              >
-                {label}
-              </button>
-            {/each}
-            <div class="hidden sm:block flex-1"></div>
+          {#each [["profiles", "Profiles"], ["regions", "Regions"], ["services", "Services"]] as const as [key, label]}
             <button
-              onclick={() => (showSettings = false)}
-              class="hidden sm:block px-4 py-2 text-xs text-gray-600 hover:text-gray-400 transition text-left"
-              >Close</button
+              onclick={() => (settingsTab = key)}
+              class="px-4 py-2.5 text-left text-xs font-semibold transition whitespace-nowrap {settingsTab ===
+              key
+                ? 'bg-gray-800 text-blue-400 border-r-2 border-blue-500'
+                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-900 border-r-2 border-transparent'}"
             >
-          </div>
+              {label}
+            </button>
+          {/each}
+        </div>
 
-          <!-- Right content -->
-          <div class="flex-1 p-3 sm:p-4 overflow-auto relative">
-            <!-- Mobile Close Button (top right inside) -->
-            <button
-              onclick={() => (showSettings = false)}
-              class="absolute top-3 right-3 sm:hidden w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 text-gray-400 hover:text-white"
-              >✕</button
-            >
-            {#if settingsTab === "profiles"}
-              <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
-                Profiles — show, hide & reorder
-              </h3>
-              <div class="space-y-1">
-                {#each profileOrder as id, idx}
+        <!-- Right content -->
+        <div class="flex-1 p-4 overflow-auto">
+          {#if settingsTab === "profiles"}
+            <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
+              Profiles — show, hide & reorder
+            </h3>
+            <div class="space-y-1">
+              {#each profileOrder as id, idx}
+                <div
+                  class="flex items-center gap-2 px-3 py-2 rounded border border-gray-800 bg-gray-800/30 hover:bg-gray-800/60 transition"
+                >
+                  <div class="flex flex-col gap-0.5">
+                    <button
+                      onclick={() => moveProfile(idx, -1)}
+                      disabled={idx === 0}
+                      class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
+                      >▲</button
+                    >
+                    <button
+                      onclick={() => moveProfile(idx, 1)}
+                      disabled={idx === profileOrder.length - 1}
+                      class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
+                      >▼</button
+                    >
+                  </div>
+                  <span class="flex-1 text-sm font-mono text-gray-200"
+                    >{id}</span
+                  >
+                  <button
+                    onclick={() => toggleProfile(id)}
+                    aria-label="Toggle {id}"
+                    class="w-9 h-5 rounded-full relative transition-colors {profileVisible.has(
+                      id,
+                    )
+                      ? 'bg-blue-600'
+                      : 'bg-gray-700'}"
+                  >
+                    <span
+                      class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all {profileVisible.has(
+                        id,
+                      )
+                        ? 'left-[18px]'
+                        : 'left-0.5'}"
+                    ></span>
+                  </button>
+                </div>
+              {/each}
+            </div>
+          {:else if settingsTab === "regions"}
+            <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
+              Regions — show, hide & reorder
+            </h3>
+            <div class="space-y-1">
+              {#each regionOrder as id, idx}
+                <div
+                  class="flex items-center gap-2 px-3 py-1.5 rounded border border-gray-800 bg-gray-800/30 hover:bg-gray-800/60 transition"
+                >
+                  <div class="flex flex-col gap-0.5">
+                    <button
+                      onclick={() => moveRegion(idx, -1)}
+                      disabled={idx === 0}
+                      class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
+                      >▲</button
+                    >
+                    <button
+                      onclick={() => moveRegion(idx, 1)}
+                      disabled={idx === regionOrder.length - 1}
+                      class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
+                      >▼</button
+                    >
+                  </div>
+                  <span class="flex-1 text-sm font-mono text-gray-200"
+                    >{id}</span
+                  >
+                  <button
+                    onclick={() => toggleRegion(id)}
+                    aria-label="Toggle {id}"
+                    class="w-9 h-5 rounded-full relative transition-colors {regionVisible.has(
+                      id,
+                    )
+                      ? 'bg-blue-600'
+                      : 'bg-gray-700'}"
+                  >
+                    <span
+                      class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all {regionVisible.has(
+                        id,
+                      )
+                        ? 'left-[18px]'
+                        : 'left-0.5'}"
+                    ></span>
+                  </button>
+                </div>
+              {/each}
+            </div>
+          {:else if settingsTab === "services"}
+            <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
+              Services — show, hide & reorder
+            </h3>
+            <div class="space-y-1">
+              {#each serviceOrder as id, idx}
+                {@const svc = services.find((s) => s.id === id)}
+                {#if svc}
                   <div
                     class="flex items-center gap-2 px-3 py-2 rounded border border-gray-800 bg-gray-800/30 hover:bg-gray-800/60 transition"
                   >
                     <div class="flex flex-col gap-0.5">
                       <button
-                        onclick={() => moveProfile(idx, -1)}
+                        onclick={() => moveService(idx, -1)}
                         disabled={idx === 0}
                         class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
                         >▲</button
                       >
                       <button
-                        onclick={() => moveProfile(idx, 1)}
-                        disabled={idx === profileOrder.length - 1}
+                        onclick={() => moveService(idx, 1)}
+                        disabled={idx === serviceOrder.length - 1}
                         class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
                         >▼</button
                       >
                     </div>
-                    <span class="flex-1 text-sm font-mono text-gray-200"
-                      >{id}</span
+                    <span class="flex-1 text-sm text-gray-200">{svc.label}</span
                     >
                     <button
-                      onclick={() => toggleProfile(id)}
-                      aria-label="Toggle {id}"
-                      class="w-9 h-5 rounded-full relative transition-colors {profileVisible.has(
+                      onclick={() => toggleService(id)}
+                      aria-label="Toggle {svc.label}"
+                      class="w-9 h-5 rounded-full relative transition-colors {serviceVisible.has(
                         id,
                       )
                         ? 'bg-blue-600'
                         : 'bg-gray-700'}"
                     >
                       <span
-                        class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all {profileVisible.has(
+                        class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all {serviceVisible.has(
                           id,
                         )
                           ? 'left-[18px]'
@@ -746,108 +816,13 @@
                       ></span>
                     </button>
                   </div>
-                {/each}
-              </div>
-            {:else if settingsTab === "regions"}
-              <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
-                Regions — show, hide & reorder
-              </h3>
-              <div class="space-y-1">
-                {#each regionOrder as id, idx}
-                  <div
-                    class="flex items-center gap-2 px-3 py-1.5 rounded border border-gray-800 bg-gray-800/30 hover:bg-gray-800/60 transition"
-                  >
-                    <div class="flex flex-col gap-0.5">
-                      <button
-                        onclick={() => moveRegion(idx, -1)}
-                        disabled={idx === 0}
-                        class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
-                        >▲</button
-                      >
-                      <button
-                        onclick={() => moveRegion(idx, 1)}
-                        disabled={idx === regionOrder.length - 1}
-                        class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
-                        >▼</button
-                      >
-                    </div>
-                    <span class="flex-1 text-sm font-mono text-gray-200"
-                      >{id}</span
-                    >
-                    <button
-                      onclick={() => toggleRegion(id)}
-                      aria-label="Toggle {id}"
-                      class="w-9 h-5 rounded-full relative transition-colors {regionVisible.has(
-                        id,
-                      )
-                        ? 'bg-blue-600'
-                        : 'bg-gray-700'}"
-                    >
-                      <span
-                        class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all {regionVisible.has(
-                          id,
-                        )
-                          ? 'left-[18px]'
-                          : 'left-0.5'}"
-                      ></span>
-                    </button>
-                  </div>
-                {/each}
-              </div>
-            {:else if settingsTab === "services"}
-              <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
-                Services — show, hide & reorder
-              </h3>
-              <div class="space-y-1">
-                {#each serviceOrder as id, idx}
-                  {@const svc = services.find((s) => s.id === id)}
-                  {#if svc}
-                    <div
-                      class="flex items-center gap-2 px-3 py-2 rounded border border-gray-800 bg-gray-800/30 hover:bg-gray-800/60 transition"
-                    >
-                      <div class="flex flex-col gap-0.5">
-                        <button
-                          onclick={() => moveService(idx, -1)}
-                          disabled={idx === 0}
-                          class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
-                          >▲</button
-                        >
-                        <button
-                          onclick={() => moveService(idx, 1)}
-                          disabled={idx === serviceOrder.length - 1}
-                          class="text-gray-600 hover:text-gray-400 text-[10px] leading-none disabled:opacity-30"
-                          >▼</button
-                        >
-                      </div>
-                      <span class="flex-1 text-sm text-gray-200"
-                        >{svc.label}</span
-                      >
-                      <button
-                        onclick={() => toggleService(id)}
-                        aria-label="Toggle {svc.label}"
-                        class="w-9 h-5 rounded-full relative transition-colors {serviceVisible.has(
-                          id,
-                        )
-                          ? 'bg-blue-600'
-                          : 'bg-gray-700'}"
-                      >
-                        <span
-                          class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all {serviceVisible.has(
-                            id,
-                          )
-                            ? 'left-[18px]'
-                            : 'left-0.5'}"
-                        ></span>
-                      </button>
-                    </div>
-                  {/if}
-                {/each}
-              </div>
-            {/if}
-          </div>
+                {/if}
+              {/each}
+            </div>
+          {/if}
         </div>
-      </div>
-    {/if}
+      </div></Modal
+    >
 
     <!-- Dynamic Content -->
     <div class="flex-1 overflow-hidden relative">

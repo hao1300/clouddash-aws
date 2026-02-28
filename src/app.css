@@ -7,3 +7,21 @@
     @apply bg-gray-900 text-white font-sans;
   }
 }
+
+/* Fix spinner wobble — text glyphs like ⟳ have uneven bounding boxes */
+.animate-spin {
+  display: inline-block;
+  text-align: center;
+  line-height: 1;
+  transform-origin: center center;
+}
+
+/* Hide scrollbars for horizontal tab bars */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
