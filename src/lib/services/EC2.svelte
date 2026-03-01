@@ -7,6 +7,10 @@
         StopInstancesCommand,
         RebootInstancesCommand,
         TerminateInstancesCommand,
+        DescribeVolumesCommand,
+        DescribeSecurityGroupsCommand,
+        DescribeKeyPairsCommand,
+        DescribeAddressesCommand,
     } from "@aws-sdk/client-ec2";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -18,10 +22,42 @@
     let actionMsg = $state("");
     let client: EC2Client | null = null;
 
+    // --- Resources State ---
+    let volumes = $state<any[]>([]);
+    let volumesLoading = $state(false);
+    let volTokenMap = $state<string[]>([]);
+    let volCurrentToken = $state<string | undefined>(undefined);
+
+    let securityGroups = $state<any[]>([]);
+    let sgLoading = $state(false);
+    let sgTokenMap = $state<string[]>([]);
+    let sgCurrentToken = $state<string | undefined>(undefined);
+
+    let keyPairs = $state<any[]>([]);
+    let kpLoading = $state(false);
+
+    let elasticIps = $state<any[]>([]);
+    let eipLoading = $state(false);
+
     // --- Service Layout State ---
-    const tabs = [{ id: "instances", label: "Instances" }];
+    const tabs = [
+        { id: "instances", label: "Instances" },
+        { id: "volumes", label: "Volumes" },
+        { id: "security-groups", label: "Security Groups" },
+        { id: "key-pairs", label: "Key Pairs" },
+        { id: "elastic-ips", label: "Elastic IPs" }
+    ];
     let activeTab = $state("instances");
     let selectedInstance = $state<any>(null);
+
+    $effect(() => {
+        if (!client) return;
+        if (activeTab === "instances" && items.length === 0) load();
+        else if (activeTab === "volumes" && volumes.length === 0) loadVolumes();
+        else if (activeTab === "security-groups" && securityGroups.length === 0) loadSecurityGroups();
+        else if (activeTab === "key-pairs" && keyPairs.length === 0) loadKeyPairs();
+        else if (activeTab === "elastic-ips" && elasticIps.length === 0) loadElasticIps();
+    });
 
     // --- Pagination Shared Helpers ---
     function pushToken(history: string[], currentNextToken?: string) {
@@ -82,6 +118,10 @@
                         private_ip: inst.PrivateIpAddress ?? "-",
                         az: inst.Placement?.AvailabilityZone ?? "",
                         launch_time: inst.LaunchTime?.toISOString() ?? "",
+                        vpc_id: inst.VpcId ?? "-",
+                        subnet_id: inst.SubnetId ?? "-",
+                        key_name: inst.KeyName ?? "-",
+                        security_groups: inst.SecurityGroups?.map(sg => sg.GroupName).join(", ") ?? "-",
                     });
                 }
             }
@@ -92,6 +132,126 @@
             error = String(e);
         } finally {
             loading = false;
+        }
+    }
+
+    async function loadVolumes(token?: string) {
+        if (!client) return;
+        try {
+            volumesLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await client.send(
+                new DescribeVolumesCommand({
+                    MaxResults: 50,
+                    NextToken: token,
+                }),
+            );
+            volumes = (resp.Volumes ?? []).map((v) => {
+                const nameTag = v.Tags?.find((t) => t.Key === "Name");
+                return {
+                    id: v.VolumeId ?? "Unknown",
+                    name: nameTag?.Value ?? "-",
+                    size: v.Size ?? 0,
+                    type: v.VolumeType ?? "Unknown",
+                    state: v.State ?? "Unknown",
+                    iops: v.Iops ?? "-",
+                    encrypted: v.Encrypted ? "Yes" : "No",
+                    az: v.AvailabilityZone ?? "-",
+                    created: v.CreateTime?.toLocaleString() ?? "-",
+                    attachments: v.Attachments?.map(a => a.InstanceId).join(", ") || "-"
+                };
+            });
+            pushToken(volTokenMap, resp.NextToken);
+            volCurrentToken = resp.NextToken;
+        } catch (e) {
+            error = String(e);
+        } finally {
+            volumesLoading = false;
+        }
+    }
+
+    async function loadSecurityGroups(token?: string) {
+        if (!client) return;
+        try {
+            sgLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await client.send(
+                new DescribeSecurityGroupsCommand({
+                    MaxResults: 50,
+                    NextToken: token,
+                }),
+            );
+            securityGroups = (resp.SecurityGroups ?? []).map((sg) => {
+                return {
+                    id: sg.GroupId ?? "Unknown",
+                    name: sg.GroupName ?? "-",
+                    description: sg.Description ?? "-",
+                    vpc_id: sg.VpcId ?? "-",
+                    inbound_rules: sg.IpPermissions?.length ?? 0,
+                    outbound_rules: sg.IpPermissionsEgress?.length ?? 0
+                };
+            });
+            pushToken(sgTokenMap, resp.NextToken);
+            sgCurrentToken = resp.NextToken;
+        } catch (e) {
+            error = String(e);
+        } finally {
+            sgLoading = false;
+        }
+    }
+
+    async function loadKeyPairs() {
+        if (!client) return;
+        try {
+            kpLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await client.send(
+                new DescribeKeyPairsCommand({}),
+            );
+            keyPairs = (resp.KeyPairs ?? []).map((kp) => {
+                return {
+                    id: kp.KeyPairId ?? "Unknown",
+                    name: kp.KeyName ?? "-",
+                    type: kp.KeyType ?? "-",
+                    fingerprint: kp.KeyFingerprint ?? "-",
+                    created: kp.CreateTime?.toLocaleString() ?? "-"
+                };
+            });
+        } catch (e) {
+            error = String(e);
+        } finally {
+            kpLoading = false;
+        }
+    }
+
+    async function loadElasticIps() {
+        if (!client) return;
+        try {
+            eipLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await client.send(
+                new DescribeAddressesCommand({}),
+            );
+            elasticIps = (resp.Addresses ?? []).map((eip) => {
+                const nameTag = eip.Tags?.find((t) => t.Key === "Name");
+                return {
+                    id: eip.AllocationId ?? "Unknown",
+                    name: nameTag?.Value ?? "-",
+                    public_ip: eip.PublicIp ?? "-",
+                    private_ip: eip.PrivateIpAddress ?? "-",
+                    instance_id: eip.InstanceId ?? "-",
+                    association_id: eip.AssociationId ?? "-",
+                    network_interface_id: eip.NetworkInterfaceId ?? "-",
+                };
+            });
+        } catch (e) {
+            error = String(e);
+        } finally {
+            eipLoading = false;
         }
     }
 
@@ -161,6 +321,51 @@
         { key: "public_ip", label: "Public IP" },
         { key: "private_ip", label: "Private IP" },
         { key: "az", label: "Availability Zone" },
+    ];
+
+    const volColumns = [
+        { key: "name", label: "Name" },
+        { key: "id", label: "Volume ID" },
+        { key: "size", label: "Size (GiB)", format: (v: number) => `${v} GiB` },
+        { key: "type", label: "Type" },
+        {
+            key: "state",
+            label: "State",
+            format: (v: string) => {
+                if (v === "in-use") return "🟢 in-use";
+                if (v === "available") return "🔵 available";
+                return `🟡 ${v}`;
+            },
+        },
+        { key: "attachments", label: "Attached Instance" },
+        { key: "iops", label: "IOPS" },
+        { key: "az", label: "Availability Zone" },
+    ];
+
+    const sgColumns = [
+        { key: "name", label: "Name" },
+        { key: "id", label: "Group ID" },
+        { key: "vpc_id", label: "VPC ID" },
+        { key: "description", label: "Description" },
+        { key: "inbound_rules", label: "Inbound Rules" },
+        { key: "outbound_rules", label: "Outbound Rules" },
+    ];
+
+    const kpColumns = [
+        { key: "name", label: "Name" },
+        { key: "id", label: "Key Pair ID" },
+        { key: "type", label: "Type" },
+        { key: "fingerprint", label: "Fingerprint" },
+        { key: "created", label: "Creation Date" },
+    ];
+
+    const eipColumns = [
+        { key: "name", label: "Name" },
+        { key: "public_ip", label: "Allocated IPv4 address" },
+        { key: "id", label: "Allocation ID" },
+        { key: "instance_id", label: "Associated instance ID" },
+        { key: "private_ip", label: "Private IPv4 address" },
+        { key: "network_interface_id", label: "Network interface ID" },
     ];
 </script>
 
@@ -258,6 +463,54 @@
                             {selectedInstance.private_ip}
                         </div>
                     </div>
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            VPC ID
+                        </div>
+                        <div class="text-base font-bold text-gray-200">
+                            {selectedInstance.vpc_id}
+                        </div>
+                    </div>
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            Subnet ID
+                        </div>
+                        <div class="text-base font-bold text-gray-200">
+                            {selectedInstance.subnet_id}
+                        </div>
+                    </div>
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            Key Name
+                        </div>
+                        <div class="text-base font-bold text-gray-200">
+                            {selectedInstance.key_name}
+                        </div>
+                    </div>
+                    <div
+                        class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
+                    >
+                        <div
+                            class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
+                        >
+                            Security Groups
+                        </div>
+                        <div class="text-base font-bold text-gray-200">
+                            {selectedInstance.security_groups}
+                        </div>
+                    </div>
                 </div>
             </div>
         {:else if activeTab === "instances"}
@@ -307,6 +560,52 @@
                     </div>
                 {/snippet}
             </PaginatedTable>
+        {:else if activeTab === "volumes"}
+            <PaginatedTable
+                items={volumes}
+                loading={volumesLoading}
+                hasNext={!!volCurrentToken}
+                hasPrev={volTokenMap.length > 0}
+                onNext={() => loadVolumes(volCurrentToken)}
+                onPrev={() => loadVolumes(popToken(volTokenMap))}
+                onRefresh={() => {
+                    volTokenMap = [];
+                    loadVolumes();
+                }}
+                columns={volColumns}
+            />
+        {:else if activeTab === "security-groups"}
+            <PaginatedTable
+                items={securityGroups}
+                loading={sgLoading}
+                hasNext={!!sgCurrentToken}
+                hasPrev={sgTokenMap.length > 0}
+                onNext={() => loadSecurityGroups(sgCurrentToken)}
+                onPrev={() => loadSecurityGroups(popToken(sgTokenMap))}
+                onRefresh={() => {
+                    sgTokenMap = [];
+                    loadSecurityGroups();
+                }}
+                columns={sgColumns}
+            />
+        {:else if activeTab === "key-pairs"}
+            <PaginatedTable
+                items={keyPairs}
+                loading={kpLoading}
+                hasNext={false}
+                hasPrev={false}
+                onRefresh={() => loadKeyPairs()}
+                columns={kpColumns}
+            />
+        {:else if activeTab === "elastic-ips"}
+            <PaginatedTable
+                items={elasticIps}
+                loading={eipLoading}
+                hasNext={false}
+                hasPrev={false}
+                onRefresh={() => loadElasticIps()}
+                columns={eipColumns}
+            />
         {/if}
     </div>
 </ServiceLayout>
