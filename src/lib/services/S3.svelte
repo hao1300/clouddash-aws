@@ -6,6 +6,10 @@
         ListObjectsV2Command,
         GetObjectCommand,
         GetBucketLocationCommand,
+        PutObjectCommand,
+        DeleteObjectCommand,
+        CreateBucketCommand,
+        DeleteBucketCommand,
     } from "@aws-sdk/client-s3";
     import { fetch } from "@tauri-apps/plugin-http";
     import { getAwsCredentials } from "./aws-creds";
@@ -40,6 +44,26 @@
     let previewContent = $state("");
     let previewLoading = $state(false);
     let previewType = $state("");
+
+    // --- Modals & Uploads ---
+    let showCreateBucket = $state(false);
+    let newBucketName = $state("");
+    let newBucketLoading = $state(false);
+
+    let showCreateFolder = $state(false);
+    let newFolderName = $state("");
+    let newFolderLoading = $state(false);
+
+    let uploadFileInput = $state<HTMLInputElement | null>(null);
+    let uploadLoading = $state(false);
+
+    let showDeleteConfirm = $state(false);
+    let itemToDelete = $state<{
+        type: "bucket" | "file" | "folder";
+        key: string;
+        name: string;
+    } | null>(null);
+    let deleteLoading = $state(false);
 
     function makeS3Client(region: string, creds: any): S3Client {
         return new S3Client({
@@ -167,6 +191,40 @@
         }
     }
 
+    async function createBucket() {
+        if (!newBucketName || !s3Client) return;
+        try {
+            newBucketLoading = true;
+            error = "";
+            await s3Client.send(
+                new CreateBucketCommand({ Bucket: newBucketName }),
+            );
+            showCreateBucket = false;
+            newBucketName = "";
+            await loadBuckets();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            newBucketLoading = false;
+        }
+    }
+
+    async function deleteBucket(name: string) {
+        if (!s3Client) return;
+        try {
+            deleteLoading = true;
+            error = "";
+            await s3Client.send(new DeleteBucketCommand({ Bucket: name }));
+            showDeleteConfirm = false;
+            itemToDelete = null;
+            await loadBuckets();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            deleteLoading = false;
+        }
+    }
+
     async function loadBuckets() {
         if (!s3Client) return;
         try {
@@ -210,6 +268,86 @@
             loadObjects();
         } else {
             selectedBucket = "";
+        }
+    }
+
+    async function createFolder() {
+        if (!newFolderName || !selectedBucket) return;
+        try {
+            newFolderLoading = true;
+            error = "";
+            let folderKey = prefix + newFolderName;
+            if (!folderKey.endsWith("/")) folderKey += "/";
+
+            const bc = await clientForBucket(selectedBucket);
+            await bc.send(
+                new PutObjectCommand({
+                    Bucket: selectedBucket,
+                    Key: folderKey,
+                    Body: new Uint8Array(0),
+                }),
+            );
+            showCreateFolder = false;
+            newFolderName = "";
+            await loadObjects();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            newFolderLoading = false;
+        }
+    }
+
+    async function deleteObject(key: string) {
+        if (!selectedBucket) return;
+        try {
+            deleteLoading = true;
+            error = "";
+            const bc = await clientForBucket(selectedBucket);
+            await bc.send(
+                new DeleteObjectCommand({
+                    Bucket: selectedBucket,
+                    Key: key,
+                }),
+            );
+            showDeleteConfirm = false;
+            itemToDelete = null;
+            if (previewKey === key) previewKey = "";
+            await loadObjects();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            deleteLoading = false;
+        }
+    }
+
+    async function onFileUpload(e: Event) {
+        const input = e.target as HTMLInputElement;
+        if (!input.files || input.files.length === 0) return;
+
+        const file = input.files[0];
+        try {
+            uploadLoading = true;
+            error = "";
+
+            const buffer = await file.arrayBuffer();
+            const body = new Uint8Array(buffer);
+
+            const bc = await clientForBucket(selectedBucket);
+            await bc.send(
+                new PutObjectCommand({
+                    Bucket: selectedBucket,
+                    Key: prefix + file.name,
+                    Body: body,
+                    ContentType: file.type || "application/octet-stream",
+                }),
+            );
+
+            input.value = ""; // Reset
+            await loadObjects();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            uploadLoading = false;
         }
     }
 
@@ -390,7 +528,153 @@
             {error}
         </div>{/if}
 
+    <!-- Modals -->
+    {#if showCreateBucket}
+        <div
+            class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        >
+            <div
+                class="bg-gray-900 border border-gray-700 rounded-lg p-6 w-96 shadow-2xl"
+            >
+                <h3 class="text-lg font-semibold text-white mb-4">
+                    Create Bucket
+                </h3>
+                <input
+                    type="text"
+                    bind:value={newBucketName}
+                    placeholder="Bucket name"
+                    class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors mb-4"
+                />
+                <div class="flex justify-end gap-2">
+                    <button
+                        onclick={() => {
+                            showCreateBucket = false;
+                            newBucketName = "";
+                        }}
+                        class="px-4 py-2 rounded text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition"
+                        >Cancel</button
+                    >
+                    <button
+                        onclick={createBucket}
+                        disabled={!newBucketName || newBucketLoading}
+                        class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-bold transition shadow"
+                    >
+                        {newBucketLoading ? "Creating..." : "Create"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if showCreateFolder}
+        <div
+            class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        >
+            <div
+                class="bg-gray-900 border border-gray-700 rounded-lg p-6 w-96 shadow-2xl"
+            >
+                <h3 class="text-lg font-semibold text-white mb-4">
+                    Create Folder
+                </h3>
+                <p class="text-xs text-gray-400 mb-4">
+                    Creates an empty 0-byte object with a trailing slash in
+                    <span class="font-mono text-blue-300"
+                        >{selectedBucket}/{prefix}</span
+                    >
+                </p>
+                <input
+                    type="text"
+                    bind:value={newFolderName}
+                    placeholder="Folder name"
+                    class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors mb-4"
+                />
+                <div class="flex justify-end gap-2">
+                    <button
+                        onclick={() => {
+                            showCreateFolder = false;
+                            newFolderName = "";
+                        }}
+                        class="px-4 py-2 rounded text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition"
+                        >Cancel</button
+                    >
+                    <button
+                        onclick={createFolder}
+                        disabled={!newFolderName || newFolderLoading}
+                        class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-bold transition shadow"
+                    >
+                        {newFolderLoading ? "Creating..." : "Create Folder"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if showDeleteConfirm && itemToDelete}
+        <div
+            class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        >
+            <div
+                class="bg-gray-900 border border-gray-700 rounded-lg p-6 w-96 shadow-2xl"
+            >
+                <h3 class="text-lg font-semibold text-red-400 mb-4">
+                    Confirm Deletion
+                </h3>
+                <p class="text-sm text-gray-300 mb-4 break-all">
+                    Are you sure you want to delete the
+                    <strong class="text-white">{itemToDelete.type}</strong>:
+                    <br />
+                    <span class="font-mono text-red-300 mt-2 block"
+                        >{itemToDelete.name}</span
+                    >
+                </p>
+                {#if itemToDelete.type === "bucket"}
+                    <p class="text-xs text-yellow-500 mb-4">
+                        Warning: Bucket must be empty before it can be deleted!
+                    </p>
+                {/if}
+                {#if itemToDelete.type === "folder"}
+                    <p class="text-xs text-yellow-500 mb-4">
+                        Warning: Deleting a folder only deletes its marker
+                        object. The contents are not deleted!
+                    </p>
+                {/if}
+                <div class="flex justify-end gap-2">
+                    <button
+                        onclick={() => {
+                            showDeleteConfirm = false;
+                            itemToDelete = null;
+                        }}
+                        class="px-4 py-2 rounded text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition"
+                        >Cancel</button
+                    >
+                    <button
+                        onclick={() => {
+                            if (!itemToDelete) return;
+                            if (itemToDelete.type === "bucket") {
+                                deleteBucket(itemToDelete.name);
+                            } else {
+                                deleteObject(itemToDelete.key);
+                            }
+                        }}
+                        disabled={deleteLoading}
+                        class="bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-bold transition shadow"
+                    >
+                        {deleteLoading ? "Deleting..." : "Delete"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
     <div class="h-full {error ? 'pt-8' : ''}">
+        <!-- Hidden file input for uploads -->
+        <input
+            type="file"
+            class="hidden"
+            bind:this={uploadFileInput}
+            onchange={onFileUpload}
+        />
+
         {#if previewKey}
             <!-- Preview View -->
             <div class="h-full flex flex-col p-4 pr-1 bg-gray-950">
@@ -480,15 +764,47 @@
                         }}
                         columns={objectColumns}
                     >
+                        {#snippet headerActionsSnippet()}
+                            <button
+                                onclick={() => uploadFileInput?.click()}
+                                disabled={uploadLoading}
+                                class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-1.5 rounded text-xs font-semibold shadow transition"
+                            >
+                                {uploadLoading ? "Uploading..." : "⬆ Upload File"}
+                            </button>
+                            <button
+                                onclick={() => {
+                                    newFolderName = "";
+                                    showCreateFolder = true;
+                                }}
+                                class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 px-3 py-1.5 rounded text-xs font-semibold transition shadow"
+                            >
+                                📁 Create Folder
+                            </button>
+                        {/snippet}
                         {#snippet actionsSnippet(item)}
                             <div class="flex justify-end gap-2">
                                 {#if item.type !== "folder"}
                                     <button
                                         onclick={() => downloadFile(item.key)}
                                         class="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs transition"
+                                        title="Download"
                                         >⬇</button
                                     >
                                 {/if}
+                                <button
+                                    onclick={() => {
+                                        itemToDelete = {
+                                            type: item.type,
+                                            key: item.key,
+                                            name: item.name,
+                                        };
+                                        showDeleteConfirm = true;
+                                    }}
+                                    class="text-red-400 hover:text-white bg-red-900/30 hover:bg-red-800 px-3 py-1 rounded text-xs transition"
+                                    title="Delete"
+                                    >🗑</button
+                                >
                             </div>
                         {/snippet}
                     </PaginatedTable>
@@ -508,6 +824,32 @@
                     <span class="text-xs text-gray-500 italic mr-2"
                         >List limit 1000</span
                     >
+                    <button
+                        onclick={() => {
+                            newBucketName = "";
+                            showCreateBucket = true;
+                        }}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-semibold shadow transition"
+                    >
+                        + Create Bucket
+                    </button>
+                {/snippet}
+                {#snippet actionsSnippet(item)}
+                    <div class="flex justify-end gap-2">
+                        <button
+                            onclick={() => {
+                                itemToDelete = {
+                                    type: "bucket",
+                                    key: item.name,
+                                    name: item.name,
+                                };
+                                showDeleteConfirm = true;
+                            }}
+                            class="text-red-400 hover:text-white bg-red-900/30 hover:bg-red-800 px-3 py-1 rounded text-xs transition"
+                            title="Delete Bucket"
+                            >🗑</button
+                        >
+                    </div>
                 {/snippet}
             </PaginatedTable>
         {/if}
