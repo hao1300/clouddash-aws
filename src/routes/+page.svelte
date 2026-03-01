@@ -2,7 +2,8 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
   import { services, type ServiceDef } from "$lib/services/registry";
-  import Modal from "$lib/components/Modal.svelte";
+  import SettingsDialog from "$lib/components/SettingsDialog.svelte";
+  import Login from "$lib/components/Login.svelte";
 
   const STORAGE_KEY = "aws_console_state";
 
@@ -297,342 +298,37 @@
   }
 
   // Generic reorder helpers
-  function moveItem<T>(arr: T[], idx: number, dir: -1 | 1): T[] {
-    const n = idx + dir;
-    if (n < 0 || n >= arr.length) return arr;
-    const copy = [...arr];
-    [copy[idx], copy[n]] = [copy[n], copy[idx]];
-    return copy;
-  }
-
-  function toggleInSet(s: Set<string>, id: string, minSize = 1): Set<string> {
-    const next = new Set(s);
-    if (next.has(id)) {
-      if (next.size > minSize) next.delete(id);
-    } else next.add(id);
-    return next;
-  }
-
-  // Profile
-  function moveProfile(idx: number, dir: -1 | 1) {
-    profileOrder = moveItem(profileOrder, idx, dir);
-    saveState();
-  }
-  function toggleProfile(id: string) {
-    profileVisible = toggleInSet(profileVisible, id, 1);
-    saveState();
-  }
-
-  // Region
-  function moveRegion(idx: number, dir: -1 | 1) {
-    regionOrder = moveItem(regionOrder, idx, dir);
-    saveState();
-  }
-  function toggleRegion(id: string) {
-    regionVisible = toggleInSet(regionVisible, id, 1);
-    saveState();
-  }
-
-  // Service
-  function moveService(idx: number, dir: -1 | 1) {
-    serviceOrder = moveItem(serviceOrder, idx, dir);
-    saveState();
-  }
-  function toggleService(id: string) {
-    serviceVisible = toggleInSet(serviceVisible, id, 1);
-    if (!serviceVisible.has(activeId)) {
-      const first = serviceOrder.find((sid) => serviceVisible.has(sid));
-      if (first) {
-        activeId = first;
-        refreshKey++;
-      }
-    }
-    saveState();
-  }
-
-  // --- Drag-and-drop reorder ---
-  let dragIdx = $state(-1);
-  let dragOverIdx = $state(-1);
-
-  function handleDragStart(e: DragEvent, idx: number) {
-    dragIdx = idx;
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", String(idx));
-    }
-  }
-
-  function handleDragOver(e: DragEvent, idx: number) {
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-    dragOverIdx = idx;
-  }
-
-  function handleDrop(
-    e: DragEvent,
-    kind: "profile" | "region" | "service",
-    toIdx: number,
-  ) {
-    e.preventDefault();
-    if (dragIdx < 0 || dragIdx === toIdx) {
-      dragIdx = -1;
-      dragOverIdx = -1;
-      return;
-    }
-    function reorder<T>(arr: T[]): T[] {
-      const copy = [...arr];
-      const [moved] = copy.splice(dragIdx, 1);
-      copy.splice(toIdx, 0, moved);
-      return copy;
-    }
-    if (kind === "profile") profileOrder = reorder(profileOrder);
-    else if (kind === "region") regionOrder = reorder(regionOrder);
-    else serviceOrder = reorder(serviceOrder);
-    saveState();
-    dragIdx = -1;
-    dragOverIdx = -1;
-  }
-
-  function handleDragEnd() {
-    dragIdx = -1;
-    dragOverIdx = -1;
-  }
 </script>
 
 <main
   class="absolute inset-0 bg-gray-950 text-white flex flex-col font-sans overflow-hidden pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]"
 >
   {#if !isAuthenticated}
-    <div class="flex items-center justify-center flex-1 p-4">
-      <div
-        class="w-full max-w-sm bg-gray-900 p-6 rounded-xl shadow-2xl border border-gray-800"
-      >
-        <h1 class="text-xl font-bold mb-4 text-blue-400">AWS Console</h1>
-        {#if error}<div
-            class="bg-red-500/20 text-red-300 p-2 rounded mb-3 text-xs"
-          >
-            {error}
-          </div>{/if}
-        <div class="space-y-3">
-          <div>
-            <div
-              class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-            >
-              Login Method
-            </div>
-            <div class="flex gap-2" role="group" aria-label="Login Method">
-              <button
-                onclick={() => switchAuthType("profile")}
-                class="flex-1 py-1.5 rounded text-xs font-semibold transition {authType ===
-                'profile'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
-                >Profile</button
-              >
-              <button
-                onclick={() => switchAuthType("manual")}
-                class="flex-1 py-1.5 rounded text-xs font-semibold transition {authType ===
-                'manual'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
-                >API Keys</button
-              >
-              <button
-                onclick={() => switchAuthType("sso")}
-                class="flex-1 py-1.5 rounded text-xs font-semibold transition {authType ===
-                'sso'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
-                >AWS SSO</button
-              >
-            </div>
-          </div>
-
-          {#if authType === "profile"}
-            <div>
-              <label
-                for="profileSelect"
-                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                >Profile</label
-              >
-              <select
-                id="profileSelect"
-                bind:value={selectedProfile}
-                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500"
-              >
-                {#each visibleProfiles as p}<option value={p}>{p}</option
-                  >{/each}
-              </select>
-            </div>
-          {:else if authType === "manual"}
-            <div>
-              <label
-                for="akInput"
-                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                >Access Key ID</label
-              >
-              <input
-                id="akInput"
-                type="text"
-                bind:value={accessKeyId}
-                placeholder="AKIAIOSFODNN7EXAMPLE"
-                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-              />
-            </div>
-            <div>
-              <label
-                for="skInput"
-                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                >Secret Access Key</label
-              >
-              <input
-                id="skInput"
-                type="password"
-                bind:value={secretAccessKey}
-                placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-              />
-            </div>
-            <div>
-              <label class="flex items-center gap-2 cursor-pointer mt-2 mb-1">
-                <input
-                  type="checkbox"
-                  bind:checked={saveProfileChecked}
-                  class="accent-blue-500 rounded bg-gray-900 border-gray-700"
-                />
-                <span class="text-xs text-gray-300"
-                  >Save as Profile in ~/.aws</span
-                >
-              </label>
-              {#if saveProfileChecked}
-                <input
-                  type="text"
-                  bind:value={saveProfileName}
-                  placeholder="Profile name (e.g. prod-admin)"
-                  class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                />
-              {/if}
-            </div>
-            <div class="mt-2">
-              <label
-                for="stInput"
-                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                >Session Token <span class="text-[10px] opacity-70"
-                  >(Optional)</span
-                ></label
-              >
-              <textarea
-                id="stInput"
-                bind:value={sessionToken}
-                rows="2"
-                placeholder="IQoJb3JpZ2luX2VjEBs..."
-                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono resize-none"
-              ></textarea>
-            </div>
-          {:else if authType === "sso"}
-            <div
-              class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
-            >
-              <strong>SSO Web Login:</strong> This will create an AWS SSO
-              profile in your <code>~/.aws/config</code> and execute
-              <code>aws sso login</code>, which securely opens your web browser
-              to authenticate.
-            </div>
-            <div>
-              <label
-                for="ssoProfileInput"
-                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                >Profile Name</label
-              >
-              <input
-                id="ssoProfileInput"
-                type="text"
-                bind:value={ssoProfileName}
-                placeholder="my-sso-admin"
-                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-              />
-            </div>
-            <div>
-              <label
-                for="ssoUrlInput"
-                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                >Start URL</label
-              >
-              <input
-                id="ssoUrlInput"
-                type="text"
-                bind:value={ssoStartUrl}
-                placeholder="https://d-12345.awsapps.com/start"
-                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-              />
-            </div>
-            <div class="flex flex-col sm:flex-row gap-2">
-              <div class="flex-1">
-                <label
-                  for="ssoRegInput"
-                  class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                  >SSO Region</label
-                >
-                <input
-                  id="ssoRegInput"
-                  type="text"
-                  bind:value={ssoRegion}
-                  placeholder="us-east-1"
-                  class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                />
-              </div>
-              <div class="flex-1">
-                <label
-                  for="ssoAccInput"
-                  class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                  >Account ID</label
-                >
-                <input
-                  id="ssoAccInput"
-                  type="text"
-                  bind:value={ssoAccountId}
-                  placeholder="123456789012"
-                  class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                />
-              </div>
-            </div>
-            <div>
-              <label
-                for="ssoRoleInput"
-                class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                >Role Name</label
-              >
-              <input
-                id="ssoRoleInput"
-                type="text"
-                bind:value={ssoRoleName}
-                placeholder="AdministratorAccess"
-                class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-              />
-            </div>
-          {/if}
-          <div>
-            <label
-              for="regionSelect"
-              class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-              >Region</label
-            >
-            <select
-              id="regionSelect"
-              bind:value={region}
-              class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500"
-            >
-              {#each visibleRegions as r}<option value={r}>{r}</option>{/each}
-            </select>
-          </div>
-          <button
-            onclick={() => login()}
-            class="w-full bg-blue-600 hover:bg-blue-500 p-2.5 rounded font-bold text-sm shadow-lg transition"
-            >{loading ? "Connecting..." : "Connect"}</button
-          >
-        </div>
-      </div>
-    </div>
+    <Login
+      bind:authType
+      bind:selectedProfile
+      bind:accessKeyId
+      bind:secretAccessKey
+      bind:sessionToken
+      bind:saveProfileChecked
+      bind:saveProfileName
+      bind:ssoProfileName
+      bind:ssoStartUrl
+      bind:ssoRegion
+      bind:ssoAccountId
+      bind:ssoRoleName
+      bind:region
+      visibleProfiles={allProfiles
+        .filter((p) => profileVisible.has(p))
+        .sort((a, b) => profileOrder.indexOf(a) - profileOrder.indexOf(b))}
+      visibleRegions={ALL_REGIONS.filter((r) => regionVisible.has(r)).sort(
+        (a, b) => regionOrder.indexOf(a) - regionOrder.indexOf(b),
+      )}
+      {loading}
+      {error}
+      onLogin={() => login()}
+      onSwitchAuthType={switchAuthType}
+    />
   {:else}
     <header
       class="flex flex-col sm:flex-row sm:items-center bg-gray-900 border-b border-gray-800 shrink-0"
@@ -706,177 +402,17 @@
         {error}
       </div>{/if}
 
-    <Modal bind:open={showSettings} title="Settings" maxWidth="max-w-xl">
-      <div class="flex -m-5" style="height: 420px;">
-        <!-- Left vertical tabs -->
-        <div
-          class="w-32 bg-gray-950 border-r border-gray-800 flex flex-col py-2 shrink-0"
-        >
-          {#each [["profiles", "Profiles"], ["regions", "Regions"], ["services", "Services"]] as const as [key, label]}
-            <button
-              onclick={() => (settingsTab = key)}
-              class="px-4 py-2.5 text-left text-xs font-semibold transition whitespace-nowrap {settingsTab ===
-              key
-                ? 'bg-gray-800 text-blue-400 border-r-2 border-blue-500'
-                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-900 border-r-2 border-transparent'}"
-            >
-              {label}
-            </button>
-          {/each}
-        </div>
-
-        <!-- Right content -->
-        <div class="flex-1 p-4 overflow-auto">
-          {#if settingsTab === "profiles"}
-            <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
-              Profiles — show, hide & reorder
-            </h3>
-            <div class="space-y-1">
-              {#each profileOrder as id, idx}
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div
-                  draggable="true"
-                  ondragstart={(e) => handleDragStart(e, idx)}
-                  ondragover={(e) => handleDragOver(e, idx)}
-                  ondrop={(e) => handleDrop(e, "profile", idx)}
-                  ondragend={handleDragEnd}
-                  class="flex items-center gap-2 px-3 py-2 rounded border transition cursor-grab active:cursor-grabbing {dragOverIdx ===
-                  idx
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-gray-800 bg-gray-800/30 hover:bg-gray-800/60'} {dragIdx ===
-                  idx
-                    ? 'opacity-40'
-                    : ''}"
-                >
-                  <span
-                    class="text-gray-600 text-sm select-none"
-                    title="Drag to reorder">⠿</span
-                  >
-                  <span class="flex-1 text-sm font-mono text-gray-200"
-                    >{id}</span
-                  >
-                  <button
-                    onclick={() => toggleProfile(id)}
-                    aria-label="Toggle {id}"
-                    class="w-9 h-5 rounded-full relative transition-colors {profileVisible.has(
-                      id,
-                    )
-                      ? 'bg-blue-600'
-                      : 'bg-gray-700'}"
-                  >
-                    <span
-                      class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all {profileVisible.has(
-                        id,
-                      )
-                        ? 'left-[18px]'
-                        : 'left-0.5'}"
-                    ></span>
-                  </button>
-                </div>
-              {/each}
-            </div>
-          {:else if settingsTab === "regions"}
-            <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
-              Regions — show, hide & reorder
-            </h3>
-            <div class="space-y-1">
-              {#each regionOrder as id, idx}
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div
-                  draggable="true"
-                  ondragstart={(e) => handleDragStart(e, idx)}
-                  ondragover={(e) => handleDragOver(e, idx)}
-                  ondrop={(e) => handleDrop(e, "region", idx)}
-                  ondragend={handleDragEnd}
-                  class="flex items-center gap-2 px-3 py-1.5 rounded border transition cursor-grab active:cursor-grabbing {dragOverIdx ===
-                  idx
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-gray-800 bg-gray-800/30 hover:bg-gray-800/60'} {dragIdx ===
-                  idx
-                    ? 'opacity-40'
-                    : ''}"
-                >
-                  <span
-                    class="text-gray-600 text-sm select-none"
-                    title="Drag to reorder">⠿</span
-                  >
-                  <span class="flex-1 text-sm font-mono text-gray-200"
-                    >{id}</span
-                  >
-                  <button
-                    onclick={() => toggleRegion(id)}
-                    aria-label="Toggle {id}"
-                    class="w-9 h-5 rounded-full relative transition-colors {regionVisible.has(
-                      id,
-                    )
-                      ? 'bg-blue-600'
-                      : 'bg-gray-700'}"
-                  >
-                    <span
-                      class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all {regionVisible.has(
-                        id,
-                      )
-                        ? 'left-[18px]'
-                        : 'left-0.5'}"
-                    ></span>
-                  </button>
-                </div>
-              {/each}
-            </div>
-          {:else if settingsTab === "services"}
-            <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
-              Services — show, hide & reorder
-            </h3>
-            <div class="space-y-1">
-              {#each serviceOrder as id, idx}
-                {@const svc = services.find((s) => s.id === id)}
-                {#if svc}
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <div
-                    draggable="true"
-                    ondragstart={(e) => handleDragStart(e, idx)}
-                    ondragover={(e) => handleDragOver(e, idx)}
-                    ondrop={(e) => handleDrop(e, "service", idx)}
-                    ondragend={handleDragEnd}
-                    class="flex items-center gap-2 px-3 py-2 rounded border transition cursor-grab active:cursor-grabbing {dragOverIdx ===
-                    idx
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-gray-800 bg-gray-800/30 hover:bg-gray-800/60'} {dragIdx ===
-                    idx
-                      ? 'opacity-40'
-                      : ''}"
-                  >
-                    <span
-                      class="text-gray-600 text-sm select-none"
-                      title="Drag to reorder">⠿</span
-                    >
-                    <span class="flex-1 text-sm text-gray-200">{svc.label}</span
-                    >
-                    <button
-                      onclick={() => toggleService(id)}
-                      aria-label="Toggle {svc.label}"
-                      class="w-9 h-5 rounded-full relative transition-colors {serviceVisible.has(
-                        id,
-                      )
-                        ? 'bg-blue-600'
-                        : 'bg-gray-700'}"
-                    >
-                      <span
-                        class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all {serviceVisible.has(
-                          id,
-                        )
-                          ? 'left-[18px]'
-                          : 'left-0.5'}"
-                      ></span>
-                    </button>
-                  </div>
-                {/if}
-              {/each}
-            </div>
-          {/if}
-        </div>
-      </div></Modal
-    >
+    <SettingsDialog
+      bind:open={showSettings}
+      bind:profileOrder
+      bind:profileVisible
+      bind:regionOrder
+      bind:regionVisible
+      bind:serviceOrder
+      bind:serviceVisible
+      {services}
+      onChange={saveState}
+    />
 
     <!-- Dynamic Content -->
     <div class="flex-1 overflow-hidden relative">
