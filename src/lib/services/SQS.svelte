@@ -51,7 +51,7 @@
         MessageRetentionPeriod: "345600",
         DeliveryDelay: "0",
         MaximumMessageSize: "262144",
-        ReceiveMessageWaitTimeSeconds: "0"
+        ReceiveMessageWaitTimeSeconds: "0",
     });
 
     // --- Queue Detail View ---
@@ -162,7 +162,7 @@
                 new GetQueueAttributesCommand({
                     QueueUrl: selectedQueue.url,
                     AttributeNames: ["All"],
-                })
+                }),
             );
             queueAttributes = attrs.Attributes ?? {};
         } catch (e) {
@@ -183,8 +183,12 @@
             const attributesToUpdate: Record<string, string> = {
                 VisibilityTimeout: String(queueAttributes.VisibilityTimeout),
                 DelaySeconds: String(queueAttributes.DelaySeconds),
-                ReceiveMessageWaitTimeSeconds: String(queueAttributes.ReceiveMessageWaitTimeSeconds),
-                MessageRetentionPeriod: String(queueAttributes.MessageRetentionPeriod),
+                ReceiveMessageWaitTimeSeconds: String(
+                    queueAttributes.ReceiveMessageWaitTimeSeconds,
+                ),
+                MessageRetentionPeriod: String(
+                    queueAttributes.MessageRetentionPeriod,
+                ),
                 MaximumMessageSize: String(queueAttributes.MaximumMessageSize),
             };
 
@@ -192,7 +196,7 @@
                 new SetQueueAttributesCommand({
                     QueueUrl: selectedQueue.url,
                     Attributes: attributesToUpdate,
-                })
+                }),
             );
             actionMsg = "Queue configuration saved.";
         } catch (e) {
@@ -204,7 +208,12 @@
 
     async function deleteQueue() {
         if (!client || !selectedQueue) return;
-        if (!confirm(`Are you sure you want to delete queue ${selectedQueue.name}? This cannot be undone.`)) return;
+        if (
+            !confirm(
+                `Are you sure you want to delete queue ${selectedQueue.name}? This cannot be undone.`,
+            )
+        )
+            return;
         try {
             loading = true;
             error = "";
@@ -212,7 +221,7 @@
             await client.send(
                 new DeleteQueueCommand({
                     QueueUrl: selectedQueue.url,
-                })
+                }),
             );
             actionMsg = `Queue ${selectedQueue.name} deleted.`;
             selectedQueue = null;
@@ -238,10 +247,14 @@
 
             const attributes: Record<string, string> = {
                 VisibilityTimeout: String(createParams.VisibilityTimeout),
-                MessageRetentionPeriod: String(createParams.MessageRetentionPeriod),
+                MessageRetentionPeriod: String(
+                    createParams.MessageRetentionPeriod,
+                ),
                 DelaySeconds: String(createParams.DeliveryDelay),
                 MaximumMessageSize: String(createParams.MaximumMessageSize),
-                ReceiveMessageWaitTimeSeconds: String(createParams.ReceiveMessageWaitTimeSeconds),
+                ReceiveMessageWaitTimeSeconds: String(
+                    createParams.ReceiveMessageWaitTimeSeconds,
+                ),
             };
 
             if (createParams.Type === "FIFO") {
@@ -252,7 +265,7 @@
                 new CreateQueueCommand({
                     QueueName: queueName,
                     Attributes: attributes,
-                })
+                }),
             );
 
             actionMsg = `Queue ${queueName} created successfully.`;
@@ -399,65 +412,129 @@
             <div class="p-6 max-w-2xl mx-auto h-full overflow-y-auto">
                 <div class="flex items-center gap-3 mb-6">
                     <button
-                        onclick={() => { showCreate = false; error = ""; actionMsg = ""; }}
+                        onclick={() => {
+                            showCreate = false;
+                            error = "";
+                            actionMsg = "";
+                        }}
                         class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
-                    >← Back to Queues</button>
-                    <h2 class="text-xl font-bold text-gray-100">Create Queue</h2>
+                        >← Back to Queues</button
+                    >
+                    <h2 class="text-xl font-bold text-gray-100">
+                        Create Queue
+                    </h2>
                 </div>
 
-                <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-5">
+                <div
+                    class="bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-5"
+                >
                     <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">Queue Name</label>
+                        <label
+                            class="block text-sm font-medium text-gray-300 mb-1"
+                            >Queue Name</label
+                        >
                         <input
                             type="text"
                             bind:value={createParams.QueueName}
                             placeholder="MyQueue"
                             class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
                         />
-                        <p class="text-xs text-gray-500 mt-1">FIFO queues will automatically have '.fifo' appended if not provided.</p>
+                        <p class="text-xs text-gray-500 mt-1">
+                            FIFO queues will automatically have '.fifo' appended
+                            if not provided.
+                        </p>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">Type</label>
+                        <label
+                            class="block text-sm font-medium text-gray-300 mb-1"
+                            >Type</label
+                        >
                         <select
                             bind:value={createParams.Type}
                             class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
                         >
-                            <option value="Standard">Standard (at-least-once delivery, best-effort ordering)</option>
-                            <option value="FIFO">FIFO (first-in-first-out delivery, exact-once processing)</option>
+                            <option value="Standard"
+                                >Standard (at-least-once delivery, best-effort
+                                ordering)</option
+                            >
+                            <option value="FIFO"
+                                >FIFO (first-in-first-out delivery, exact-once
+                                processing)</option
+                            >
                         </select>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Visibility Timeout (seconds)</label>
-                            <input type="number" bind:value={createParams.VisibilityTimeout} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-1"
+                                >Visibility Timeout (seconds)</label
+                            >
+                            <input
+                                type="number"
+                                bind:value={createParams.VisibilityTimeout}
+                                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                            />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Message Retention Period (seconds)</label>
-                            <input type="number" bind:value={createParams.MessageRetentionPeriod} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-1"
+                                >Message Retention Period (seconds)</label
+                            >
+                            <input
+                                type="number"
+                                bind:value={createParams.MessageRetentionPeriod}
+                                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                            />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Delivery Delay (seconds)</label>
-                            <input type="number" bind:value={createParams.DeliveryDelay} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-1"
+                                >Delivery Delay (seconds)</label
+                            >
+                            <input
+                                type="number"
+                                bind:value={createParams.DeliveryDelay}
+                                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                            />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Maximum Message Size (bytes)</label>
-                            <input type="number" bind:value={createParams.MaximumMessageSize} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-1"
+                                >Maximum Message Size (bytes)</label
+                            >
+                            <input
+                                type="number"
+                                bind:value={createParams.MaximumMessageSize}
+                                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                            />
                         </div>
                         <div class="md:col-span-2">
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Receive Message Wait Time (seconds)</label>
-                            <input type="number" bind:value={createParams.ReceiveMessageWaitTimeSeconds} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-1"
+                                >Receive Message Wait Time (seconds)</label
+                            >
+                            <input
+                                type="number"
+                                bind:value={
+                                    createParams.ReceiveMessageWaitTimeSeconds
+                                }
+                                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                            />
                         </div>
                     </div>
 
                     <div class="pt-4 flex justify-end">
                         <button
                             onclick={createQueue}
-                            disabled={createLoading || !createParams.QueueName.trim()}
+                            disabled={createLoading ||
+                                !createParams.QueueName.trim()}
                             class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-6 py-2 rounded text-sm font-bold transition flex items-center gap-2"
                         >
-                            {#if createLoading}<span class="animate-spin">⟳</span>{/if}
+                            {#if createLoading}<span class="animate-spin"
+                                    >⟳</span
+                                >{/if}
                             Create Queue
                         </button>
                     </div>
@@ -482,18 +559,28 @@
                         >{selectedQueue.name}</span
                     >
 
-                    <div class="flex gap-1 ml-auto border border-gray-800 rounded bg-black p-1">
+                    <div
+                        class="flex gap-1 ml-auto border border-gray-800 rounded bg-black p-1"
+                    >
                         <button
-                            onclick={() => queueDetailTab = "messages"}
-                            class="px-3 py-1 text-xs rounded transition-colors {queueDetailTab === 'messages' ? 'bg-gray-800 text-white font-semibold' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'}"
-                        >Messages</button>
+                            onclick={() => (queueDetailTab = "messages")}
+                            class="px-3 py-1 text-xs rounded transition-colors {queueDetailTab ===
+                            'messages'
+                                ? 'bg-gray-800 text-white font-semibold'
+                                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'}"
+                            >Messages</button
+                        >
                         <button
-                            onclick={() => queueDetailTab = "configuration"}
-                            class="px-3 py-1 text-xs rounded transition-colors {queueDetailTab === 'configuration' ? 'bg-gray-800 text-white font-semibold' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'}"
-                        >Configuration</button>
+                            onclick={() => (queueDetailTab = "configuration")}
+                            class="px-3 py-1 text-xs rounded transition-colors {queueDetailTab ===
+                            'configuration'
+                                ? 'bg-gray-800 text-white font-semibold'
+                                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'}"
+                            >Configuration</button
+                        >
                     </div>
 
-                    {#if queueDetailTab === 'messages'}
+                    {#if queueDetailTab === "messages"}
                         <button
                             onclick={purgeQueue}
                             class="bg-red-600/80 hover:bg-red-500 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow ml-2"
@@ -504,7 +591,8 @@
                             disabled={msgLoading}
                             class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow flex items-center gap-2"
                         >
-                            {#if msgLoading}<span class="animate-spin">⟳</span>{/if}
+                            {#if msgLoading}<span class="animate-spin">⟳</span
+                                >{/if}
                             Poll Messages
                         </button>
                     {:else}
@@ -518,149 +606,251 @@
                             disabled={attributesLoading}
                             class="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow flex items-center gap-2"
                         >
-                            {#if attributesLoading}<span class="animate-spin">⟳</span>{/if}
+                            {#if attributesLoading}<span class="animate-spin"
+                                    >⟳</span
+                                >{/if}
                             Save Config
                         </button>
                     {/if}
                 </div>
 
-                {#if queueDetailTab === 'messages'}
-                <!-- Send Message -->
-                <div
-                    class="flex gap-2 mb-4 shrink-0 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm"
-                >
-                    <textarea
-                        bind:value={sendBody}
-                        placeholder="Message body (JSON or text)"
-                        rows="2"
-                        class="flex-1 bg-black text-xs p-3 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 resize-none font-mono shadow-inner"
-                    ></textarea>
-                    <button
-                        onclick={sendMessage}
-                        disabled={!sendBody.trim() || sendLoading}
-                        class="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white px-6 rounded text-xs font-bold transition shadow flex items-center gap-2"
-                    >
-                        {#if sendLoading}<span class="animate-spin">⟳</span
-                            >{/if} Send
-                    </button>
-                </div>
-
-                <!-- Messages Table -->
-                <div
-                    class="flex-1 min-h-0 bg-gray-900 rounded-lg border border-gray-800 flex flex-col shadow-sm overflow-hidden"
-                >
+                {#if queueDetailTab === "messages"}
+                    <!-- Send Message -->
                     <div
-                        class="px-4 py-2 border-b border-gray-800 bg-gray-900/80 flex justify-between items-center shrink-0"
+                        class="flex gap-2 mb-4 shrink-0 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm"
                     >
-                        <h3
-                            class="text-xs font-bold text-gray-400 uppercase tracking-widest"
+                        <textarea
+                            bind:value={sendBody}
+                            placeholder="Message body (JSON or text)"
+                            rows="2"
+                            class="flex-1 bg-black text-xs p-3 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 resize-none font-mono shadow-inner"
+                        ></textarea>
+                        <button
+                            onclick={sendMessage}
+                            disabled={!sendBody.trim() || sendLoading}
+                            class="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white px-6 rounded text-xs font-bold transition shadow flex items-center gap-2"
                         >
-                            Polled Messages
-                        </h3>
-                        <span class="text-xs text-gray-500"
-                            >{messages.length > 0
-                                ? `${messages.length} messages`
-                                : "0 messages"}</span
-                        >
+                            {#if sendLoading}<span class="animate-spin">⟳</span
+                                >{/if} Send
+                        </button>
                     </div>
-                    <div class="flex-1 overflow-auto bg-gray-950 p-2">
-                        {#if msgLoading && messages.length === 0}
-                            <div
-                                class="h-full flex items-center justify-center text-gray-500"
+
+                    <!-- Messages Table -->
+                    <div
+                        class="flex-1 min-h-0 bg-gray-900 rounded-lg border border-gray-800 flex flex-col shadow-sm overflow-hidden"
+                    >
+                        <div
+                            class="px-4 py-2 border-b border-gray-800 bg-gray-900/80 flex justify-between items-center shrink-0"
+                        >
+                            <h3
+                                class="text-xs font-bold text-gray-400 uppercase tracking-widest"
                             >
-                                <span class="animate-spin text-xl mr-2">⟳</span>
-                                Polling...
-                            </div>
-                        {:else if messages.length > 0}
-                            <div class="space-y-2">
-                                {#each messages as msg}
-                                    <div
-                                        class="bg-gray-900 p-3 rounded-lg border border-gray-800 hover:border-gray-700 transition-colors"
+                                Polled Messages
+                            </h3>
+                            <span class="text-xs text-gray-500"
+                                >{messages.length > 0
+                                    ? `${messages.length} messages`
+                                    : "0 messages"}</span
+                            >
+                        </div>
+                        <div class="flex-1 overflow-auto bg-gray-950 p-2">
+                            {#if msgLoading && messages.length === 0}
+                                <div
+                                    class="h-full flex items-center justify-center text-gray-500"
+                                >
+                                    <span class="animate-spin text-xl mr-2"
+                                        >⟳</span
                                     >
+                                    Polling...
+                                </div>
+                            {:else if messages.length > 0}
+                                <div class="space-y-2">
+                                    {#each messages as msg}
                                         <div
-                                            class="flex justify-between items-start mb-2"
+                                            class="bg-gray-900 p-3 rounded-lg border border-gray-800 hover:border-gray-700 transition-colors"
                                         >
-                                            <span
-                                                class="font-mono text-xs text-gray-500 truncate mr-4"
-                                                title={msg.id}>{msg.id}</span
+                                            <div
+                                                class="flex justify-between items-start mb-2"
                                             >
-                                            <button
-                                                onclick={() =>
-                                                    deleteMessage(msg.receipt)}
-                                                class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs shrink-0 transition"
-                                                >Delete</button
-                                            >
+                                                <span
+                                                    class="font-mono text-xs text-gray-500 truncate mr-4"
+                                                    title={msg.id}
+                                                    >{msg.id}</span
+                                                >
+                                                <button
+                                                    onclick={() =>
+                                                        deleteMessage(
+                                                            msg.receipt,
+                                                        )}
+                                                    class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs shrink-0 transition"
+                                                    >Delete</button
+                                                >
+                                            </div>
+                                            <pre
+                                                class="text-xs text-gray-300 whitespace-pre-wrap break-all bg-black p-2 rounded border border-gray-800 max-h-40 overflow-auto">{msg.body}</pre>
+                                            {#if msg.sentTimestamp}<div
+                                                    class="text-xs text-gray-600 mt-2 text-right"
+                                                >
+                                                    {new Date(
+                                                        Number(
+                                                            msg.sentTimestamp,
+                                                        ),
+                                                    ).toLocaleString()}
+                                                </div>{/if}
                                         </div>
-                                        <pre
-                                            class="text-xs text-gray-300 whitespace-pre-wrap break-all bg-black p-2 rounded border border-gray-800 max-h-40 overflow-auto">{msg.body}</pre>
-                                        {#if msg.sentTimestamp}<div
-                                                class="text-xs text-gray-600 mt-2 text-right"
-                                            >
-                                                {new Date(
-                                                    Number(msg.sentTimestamp),
-                                                ).toLocaleString()}
-                                            </div>{/if}
-                                    </div>
-                                {/each}
-                            </div>
-                        {:else}
-                            <div
-                                class="h-full flex items-center justify-center text-gray-600 text-sm italic"
-                            >
-                                Click "Poll Messages" to retrieve messages.
-                            </div>
-                        {/if}
+                                    {/each}
+                                </div>
+                            {:else}
+                                <div
+                                    class="h-full flex items-center justify-center text-gray-600 text-sm italic"
+                                >
+                                    Click "Poll Messages" to retrieve messages.
+                                </div>
+                            {/if}
+                        </div>
                     </div>
-                </div>
                 {:else}
-                    <div class="flex-1 overflow-auto bg-gray-900 rounded-lg border border-gray-800 p-6 shadow-sm">
+                    <div
+                        class="flex-1 overflow-auto bg-gray-900 rounded-lg border border-gray-800 p-6 shadow-sm"
+                    >
                         {#if attributesLoading && Object.keys(queueAttributes).length === 0}
-                            <div class="flex items-center justify-center text-gray-500 h-full">
+                            <div
+                                class="flex items-center justify-center text-gray-500 h-full"
+                            >
                                 <span class="animate-spin text-xl mr-2">⟳</span>
                                 Loading Configuration...
                             </div>
                         {:else}
-                            <h3 class="text-sm font-bold text-gray-200 mb-6 border-b border-gray-800 pb-2">Queue Configuration</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+                            <h3
+                                class="text-sm font-bold text-gray-200 mb-6 border-b border-gray-800 pb-2"
+                            >
+                                Queue Configuration
+                            </h3>
+                            <div
+                                class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl"
+                            >
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-400 mb-1">Visibility Timeout (seconds)</label>
-                                    <input type="number" bind:value={queueAttributes.VisibilityTimeout} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                    <label
+                                        class="block text-xs font-medium text-gray-400 mb-1"
+                                        >Visibility Timeout (seconds)</label
+                                    >
+                                    <input
+                                        type="number"
+                                        bind:value={
+                                            queueAttributes.VisibilityTimeout
+                                        }
+                                        class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                                    />
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-400 mb-1">Message Retention Period (seconds)</label>
-                                    <input type="number" bind:value={queueAttributes.MessageRetentionPeriod} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                    <label
+                                        class="block text-xs font-medium text-gray-400 mb-1"
+                                        >Message Retention Period (seconds)</label
+                                    >
+                                    <input
+                                        type="number"
+                                        bind:value={
+                                            queueAttributes.MessageRetentionPeriod
+                                        }
+                                        class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                                    />
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-400 mb-1">Delivery Delay (seconds)</label>
-                                    <input type="number" bind:value={queueAttributes.DelaySeconds} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                    <label
+                                        class="block text-xs font-medium text-gray-400 mb-1"
+                                        >Delivery Delay (seconds)</label
+                                    >
+                                    <input
+                                        type="number"
+                                        bind:value={
+                                            queueAttributes.DelaySeconds
+                                        }
+                                        class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                                    />
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-400 mb-1">Maximum Message Size (bytes)</label>
-                                    <input type="number" bind:value={queueAttributes.MaximumMessageSize} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                    <label
+                                        class="block text-xs font-medium text-gray-400 mb-1"
+                                        >Maximum Message Size (bytes)</label
+                                    >
+                                    <input
+                                        type="number"
+                                        bind:value={
+                                            queueAttributes.MaximumMessageSize
+                                        }
+                                        class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                                    />
                                 </div>
                                 <div class="md:col-span-2">
-                                    <label class="block text-xs font-medium text-gray-400 mb-1">Receive Message Wait Time (seconds)</label>
-                                    <input type="number" bind:value={queueAttributes.ReceiveMessageWaitTimeSeconds} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                    <label
+                                        class="block text-xs font-medium text-gray-400 mb-1"
+                                        >Receive Message Wait Time (seconds)</label
+                                    >
+                                    <input
+                                        type="number"
+                                        bind:value={
+                                            queueAttributes.ReceiveMessageWaitTimeSeconds
+                                        }
+                                        class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                                    />
                                 </div>
                             </div>
 
-                            <h3 class="text-sm font-bold text-gray-200 mt-10 mb-4 border-b border-gray-800 pb-2">Queue Details (Read Only)</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-300">
-                                <div class="bg-black/50 p-3 rounded border border-gray-800">
-                                    <span class="text-gray-500 block mb-1">Queue ARN</span>
-                                    <span class="font-mono break-all">{queueAttributes.QueueArn ?? '-'}</span>
+                            <h3
+                                class="text-sm font-bold text-gray-200 mt-10 mb-4 border-b border-gray-800 pb-2"
+                            >
+                                Queue Details (Read Only)
+                            </h3>
+                            <div
+                                class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-300"
+                            >
+                                <div
+                                    class="bg-black/50 p-3 rounded border border-gray-800"
+                                >
+                                    <span class="text-gray-500 block mb-1"
+                                        >Queue ARN</span
+                                    >
+                                    <span class="font-mono break-all"
+                                        >{queueAttributes.QueueArn ?? "-"}</span
+                                    >
                                 </div>
-                                <div class="bg-black/50 p-3 rounded border border-gray-800">
-                                    <span class="text-gray-500 block mb-1">Created Timestamp</span>
-                                    <span class="font-mono">{queueAttributes.CreatedTimestamp ? new Date(Number(queueAttributes.CreatedTimestamp) * 1000).toLocaleString() : '-'}</span>
+                                <div
+                                    class="bg-black/50 p-3 rounded border border-gray-800"
+                                >
+                                    <span class="text-gray-500 block mb-1"
+                                        >Created Timestamp</span
+                                    >
+                                    <span class="font-mono"
+                                        >{queueAttributes.CreatedTimestamp
+                                            ? new Date(
+                                                  Number(
+                                                      queueAttributes.CreatedTimestamp,
+                                                  ) * 1000,
+                                              ).toLocaleString()
+                                            : "-"}</span
+                                    >
                                 </div>
-                                <div class="bg-black/50 p-3 rounded border border-gray-800">
-                                    <span class="text-gray-500 block mb-1">Messages Available</span>
-                                    <span class="font-mono">{queueAttributes.ApproximateNumberOfMessages ?? '-'}</span>
+                                <div
+                                    class="bg-black/50 p-3 rounded border border-gray-800"
+                                >
+                                    <span class="text-gray-500 block mb-1"
+                                        >Messages Available</span
+                                    >
+                                    <span class="font-mono"
+                                        >{queueAttributes.ApproximateNumberOfMessages ??
+                                            "-"}</span
+                                    >
                                 </div>
-                                <div class="bg-black/50 p-3 rounded border border-gray-800">
-                                    <span class="text-gray-500 block mb-1">Messages In Flight</span>
-                                    <span class="font-mono">{queueAttributes.ApproximateNumberOfMessagesNotVisible ?? '-'}</span>
+                                <div
+                                    class="bg-black/50 p-3 rounded border border-gray-800"
+                                >
+                                    <span class="text-gray-500 block mb-1"
+                                        >Messages In Flight</span
+                                    >
+                                    <span class="font-mono"
+                                        >{queueAttributes.ApproximateNumberOfMessagesNotVisible ??
+                                            "-"}</span
+                                    >
                                 </div>
                             </div>
                         {/if}
@@ -676,13 +866,12 @@
                 onRefresh={() => loadQueues()}
                 columns={queueColumns}
             >
-                {#snippet headerActionsSnippet()}
+                {#snippet children(queue: any)}
                     <button
                         onclick={() => {
                             showCreate = true;
                             selectedQueue = null;
                             error = "";
-                            actionMsg = "";
                         }}
                         class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
                     >

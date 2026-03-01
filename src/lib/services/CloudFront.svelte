@@ -245,7 +245,9 @@
                                 ? 'text-green-400'
                                 : 'text-red-400'}"
                         >
-                            {selectedDist.status} ({selectedDist.enabled
+                            {#snippet children(
+                                dist: any,
+                            )}{selectedDist.status}{/snippet} ({selectedDist.enabled
                                 ? "Enabled"
                                 : "Disabled"})
                         </div>

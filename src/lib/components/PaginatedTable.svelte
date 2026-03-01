@@ -12,6 +12,7 @@
         onRefresh = () => {},
         actionsSnippet = undefined,
         headerActionsSnippet = undefined,
+        children = undefined,
     }: {
         items?: T[];
         columns?: {
@@ -29,6 +30,7 @@
         onRefresh?: () => void;
         actionsSnippet?: Snippet<[T]>;
         headerActionsSnippet?: Snippet;
+        children?: Snippet<[T]>;
     } = $props();
 
     // Local state

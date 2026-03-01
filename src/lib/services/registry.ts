@@ -5,6 +5,14 @@ import S3 from './S3.svelte';
 import DynamoDB from './DynamoDB.svelte';
 import SQS from './SQS.svelte';
 import CloudFront from './CloudFront.svelte';
+import StepFunctions from './StepFunctions.svelte';
+import Lambda from './Lambda.svelte';
+import SNS from './SNS.svelte';
+import IAM from './IAM.svelte';
+import SecretsManager from './SecretsManager.svelte';
+import ElasticBeanstalk from './ElasticBeanstalk.svelte';
+import CloudFormation from './CloudFormation.svelte';
+import SES from './SES.svelte';
 
 export interface ServiceDef {
     id: string;
@@ -28,4 +36,12 @@ export const services: ServiceDef[] = [
     { id: 'dynamodb', label: 'DynamoDB', component: DynamoDB as unknown as Component, defaultEnabled: true },
     { id: 'sqs', label: 'SQS', component: SQS as unknown as Component, defaultEnabled: true },
     { id: 'cloudfront', label: 'CloudFront', component: CloudFront as unknown as Component, defaultEnabled: true },
+    { id: 'stepfunctions', label: 'Step Functions', component: StepFunctions as unknown as Component, defaultEnabled: true },
+    { id: 'lambda', label: 'Lambda', component: Lambda as unknown as Component, defaultEnabled: true },
+    { id: 'sns', label: 'SNS', component: SNS as unknown as Component, defaultEnabled: true },
+    { id: 'iam', label: 'IAM', component: IAM as unknown as Component, defaultEnabled: true },
+    { id: 'secretsmanager', label: 'Secrets Manager', component: SecretsManager as unknown as Component, defaultEnabled: true },
+    { id: 'elasticbeanstalk', label: 'Elastic Beanstalk', component: ElasticBeanstalk as unknown as Component, defaultEnabled: true },
+    { id: 'cloudformation', label: 'CloudFormation', component: CloudFormation as unknown as Component, defaultEnabled: true },
+    { id: 'ses', label: 'SES', component: SES as unknown as Component, defaultEnabled: true },
 ];
