@@ -5,12 +5,15 @@
         DescribeAlarmsCommand,
         ListDashboardsCommand,
         GetDashboardCommand,
+        ListMetricsCommand,
     } from "@aws-sdk/client-cloudwatch";
     import {
         CloudWatchLogsClient,
         DescribeLogGroupsCommand,
         StartQueryCommand,
         GetQueryResultsCommand,
+        DescribeLogStreamsCommand,
+        GetLogEventsCommand,
     } from "@aws-sdk/client-cloudwatch-logs";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -24,7 +27,9 @@
     // --- Service Layout State ---
     const tabs = [
         { id: "alarms", label: "Alarms" },
+        { id: "metrics", label: "Metrics" },
         { id: "dashboards", label: "Dashboards" },
+        { id: "loggroups", label: "Log Groups" },
         { id: "logs", label: "Logs Insights" },
     ];
     let activeTab = $state("alarms");
@@ -61,6 +66,12 @@
     let hideAutoScaling = $state(true);
     let selectedAlarm = $state<any>(null);
 
+    // --- Metrics ---
+    let metrics = $state<any[]>([]);
+    let metricsLoading = $state(false);
+    let metricsTokenMap = $state<string[]>([]);
+    let metricsCurrentToken = $state<string | undefined>(undefined);
+
     // --- Dashboards ---
     let dashboards = $state<any[]>([]);
     let dashLoading = $state(false);
@@ -68,6 +79,26 @@
     let dashCurrentToken = $state<string | undefined>(undefined);
     let selectedDash = $state("");
     let dashBody = $state("");
+
+    // --- Log Groups (Table View) ---
+    let logGroupsTable = $state<any[]>([]);
+    let logGroupsLoading = $state(false);
+    let logGroupsTokenMap = $state<string[]>([]);
+    let logGroupsCurrentToken = $state<string | undefined>(undefined);
+    let selectedGroupForStreams = $state("");
+
+    // --- Log Streams ---
+    let logStreams = $state<any[]>([]);
+    let logStreamsLoading = $state(false);
+    let logStreamsTokenMap = $state<string[]>([]);
+    let logStreamsCurrentToken = $state<string | undefined>(undefined);
+    let selectedStreamForEvents = $state("");
+
+    // --- Log Events ---
+    let logEvents = $state<any[]>([]);
+    let logEventsLoading = $state(false);
+    let logEventsNextToken = $state<string | undefined>(undefined);
+    let logEventsPrevToken = $state<string | undefined>(undefined);
 
     // --- Logs Insights ---
     let logGroups = $state<any[]>([]);
@@ -104,7 +135,9 @@
             cwClient = new CloudWatchClient(config);
             logsClient = new CloudWatchLogsClient(config);
             await loadAlarms();
+            await loadMetrics();
             await loadDashboards();
+            await loadLogGroupsTable();
             await loadLogGroups();
         } catch (e) {
             error = String(e);
@@ -152,6 +185,30 @@
         }
     }
 
+    // --- Metrics API ---
+    async function loadMetrics(token?: string) {
+        if (!cwClient) return;
+        try {
+            metricsLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await cwClient.send(
+                new ListMetricsCommand({ NextToken: token }),
+            );
+            metrics = (resp.Metrics ?? []).map((m) => ({
+                namespace: m.Namespace ?? "",
+                metricName: m.MetricName ?? "",
+                dimensions: (m.Dimensions ?? []).map((d) => `${d.Name}=${d.Value}`).join(", "),
+            }));
+            pushToken(metricsTokenMap, resp.NextToken);
+            metricsCurrentToken = resp.NextToken;
+        } catch (e) {
+            error = String(e);
+        } finally {
+            metricsLoading = false;
+        }
+    }
+
     // --- Dashboards API ---
     async function loadDashboards(token?: string) {
         if (!cwClient) return;
@@ -192,6 +249,106 @@
         } catch (e) {
             error = String(e);
             dashBody = "";
+        }
+    }
+
+    // --- Log Groups / Streams / Events API ---
+    async function loadLogGroupsTable(token?: string) {
+        if (!logsClient) return;
+        try {
+            logGroupsLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await logsClient.send(
+                new DescribeLogGroupsCommand({ limit: 50, nextToken: token }),
+            );
+            logGroupsTable = (resp.logGroups ?? []).map((g) => ({
+                name: g.logGroupName ?? "",
+                storedBytes: g.storedBytes ?? 0,
+                retentionDays: g.retentionInDays ?? "Never expire",
+                creationTime: g.creationTime ? new Date(g.creationTime).toLocaleString() : "-",
+            }));
+            pushToken(logGroupsTokenMap, resp.nextToken);
+            logGroupsCurrentToken = resp.nextToken;
+        } catch (e) {
+            error = String(e);
+        } finally {
+            logGroupsLoading = false;
+        }
+    }
+
+    async function loadLogStreams(logGroupName: string, token?: string) {
+        if (!logsClient) return;
+        try {
+            selectedGroupForStreams = logGroupName;
+            logStreamsLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await logsClient.send(
+                new DescribeLogStreamsCommand({
+                    logGroupName,
+                    limit: 50,
+                    nextToken: token,
+                    orderBy: "LastEventTime",
+                    descending: true,
+                }),
+            );
+            logStreams = (resp.logStreams ?? []).map((s) => ({
+                name: s.logStreamName ?? "",
+                creationTime: s.creationTime ? new Date(s.creationTime).toLocaleString() : "-",
+                lastEventTime: s.lastEventTimestamp ? new Date(s.lastEventTimestamp).toLocaleString() : "-",
+                storedBytes: s.storedBytes ?? 0,
+            }));
+            pushToken(logStreamsTokenMap, resp.nextToken);
+            logStreamsCurrentToken = resp.nextToken;
+        } catch (e) {
+            error = String(e);
+        } finally {
+            logStreamsLoading = false;
+        }
+    }
+
+    async function loadLogEvents(logGroupName: string, logStreamName: string, token?: string, direction: "next" | "prev" = "next") {
+        if (!logsClient) return;
+        try {
+            selectedStreamForEvents = logStreamName;
+            logEventsLoading = true;
+            error = "";
+            actionMsg = "";
+
+            const params: any = {
+                logGroupName,
+                logStreamName,
+                limit: 100,
+            };
+
+            if (token) {
+                params.nextToken = token;
+            } else if (direction === "next" && !token) {
+                 params.startFromHead = true;
+            }
+
+            const resp = await logsClient.send(
+                new GetLogEventsCommand(params),
+            );
+
+            logEvents = (resp.events ?? []).map((e) => ({
+                timestamp: e.timestamp ? new Date(e.timestamp).toLocaleString() : "-",
+                message: e.message ?? "",
+            }));
+
+            // Only update tokens if there are actually events or if it's the first load
+            if (resp.events && resp.events.length > 0 || !token) {
+                logEventsNextToken = resp.nextForwardToken;
+                logEventsPrevToken = resp.nextBackwardToken;
+            } else if (resp.events && resp.events.length === 0) {
+                 actionMsg = direction === "next" ? "No newer log events found." : "No older log events found.";
+            }
+
+        } catch (e) {
+            error = String(e);
+        } finally {
+            logEventsLoading = false;
         }
     }
 
@@ -457,6 +614,24 @@
                     {/snippet}
                 </PaginatedTable>
             {/if}
+        {:else if activeTab === "metrics"}
+            <PaginatedTable
+                items={metrics}
+                loading={metricsLoading}
+                hasNext={!!metricsCurrentToken}
+                hasPrev={metricsTokenMap.length > 0}
+                onNext={() => loadMetrics(metricsCurrentToken)}
+                onPrev={() => loadMetrics(popToken(metricsTokenMap))}
+                onRefresh={() => {
+                    metricsTokenMap = [];
+                    loadMetrics();
+                }}
+                columns={[
+                    { key: "namespace", label: "Namespace" },
+                    { key: "metricName", label: "Metric Name" },
+                    { key: "dimensions", label: "Dimensions" },
+                ]}
+            />
         {:else if activeTab === "dashboards"}
             {#if selectedDash}
                 <div class="p-4 pr-1 h-full flex flex-col pt-2">
@@ -504,6 +679,120 @@
                         >
                     {/snippet}
                 </PaginatedTable>
+            {/if}
+        {:else if activeTab === "loggroups"}
+            {#if selectedStreamForEvents}
+                <div class="h-full flex flex-col p-4 pr-1 bg-gray-950">
+                    <div class="mb-3 flex items-center gap-2 shrink-0">
+                        <button
+                            onclick={() => {
+                                selectedStreamForEvents = "";
+                                logEvents = [];
+                            }}
+                            class="text-xs text-blue-400 hover:text-blue-300 transition px-2 py-1 rounded bg-blue-600/10 hover:bg-blue-600/20"
+                            >← Back to Log Streams</button
+                        >
+                        <span class="text-sm font-bold text-gray-200"
+                            >{selectedStreamForEvents}</span
+                        >
+                        <div class="flex-1"></div>
+                        <button
+                            onclick={() => loadLogEvents(selectedGroupForStreams, selectedStreamForEvents, logEventsPrevToken, "prev")}
+                            disabled={!logEventsPrevToken || logEventsLoading}
+                            class="text-xs text-blue-400 hover:text-blue-300 transition px-2 py-1 rounded bg-blue-600/10 hover:bg-blue-600/20 disabled:opacity-50"
+                        >Older Logs</button>
+                        <button
+                            onclick={() => loadLogEvents(selectedGroupForStreams, selectedStreamForEvents, logEventsNextToken, "next")}
+                            disabled={!logEventsNextToken || logEventsLoading}
+                            class="text-xs text-blue-400 hover:text-blue-300 transition px-2 py-1 rounded bg-blue-600/10 hover:bg-blue-600/20 disabled:opacity-50"
+                        >Newer Logs</button>
+                    </div>
+
+                    <div class="flex-1 bg-gray-900 rounded-lg border border-gray-800 text-xs text-gray-300 overflow-auto font-mono relative p-2 shadow-inner">
+                        {#if logEventsLoading && logEvents.length === 0}
+                            <div class="text-gray-500 italic p-4 text-center">Loading events...</div>
+                        {:else if logEvents.length === 0}
+                            <div class="text-gray-500 italic p-4 text-center">No events found.</div>
+                        {:else}
+                            <div class="space-y-1">
+                                {#each logEvents as event}
+                                    <div class="flex gap-4 hover:bg-gray-800/50 p-1 rounded transition-colors break-words">
+                                        <div class="text-gray-500 shrink-0 w-40">{event.timestamp}</div>
+                                        <div class="text-gray-300 whitespace-pre-wrap">{event.message}</div>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+            {:else if selectedGroupForStreams}
+                <div class="h-full flex flex-col p-4 pr-1 pt-2">
+                    <div class="mb-3 flex items-center gap-2 shrink-0">
+                        <button
+                            onclick={() => {
+                                selectedGroupForStreams = "";
+                                logStreams = [];
+                                logStreamsTokenMap = [];
+                                logStreamsCurrentToken = undefined;
+                            }}
+                            class="text-xs text-blue-400 hover:text-blue-300 transition px-2 py-1 rounded bg-blue-600/10 hover:bg-blue-600/20"
+                            >← Back to Log Groups</button
+                        >
+                        <span class="text-sm font-bold text-gray-200"
+                            >{selectedGroupForStreams}</span
+                        >
+                    </div>
+
+                    <PaginatedTable
+                        items={logStreams}
+                        loading={logStreamsLoading}
+                        hasNext={!!logStreamsCurrentToken}
+                        hasPrev={logStreamsTokenMap.length > 0}
+                        onNext={() => loadLogStreams(selectedGroupForStreams, logStreamsCurrentToken)}
+                        onPrev={() => loadLogStreams(selectedGroupForStreams, popToken(logStreamsTokenMap))}
+                        onRefresh={() => {
+                            logStreamsTokenMap = [];
+                            loadLogStreams(selectedGroupForStreams);
+                        }}
+                        columns={[
+                            {
+                                key: "name",
+                                label: "Log Stream Name",
+                                onClick: (item) => {
+                                    loadLogEvents(selectedGroupForStreams, item.name);
+                                }
+                            },
+                            { key: "creationTime", label: "Creation Time" },
+                            { key: "lastEventTime", label: "Last Event Time" },
+                            { key: "storedBytes", label: "Stored Bytes", format: formatBytes },
+                        ]}
+                    />
+                </div>
+            {:else}
+                <PaginatedTable
+                    items={logGroupsTable}
+                    loading={logGroupsLoading}
+                    hasNext={!!logGroupsCurrentToken}
+                    hasPrev={logGroupsTokenMap.length > 0}
+                    onNext={() => loadLogGroupsTable(logGroupsCurrentToken)}
+                    onPrev={() => loadLogGroupsTable(popToken(logGroupsTokenMap))}
+                    onRefresh={() => {
+                        logGroupsTokenMap = [];
+                        loadLogGroupsTable();
+                    }}
+                    columns={[
+                        {
+                            key: "name",
+                            label: "Log Group Name",
+                            onClick: (item) => {
+                                loadLogStreams(item.name);
+                            }
+                        },
+                        { key: "retentionDays", label: "Retention" },
+                        { key: "creationTime", label: "Creation Time" },
+                        { key: "storedBytes", label: "Stored Bytes", format: formatBytes },
+                    ]}
+                />
             {/if}
         {:else if activeTab === "logs"}
             <div class="h-full flex flex-col p-4 pr-1 bg-gray-950">
