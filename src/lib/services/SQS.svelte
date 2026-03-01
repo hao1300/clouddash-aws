@@ -8,6 +8,9 @@
         ReceiveMessageCommand,
         DeleteMessageCommand,
         PurgeQueueCommand,
+        CreateQueueCommand,
+        DeleteQueueCommand,
+        SetQueueAttributesCommand,
     } from "@aws-sdk/client-sqs";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -38,8 +41,24 @@
     let tokenMap = $state<string[]>([]);
     let currentToken = $state<string | undefined>(undefined);
 
+    // --- Create Queue ---
+    let showCreate = $state(false);
+    let createLoading = $state(false);
+    let createParams = $state({
+        QueueName: "",
+        Type: "Standard",
+        VisibilityTimeout: "30",
+        MessageRetentionPeriod: "345600",
+        DeliveryDelay: "0",
+        MaximumMessageSize: "262144",
+        ReceiveMessageWaitTimeSeconds: "0"
+    });
+
     // --- Queue Detail View ---
     let selectedQueue = $state<any>(null);
+    let queueDetailTab = $state<"messages" | "configuration">("messages");
+    let queueAttributes = $state<Record<string, string>>({});
+    let attributesLoading = $state(false);
     let messages = $state<any[]>([]);
     let msgLoading = $state(false);
     let sendBody = $state("");
@@ -125,10 +144,126 @@
         }
     }
 
-    function selectQueue(q: any) {
+    async function selectQueue(q: any) {
         selectedQueue = q;
         messages = [];
         actionMsg = "";
+        showCreate = false;
+        queueDetailTab = "messages";
+        await loadQueueAttributes();
+    }
+
+    async function loadQueueAttributes() {
+        if (!client || !selectedQueue) return;
+        try {
+            attributesLoading = true;
+            error = "";
+            const attrs = await client.send(
+                new GetQueueAttributesCommand({
+                    QueueUrl: selectedQueue.url,
+                    AttributeNames: ["All"],
+                })
+            );
+            queueAttributes = attrs.Attributes ?? {};
+        } catch (e) {
+            error = String(e);
+        } finally {
+            attributesLoading = false;
+        }
+    }
+
+    async function saveQueueAttributes() {
+        if (!client || !selectedQueue) return;
+        try {
+            attributesLoading = true;
+            error = "";
+            actionMsg = "";
+
+            // Only update the ones we care about changing
+            const attributesToUpdate: Record<string, string> = {
+                VisibilityTimeout: String(queueAttributes.VisibilityTimeout),
+                DelaySeconds: String(queueAttributes.DelaySeconds),
+                ReceiveMessageWaitTimeSeconds: String(queueAttributes.ReceiveMessageWaitTimeSeconds),
+                MessageRetentionPeriod: String(queueAttributes.MessageRetentionPeriod),
+                MaximumMessageSize: String(queueAttributes.MaximumMessageSize),
+            };
+
+            await client.send(
+                new SetQueueAttributesCommand({
+                    QueueUrl: selectedQueue.url,
+                    Attributes: attributesToUpdate,
+                })
+            );
+            actionMsg = "Queue configuration saved.";
+        } catch (e) {
+            error = String(e);
+        } finally {
+            attributesLoading = false;
+        }
+    }
+
+    async function deleteQueue() {
+        if (!client || !selectedQueue) return;
+        if (!confirm(`Are you sure you want to delete queue ${selectedQueue.name}? This cannot be undone.`)) return;
+        try {
+            loading = true;
+            error = "";
+            actionMsg = "";
+            await client.send(
+                new DeleteQueueCommand({
+                    QueueUrl: selectedQueue.url,
+                })
+            );
+            actionMsg = `Queue ${selectedQueue.name} deleted.`;
+            selectedQueue = null;
+            await loadQueues();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            loading = false;
+        }
+    }
+
+    async function createQueue() {
+        if (!client || !createParams.QueueName) return;
+        try {
+            createLoading = true;
+            error = "";
+            actionMsg = "";
+
+            let queueName = createParams.QueueName;
+            if (createParams.Type === "FIFO" && !queueName.endsWith(".fifo")) {
+                queueName += ".fifo";
+            }
+
+            const attributes: Record<string, string> = {
+                VisibilityTimeout: String(createParams.VisibilityTimeout),
+                MessageRetentionPeriod: String(createParams.MessageRetentionPeriod),
+                DelaySeconds: String(createParams.DeliveryDelay),
+                MaximumMessageSize: String(createParams.MaximumMessageSize),
+                ReceiveMessageWaitTimeSeconds: String(createParams.ReceiveMessageWaitTimeSeconds),
+            };
+
+            if (createParams.Type === "FIFO") {
+                attributes.FifoQueue = "true";
+            }
+
+            await client.send(
+                new CreateQueueCommand({
+                    QueueName: queueName,
+                    Attributes: attributes,
+                })
+            );
+
+            actionMsg = `Queue ${queueName} created successfully.`;
+            showCreate = false;
+            createParams.QueueName = ""; // Reset
+            await loadQueues();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            createLoading = false;
+        }
     }
 
     // --- Messages API ---
@@ -260,7 +395,75 @@
         </div>{/if}
 
     <div class="h-full {error || actionMsg ? 'pt-8' : ''}">
-        {#if selectedQueue}
+        {#if showCreate}
+            <div class="p-6 max-w-2xl mx-auto h-full overflow-y-auto">
+                <div class="flex items-center gap-3 mb-6">
+                    <button
+                        onclick={() => { showCreate = false; error = ""; actionMsg = ""; }}
+                        class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
+                    >← Back to Queues</button>
+                    <h2 class="text-xl font-bold text-gray-100">Create Queue</h2>
+                </div>
+
+                <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Queue Name</label>
+                        <input
+                            type="text"
+                            bind:value={createParams.QueueName}
+                            placeholder="MyQueue"
+                            class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                        />
+                        <p class="text-xs text-gray-500 mt-1">FIFO queues will automatically have '.fifo' appended if not provided.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Type</label>
+                        <select
+                            bind:value={createParams.Type}
+                            class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+                        >
+                            <option value="Standard">Standard (at-least-once delivery, best-effort ordering)</option>
+                            <option value="FIFO">FIFO (first-in-first-out delivery, exact-once processing)</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Visibility Timeout (seconds)</label>
+                            <input type="number" bind:value={createParams.VisibilityTimeout} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Message Retention Period (seconds)</label>
+                            <input type="number" bind:value={createParams.MessageRetentionPeriod} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Delivery Delay (seconds)</label>
+                            <input type="number" bind:value={createParams.DeliveryDelay} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Maximum Message Size (bytes)</label>
+                            <input type="number" bind:value={createParams.MaximumMessageSize} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Receive Message Wait Time (seconds)</label>
+                            <input type="number" bind:value={createParams.ReceiveMessageWaitTimeSeconds} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-end">
+                        <button
+                            onclick={createQueue}
+                            disabled={createLoading || !createParams.QueueName.trim()}
+                            class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-6 py-2 rounded text-sm font-bold transition flex items-center gap-2"
+                        >
+                            {#if createLoading}<span class="animate-spin">⟳</span>{/if}
+                            Create Queue
+                        </button>
+                    </div>
+                </div>
+            </div>
+        {:else if selectedQueue}
             <div class="h-full flex flex-col bg-gray-950 p-4 pr-1">
                 <!-- Header & Actions -->
                 <div
@@ -278,21 +481,50 @@
                         class="text-sm font-bold text-gray-200 truncate flex-1"
                         >{selectedQueue.name}</span
                     >
-                    <button
-                        onclick={purgeQueue}
-                        class="bg-red-600/80 hover:bg-red-500 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow"
-                        >Purge Queue</button
-                    >
-                    <button
-                        onclick={pollMessages}
-                        disabled={msgLoading}
-                        class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow flex items-center gap-2"
-                    >
-                        {#if msgLoading}<span class="animate-spin">⟳</span>{/if}
-                        Poll Messages
-                    </button>
+
+                    <div class="flex gap-1 ml-auto border border-gray-800 rounded bg-black p-1">
+                        <button
+                            onclick={() => queueDetailTab = "messages"}
+                            class="px-3 py-1 text-xs rounded transition-colors {queueDetailTab === 'messages' ? 'bg-gray-800 text-white font-semibold' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'}"
+                        >Messages</button>
+                        <button
+                            onclick={() => queueDetailTab = "configuration"}
+                            class="px-3 py-1 text-xs rounded transition-colors {queueDetailTab === 'configuration' ? 'bg-gray-800 text-white font-semibold' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'}"
+                        >Configuration</button>
+                    </div>
+
+                    {#if queueDetailTab === 'messages'}
+                        <button
+                            onclick={purgeQueue}
+                            class="bg-red-600/80 hover:bg-red-500 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow ml-2"
+                            >Purge Queue</button
+                        >
+                        <button
+                            onclick={pollMessages}
+                            disabled={msgLoading}
+                            class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow flex items-center gap-2"
+                        >
+                            {#if msgLoading}<span class="animate-spin">⟳</span>{/if}
+                            Poll Messages
+                        </button>
+                    {:else}
+                        <button
+                            onclick={deleteQueue}
+                            class="bg-red-600/80 hover:bg-red-500 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow ml-2"
+                            >Delete Queue</button
+                        >
+                        <button
+                            onclick={saveQueueAttributes}
+                            disabled={attributesLoading}
+                            class="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow flex items-center gap-2"
+                        >
+                            {#if attributesLoading}<span class="animate-spin">⟳</span>{/if}
+                            Save Config
+                        </button>
+                    {/if}
                 </div>
 
+                {#if queueDetailTab === 'messages'}
                 <!-- Send Message -->
                 <div
                     class="flex gap-2 mb-4 shrink-0 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm"
@@ -380,6 +612,60 @@
                         {/if}
                     </div>
                 </div>
+                {:else}
+                    <div class="flex-1 overflow-auto bg-gray-900 rounded-lg border border-gray-800 p-6 shadow-sm">
+                        {#if attributesLoading && Object.keys(queueAttributes).length === 0}
+                            <div class="flex items-center justify-center text-gray-500 h-full">
+                                <span class="animate-spin text-xl mr-2">⟳</span>
+                                Loading Configuration...
+                            </div>
+                        {:else}
+                            <h3 class="text-sm font-bold text-gray-200 mb-6 border-b border-gray-800 pb-2">Queue Configuration</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-400 mb-1">Visibility Timeout (seconds)</label>
+                                    <input type="number" bind:value={queueAttributes.VisibilityTimeout} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-400 mb-1">Message Retention Period (seconds)</label>
+                                    <input type="number" bind:value={queueAttributes.MessageRetentionPeriod} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-400 mb-1">Delivery Delay (seconds)</label>
+                                    <input type="number" bind:value={queueAttributes.DelaySeconds} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-400 mb-1">Maximum Message Size (bytes)</label>
+                                    <input type="number" bind:value={queueAttributes.MaximumMessageSize} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-medium text-gray-400 mb-1">Receive Message Wait Time (seconds)</label>
+                                    <input type="number" bind:value={queueAttributes.ReceiveMessageWaitTimeSeconds} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                </div>
+                            </div>
+
+                            <h3 class="text-sm font-bold text-gray-200 mt-10 mb-4 border-b border-gray-800 pb-2">Queue Details (Read Only)</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-300">
+                                <div class="bg-black/50 p-3 rounded border border-gray-800">
+                                    <span class="text-gray-500 block mb-1">Queue ARN</span>
+                                    <span class="font-mono break-all">{queueAttributes.QueueArn ?? '-'}</span>
+                                </div>
+                                <div class="bg-black/50 p-3 rounded border border-gray-800">
+                                    <span class="text-gray-500 block mb-1">Created Timestamp</span>
+                                    <span class="font-mono">{queueAttributes.CreatedTimestamp ? new Date(Number(queueAttributes.CreatedTimestamp) * 1000).toLocaleString() : '-'}</span>
+                                </div>
+                                <div class="bg-black/50 p-3 rounded border border-gray-800">
+                                    <span class="text-gray-500 block mb-1">Messages Available</span>
+                                    <span class="font-mono">{queueAttributes.ApproximateNumberOfMessages ?? '-'}</span>
+                                </div>
+                                <div class="bg-black/50 p-3 rounded border border-gray-800">
+                                    <span class="text-gray-500 block mb-1">Messages In Flight</span>
+                                    <span class="font-mono">{queueAttributes.ApproximateNumberOfMessagesNotVisible ?? '-'}</span>
+                                </div>
+                            </div>
+                        {/if}
+                    </div>
+                {/if}
             </div>
         {:else}
             <PaginatedTable
@@ -389,7 +675,21 @@
                 hasPrev={false}
                 onRefresh={() => loadQueues()}
                 columns={queueColumns}
-            />
+            >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={() => {
+                            showCreate = true;
+                            selectedQueue = null;
+                            error = "";
+                            actionMsg = "";
+                        }}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
+                    >
+                        Create Queue
+                    </button>
+                {/snippet}
+            </PaginatedTable>
         {/if}
     </div>
 </ServiceLayout>
