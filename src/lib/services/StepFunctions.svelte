@@ -9,6 +9,7 @@
         GetExecutionHistoryCommand,
         type StateMachineListItem,
         type ExecutionListItem,
+        type HistoryEvent,
     } from "@aws-sdk/client-sfn";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -47,6 +48,13 @@
     let executions = $state<ExecutionListItem[]>([]);
     let execTokenMap = $state<string[]>([]);
     let execCurrentToken = $state<string | undefined>(undefined);
+
+    // Selected Execution Detail
+    let selectedExecution = $state<ExecutionListItem | null>(null);
+    let executionDetails = $state<any>(null);
+    let executionHistory = $state<HistoryEvent[]>([]);
+    let historyTokenMap = $state<string[]>([]);
+    let historyCurrentToken = $state<string | undefined>(undefined);
 
     // Start Execution
     let startInput = $state("{}");
@@ -170,7 +178,65 @@
         execTokenMap = [];
         execCurrentToken = undefined;
         executions = [];
+        selectedExecution = null;
         loadExecutions();
+    }
+
+    function openExecution(exec: ExecutionListItem) {
+        selectedExecution = exec;
+        executionDetails = null;
+        executionHistory = [];
+        historyTokenMap = [];
+        historyCurrentToken = undefined;
+        loadExecutionDetails();
+        loadExecutionHistory();
+    }
+
+    async function loadExecutionDetails() {
+        if (!client || !selectedExecution?.executionArn) return;
+        try {
+            const res = await client.send(
+                new DescribeExecutionCommand({
+                    executionArn: selectedExecution.executionArn,
+                }),
+            );
+            executionDetails = res;
+        } catch (e: any) {
+            error = e.message || String(e);
+        }
+    }
+
+    async function loadExecutionHistory(token?: string) {
+        if (!client || !selectedExecution?.executionArn) return;
+        loading = true;
+        try {
+            const res = await client.send(
+                new GetExecutionHistoryCommand({
+                    executionArn: selectedExecution.executionArn,
+                    maxResults: 50,
+                    nextToken: token,
+                    reverseOrder: true,
+                }),
+            );
+            executionHistory = res.events || [];
+            historyCurrentToken = res.nextToken;
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            loading = false;
+        }
+    }
+
+    function handleHistoryNext() {
+        if (historyCurrentToken) {
+            pushToken(historyTokenMap, historyCurrentToken);
+            loadExecutionHistory(historyCurrentToken);
+        }
+    }
+
+    function handleHistoryPrev() {
+        const prevToken = popToken(historyTokenMap);
+        loadExecutionHistory(prevToken);
     }
 </script>
 
@@ -288,8 +354,9 @@
                     class="flex-1 overflow-auto p-4 sm:p-6 p-rel relative min-h-0"
                 >
                     {#if detailTab === "executions"}
-                        <div class="absolute inset-0">
-                            <PaginatedTable
+                        {#if !selectedExecution}
+                            <div class="absolute inset-0">
+                                <PaginatedTable
                                 items={executions}
                                 {loading}
                                 columns={[
@@ -308,20 +375,25 @@
                                 hasPrev={execTokenMap.length > 0}
                                 onNext={handleExecNext}
                                 onPrev={handleExecPrev}
-                                onRefresh={() => {
-                                    execTokenMap = [];
-                                    loadExecutions();
-                                }}
-                            >
-                                {#snippet children(exec: any)}
-                                    <td
-                                        class="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-300"
-                                    >
-                                        {exec.name}
-                                    </td>
-                                    <td
-                                        class="px-4 py-3 whitespace-nowrap text-sm"
-                                    >
+                                    onRefresh={() => {
+                                        execTokenMap = [];
+                                        loadExecutions();
+                                    }}
+                                >
+                                    {#snippet children(exec: any)}
+                                        <td
+                                            class="px-4 py-3 whitespace-nowrap text-sm font-mono"
+                                        >
+                                            <button
+                                                class="text-blue-400 hover:text-blue-300 font-medium hover:underline text-left"
+                                                onclick={() => openExecution(exec)}
+                                            >
+                                                {exec.name}
+                                            </button>
+                                        </td>
+                                        <td
+                                            class="px-4 py-3 whitespace-nowrap text-sm"
+                                        >
                                         <span
                                             class="px-2 py-0.5 rounded text-xs
                                                 {exec.status === 'SUCCEEDED'
@@ -354,15 +426,122 @@
                                     <td
                                         class="px-4 py-3 whitespace-nowrap text-sm text-gray-400"
                                     >
-                                        {exec.stopDate
-                                            ? new Date(
-                                                  exec.stopDate,
-                                              ).toLocaleString()
-                                            : "-"}
-                                    </td>
-                                {/snippet}
-                            </PaginatedTable>
-                        </div>
+                                            {exec.stopDate
+                                                ? new Date(
+                                                      exec.stopDate,
+                                                  ).toLocaleString()
+                                                : "-"}
+                                        </td>
+                                    {/snippet}
+                                </PaginatedTable>
+                            </div>
+                        {:else}
+                            <div class="h-full flex flex-col -m-4 sm:-m-6">
+                                <div
+                                    class="px-4 sm:px-6 py-4 bg-gray-900 border-b border-gray-800 shrink-0"
+                                >
+                                    <div class="flex items-center gap-3">
+                                        <button
+                                            class="text-gray-400 hover:text-white transition"
+                                            onclick={() => {
+                                                selectedExecution = null;
+                                            }}
+                                        >
+                                            ← Back to Executions
+                                        </button>
+                                        <h2
+                                            class="text-lg font-bold text-gray-100 flex items-center gap-2"
+                                        >
+                                            {selectedExecution.name}
+                                        </h2>
+                                    </div>
+                                </div>
+                                <div class="flex-1 overflow-auto p-4 sm:p-6 flex flex-col gap-6">
+                                    <!-- Details Box -->
+                                    <div class="bg-gray-900 border border-gray-800 rounded p-4 shadow-sm shrink-0">
+                                        {#if executionDetails}
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <h3 class="text-xs font-semibold text-gray-500 uppercase mb-1">Status</h3>
+                                                    <span
+                                                        class="px-2 py-0.5 rounded text-xs font-medium
+                                                            {executionDetails.status === 'SUCCEEDED' ? 'bg-green-500/20 text-green-400' : ''}
+                                                            {executionDetails.status === 'RUNNING' ? 'bg-blue-500/20 text-blue-400' : ''}
+                                                            {executionDetails.status === 'FAILED' ? 'bg-red-500/20 text-red-400' : ''}
+                                                            {executionDetails.status === 'TIMED_OUT' || executionDetails.status === 'ABORTED' ? 'bg-orange-500/20 text-orange-400' : ''}
+                                                        "
+                                                    >
+                                                        {executionDetails.status}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <h3 class="text-xs font-semibold text-gray-500 uppercase mb-1">Duration</h3>
+                                                    <span class="text-sm text-gray-300">
+                                                        {#if executionDetails.startDate && executionDetails.stopDate}
+                                                            {((new Date(executionDetails.stopDate).getTime() - new Date(executionDetails.startDate).getTime()) / 1000).toFixed(2)}s
+                                                        {:else}
+                                                            -
+                                                        {/if}
+                                                    </span>
+                                                </div>
+                                                <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-800 pt-4 mt-2">
+                                                    <div>
+                                                        <h3 class="text-xs font-semibold text-gray-500 uppercase mb-2">Input</h3>
+                                                        <pre class="bg-gray-950 p-2 rounded text-xs text-gray-300 font-mono overflow-auto max-h-48">{executionDetails.input || "None"}</pre>
+                                                    </div>
+                                                    <div>
+                                                        <h3 class="text-xs font-semibold text-gray-500 uppercase mb-2">Output</h3>
+                                                        <pre class="bg-gray-950 p-2 rounded text-xs text-green-400 font-mono overflow-auto max-h-48">{executionDetails.output || "None"}</pre>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {:else}
+                                            <div class="text-sm text-gray-500 animate-pulse">Loading details...</div>
+                                        {/if}
+                                    </div>
+
+                                    <!-- Event History Table -->
+                                    <div class="flex-1 bg-gray-900 border border-gray-800 rounded flex flex-col overflow-hidden min-h-[300px]">
+                                        <div class="px-4 py-3 border-b border-gray-800 bg-gray-900 shrink-0">
+                                            <h3 class="text-sm font-semibold text-gray-200">Event History</h3>
+                                        </div>
+                                        <div class="flex-1 relative">
+                                            <div class="absolute inset-0">
+                                                <PaginatedTable
+                                                    items={executionHistory}
+                                                    {loading}
+                                                    columns={[
+                                                        { label: "ID", key: "id", sortable: true },
+                                                        { label: "Type", key: "type", sortable: true },
+                                                        { label: "Timestamp", key: "timestamp", sortable: true },
+                                                    ]}
+                                                    hasNext={!!historyCurrentToken}
+                                                    hasPrev={historyTokenMap.length > 0}
+                                                    onNext={handleHistoryNext}
+                                                    onPrev={handleHistoryPrev}
+                                                    onRefresh={() => {
+                                                        historyTokenMap = [];
+                                                        loadExecutionHistory();
+                                                    }}
+                                                >
+                                                    {#snippet children(event: any)}
+                                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-400 w-16">
+                                                            {event.id}
+                                                        </td>
+                                                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-200">
+                                                            {event.type}
+                                                        </td>
+                                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-400">
+                                                            {event.timestamp ? new Date(event.timestamp).toLocaleString() : ""}
+                                                        </td>
+                                                    {/snippet}
+                                                </PaginatedTable>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {/if}
                     {:else if detailTab === "start"}
                         <div class="max-w-3xl space-y-4">
                             <h3 class="text-lg font-bold text-gray-100 mb-4">
