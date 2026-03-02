@@ -11,6 +11,8 @@
         DescribeSecurityGroupsCommand,
         DescribeKeyPairsCommand,
         DescribeAddressesCommand,
+        DescribeImagesCommand,
+        DescribeSnapshotsCommand,
     } from "@aws-sdk/client-ec2";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -18,6 +20,7 @@
 
     let items = $state<any[]>([]);
     let loading = $state(false);
+    let itemsLoaded = $state(false);
     let error = $state("");
     let actionMsg = $state("");
     let client: EC2Client | null = null;
@@ -25,24 +28,42 @@
     // --- Resources State ---
     let volumes = $state<any[]>([]);
     let volumesLoading = $state(false);
+    let volumesLoaded = $state(false);
     let volTokenMap = $state<string[]>([]);
     let volCurrentToken = $state<string | undefined>(undefined);
 
     let securityGroups = $state<any[]>([]);
     let sgLoading = $state(false);
+    let sgLoaded = $state(false);
     let sgTokenMap = $state<string[]>([]);
     let sgCurrentToken = $state<string | undefined>(undefined);
 
     let keyPairs = $state<any[]>([]);
     let kpLoading = $state(false);
+    let kpLoaded = $state(false);
 
     let elasticIps = $state<any[]>([]);
     let eipLoading = $state(false);
+    let eipLoaded = $state(false);
+
+    let amis = $state<any[]>([]);
+    let amisLoading = $state(false);
+    let amisLoaded = $state(false);
+    let amiTokenMap = $state<string[]>([]);
+    let amiCurrentToken = $state<string | undefined>(undefined);
+
+    let snapshots = $state<any[]>([]);
+    let snapshotsLoading = $state(false);
+    let snapshotsLoaded = $state(false);
+    let snapshotTokenMap = $state<string[]>([]);
+    let snapshotCurrentToken = $state<string | undefined>(undefined);
 
     // --- Service Layout State ---
     const tabs = [
         { id: "instances", label: "Instances" },
+        { id: "amis", label: "AMIs" },
         { id: "volumes", label: "Volumes" },
+        { id: "snapshots", label: "Snapshots" },
         { id: "security-groups", label: "Security Groups" },
         { id: "key-pairs", label: "Key Pairs" },
         { id: "elastic-ips", label: "Elastic IPs" }
@@ -52,11 +73,13 @@
 
     $effect(() => {
         if (!client) return;
-        if (activeTab === "instances" && items.length === 0) load();
-        else if (activeTab === "volumes" && volumes.length === 0) loadVolumes();
-        else if (activeTab === "security-groups" && securityGroups.length === 0) loadSecurityGroups();
-        else if (activeTab === "key-pairs" && keyPairs.length === 0) loadKeyPairs();
-        else if (activeTab === "elastic-ips" && elasticIps.length === 0) loadElasticIps();
+        if (activeTab === "instances" && !itemsLoaded) load();
+        else if (activeTab === "amis" && !amisLoaded) loadAmis();
+        else if (activeTab === "volumes" && !volumesLoaded) loadVolumes();
+        else if (activeTab === "snapshots" && !snapshotsLoaded) loadSnapshots();
+        else if (activeTab === "security-groups" && !sgLoaded) loadSecurityGroups();
+        else if (activeTab === "key-pairs" && !kpLoaded) loadKeyPairs();
+        else if (activeTab === "elastic-ips" && !eipLoaded) loadElasticIps();
     });
 
     // --- Pagination Shared Helpers ---
@@ -132,6 +155,41 @@
             error = String(e);
         } finally {
             loading = false;
+            itemsLoaded = true;
+        }
+    }
+
+    async function loadAmis(token?: string) {
+        if (!client) return;
+        try {
+            amisLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await client.send(
+                new DescribeImagesCommand({
+                    Owners: ["self"],
+                    MaxResults: 50,
+                    NextToken: token,
+                }),
+            );
+            amis = (resp.Images ?? []).map((img) => {
+                return {
+                    id: img.ImageId ?? "Unknown",
+                    name: img.Name ?? "-",
+                    state: img.State ?? "Unknown",
+                    created: img.CreationDate ? new Date(img.CreationDate).toLocaleString() : "-",
+                    architecture: img.Architecture ?? "-",
+                    platform: img.PlatformDetails ?? "-",
+                    public: img.Public ? "Yes" : "No",
+                };
+            });
+            pushToken(amiTokenMap, resp.NextToken);
+            amiCurrentToken = resp.NextToken;
+        } catch (e) {
+            error = String(e);
+        } finally {
+            amisLoading = false;
+            amisLoaded = true;
         }
     }
 
@@ -168,6 +226,41 @@
             error = String(e);
         } finally {
             volumesLoading = false;
+            volumesLoaded = true;
+        }
+    }
+
+    async function loadSnapshots(token?: string) {
+        if (!client) return;
+        try {
+            snapshotsLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await client.send(
+                new DescribeSnapshotsCommand({
+                    OwnerIds: ["self"],
+                    MaxResults: 50,
+                    NextToken: token,
+                }),
+            );
+            snapshots = (resp.Snapshots ?? []).map((snap) => {
+                return {
+                    id: snap.SnapshotId ?? "Unknown",
+                    description: snap.Description ?? "-",
+                    size: snap.VolumeSize ?? 0,
+                    state: snap.State ?? "Unknown",
+                    started: snap.StartTime ? snap.StartTime.toLocaleString() : "-",
+                    progress: snap.Progress ?? "-",
+                    volume_id: snap.VolumeId ?? "-",
+                };
+            });
+            pushToken(snapshotTokenMap, resp.NextToken);
+            snapshotCurrentToken = resp.NextToken;
+        } catch (e) {
+            error = String(e);
+        } finally {
+            snapshotsLoading = false;
+            snapshotsLoaded = true;
         }
     }
 
@@ -199,6 +292,7 @@
             error = String(e);
         } finally {
             sgLoading = false;
+            sgLoaded = true;
         }
     }
 
@@ -224,6 +318,7 @@
             error = String(e);
         } finally {
             kpLoading = false;
+            kpLoaded = true;
         }
     }
 
@@ -252,6 +347,7 @@
             error = String(e);
         } finally {
             eipLoading = false;
+            eipLoaded = true;
         }
     }
 
@@ -366,6 +462,38 @@
         { key: "instance_id", label: "Associated instance ID" },
         { key: "private_ip", label: "Private IPv4 address" },
         { key: "network_interface_id", label: "Network interface ID" },
+    ];
+
+    const amiColumns = [
+        { key: "name", label: "Name" },
+        { key: "id", label: "AMI ID" },
+        { key: "state", label: "State",
+            format: (v: string) => {
+                if (v === "available") return "🟢 available";
+                if (v === "pending") return "🟡 pending";
+                return `🔴 ${v}`;
+            }
+        },
+        { key: "created", label: "Creation Date" },
+        { key: "architecture", label: "Architecture" },
+        { key: "platform", label: "Platform" },
+        { key: "public", label: "Public" },
+    ];
+
+    const snapshotColumns = [
+        { key: "description", label: "Description" },
+        { key: "id", label: "Snapshot ID" },
+        { key: "size", label: "Size (GiB)", format: (v: number) => `${v} GiB` },
+        { key: "state", label: "State",
+            format: (v: string) => {
+                if (v === "completed") return "🟢 completed";
+                if (v === "pending") return "🟡 pending";
+                return `🔴 ${v}`;
+            }
+        },
+        { key: "started", label: "Start Time" },
+        { key: "progress", label: "Progress" },
+        { key: "volume_id", label: "Volume ID" },
     ];
 </script>
 
@@ -523,6 +651,7 @@
                 onPrev={() => load(popToken(tokenMap))}
                 onRefresh={() => {
                     tokenMap = [];
+                    itemsLoaded = false;
                     load();
                 }}
                 {columns}
@@ -560,6 +689,21 @@
                     </div>
                 {/snippet}
             </PaginatedTable>
+        {:else if activeTab === "amis"}
+            <PaginatedTable
+                items={amis}
+                loading={amisLoading}
+                hasNext={!!amiCurrentToken}
+                hasPrev={amiTokenMap.length > 0}
+                onNext={() => loadAmis(amiCurrentToken)}
+                onPrev={() => loadAmis(popToken(amiTokenMap))}
+                onRefresh={() => {
+                    amiTokenMap = [];
+                    amisLoaded = false;
+                    loadAmis();
+                }}
+                columns={amiColumns}
+            />
         {:else if activeTab === "volumes"}
             <PaginatedTable
                 items={volumes}
@@ -570,9 +714,25 @@
                 onPrev={() => loadVolumes(popToken(volTokenMap))}
                 onRefresh={() => {
                     volTokenMap = [];
+                    volumesLoaded = false;
                     loadVolumes();
                 }}
                 columns={volColumns}
+            />
+        {:else if activeTab === "snapshots"}
+            <PaginatedTable
+                items={snapshots}
+                loading={snapshotsLoading}
+                hasNext={!!snapshotCurrentToken}
+                hasPrev={snapshotTokenMap.length > 0}
+                onNext={() => loadSnapshots(snapshotCurrentToken)}
+                onPrev={() => loadSnapshots(popToken(snapshotTokenMap))}
+                onRefresh={() => {
+                    snapshotTokenMap = [];
+                    snapshotsLoaded = false;
+                    loadSnapshots();
+                }}
+                columns={snapshotColumns}
             />
         {:else if activeTab === "security-groups"}
             <PaginatedTable
@@ -584,6 +744,7 @@
                 onPrev={() => loadSecurityGroups(popToken(sgTokenMap))}
                 onRefresh={() => {
                     sgTokenMap = [];
+                    sgLoaded = false;
                     loadSecurityGroups();
                 }}
                 columns={sgColumns}
@@ -594,7 +755,10 @@
                 loading={kpLoading}
                 hasNext={false}
                 hasPrev={false}
-                onRefresh={() => loadKeyPairs()}
+                onRefresh={() => {
+                    kpLoaded = false;
+                    loadKeyPairs();
+                }}
                 columns={kpColumns}
             />
         {:else if activeTab === "elastic-ips"}
@@ -603,7 +767,10 @@
                 loading={eipLoading}
                 hasNext={false}
                 hasPrev={false}
-                onRefresh={() => loadElasticIps()}
+                onRefresh={() => {
+                    eipLoaded = false;
+                    loadElasticIps();
+                }}
                 columns={eipColumns}
             />
         {/if}
