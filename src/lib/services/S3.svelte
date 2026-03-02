@@ -48,6 +48,7 @@
     // --- Modals & Uploads ---
     let showCreateBucket = $state(false);
     let newBucketName = $state("");
+    let newBucketRegion = $state("us-east-1");
     let newBucketLoading = $state(false);
 
     let showCreateFolder = $state(false);
@@ -196,11 +197,20 @@
         try {
             newBucketLoading = true;
             error = "";
+
+            const createParams: any = { Bucket: newBucketName };
+            if (newBucketRegion !== "us-east-1") {
+                createParams.CreateBucketConfiguration = {
+                    LocationConstraint: newBucketRegion as any
+                };
+            }
+
             await s3Client.send(
-                new CreateBucketCommand({ Bucket: newBucketName }),
+                new CreateBucketCommand(createParams),
             );
             showCreateBucket = false;
             newBucketName = "";
+            newBucketRegion = "us-east-1";
             await loadBuckets();
         } catch (e) {
             error = String(e);
@@ -231,12 +241,36 @@
             loading = true;
             error = "";
             const resp = await s3Client.send(new ListBucketsCommand({}));
-            buckets = (resp.Buckets || []).map((b) => ({
+
+            const rawBuckets = resp.Buckets || [];
+
+            // Immediately render the buckets with "Loading..." region state
+            buckets = rawBuckets.map((b) => ({
                 name: b.Name || "Unknown",
+                region: "Loading...",
                 creation_date: b.CreationDate
                     ? b.CreationDate.toISOString()
                     : null,
             }));
+
+            // Kick off an async background process to fetch regions, updating state sequentially
+            (async () => {
+                for (let i = 0; i < buckets.length; i++) {
+                    const b = buckets[i];
+                    try {
+                        const loc = await s3Client!.send(
+                            new GetBucketLocationCommand({ Bucket: b.name })
+                        );
+                        b.region = loc.LocationConstraint || "us-east-1";
+                    } catch (e) {
+                        b.region = "-";
+                        console.warn(`Could not get location for bucket ${b.name}`, e);
+                    }
+                    // Trigger reactivity
+                    buckets = [...buckets];
+                }
+            })();
+
         } catch (e) {
             error = String(e);
         } finally {
@@ -495,6 +529,10 @@
             onClick: (item: any) => browseBucket(item.name),
         },
         {
+            key: "region",
+            label: "Region",
+        },
+        {
             key: "creation_date",
             label: "Creation Date",
             format: (v: string) => (v ? new Date(v).toLocaleString() : "-"),
@@ -539,17 +577,53 @@
                 <h3 class="text-lg font-semibold text-white mb-4">
                     Create Bucket
                 </h3>
-                <input
-                    type="text"
-                    bind:value={newBucketName}
-                    placeholder="Bucket name"
-                    class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors mb-4"
-                />
+
+                <div class="mb-3">
+                    <label class="block text-xs text-gray-400 mb-1">Bucket Name</label>
+                    <input
+                        type="text"
+                        bind:value={newBucketName}
+                        placeholder="my-cool-bucket"
+                        class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors"
+                    />
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-xs text-gray-400 mb-1">Region</label>
+                    <select
+                        bind:value={newBucketRegion}
+                        class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors"
+                    >
+                        <option value="us-east-1">us-east-1 (N. Virginia)</option>
+                        <option value="us-east-2">us-east-2 (Ohio)</option>
+                        <option value="us-west-1">us-west-1 (N. California)</option>
+                        <option value="us-west-2">us-west-2 (Oregon)</option>
+                        <option value="af-south-1">af-south-1 (Cape Town)</option>
+                        <option value="ap-east-1">ap-east-1 (Hong Kong)</option>
+                        <option value="ap-south-1">ap-south-1 (Mumbai)</option>
+                        <option value="ap-northeast-3">ap-northeast-3 (Osaka)</option>
+                        <option value="ap-northeast-2">ap-northeast-2 (Seoul)</option>
+                        <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+                        <option value="ap-southeast-2">ap-southeast-2 (Sydney)</option>
+                        <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
+                        <option value="ca-central-1">ca-central-1 (Canada)</option>
+                        <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+                        <option value="eu-west-1">eu-west-1 (Ireland)</option>
+                        <option value="eu-west-2">eu-west-2 (London)</option>
+                        <option value="eu-south-1">eu-south-1 (Milan)</option>
+                        <option value="eu-west-3">eu-west-3 (Paris)</option>
+                        <option value="eu-north-1">eu-north-1 (Stockholm)</option>
+                        <option value="me-south-1">me-south-1 (Bahrain)</option>
+                        <option value="sa-east-1">sa-east-1 (São Paulo)</option>
+                    </select>
+                </div>
+
                 <div class="flex justify-end gap-2">
                     <button
                         onclick={() => {
                             showCreateBucket = false;
                             newBucketName = "";
+                            newBucketRegion = "us-east-1";
                         }}
                         class="px-4 py-2 rounded text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition"
                         >Cancel</button
