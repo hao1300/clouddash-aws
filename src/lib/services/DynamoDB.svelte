@@ -6,8 +6,12 @@
         DescribeTableCommand,
         ScanCommand,
         QueryCommand,
+        CreateTableCommand,
+        DeleteTableCommand,
+        PutItemCommand,
+        DeleteItemCommand,
     } from "@aws-sdk/client-dynamodb";
-    import { unmarshall } from "@aws-sdk/util-dynamodb";
+    import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
@@ -25,6 +29,28 @@
 
     // --- Explore Items Mode ---
     let exploreMode = $state<"scan" | "query">("scan");
+
+    // --- Modals State ---
+    let showCreateTable = $state(false);
+    let newTableName = $state("");
+    let newPkName = $state("");
+    let newPkType = $state("S");
+    let hasSk = $state(false);
+    let newSkName = $state("");
+    let newSkType = $state("S");
+    let billingMode = $state("PAY_PER_REQUEST");
+    let createTableLoading = $state(false);
+
+    let tableToDelete = $state<string | null>(null);
+    let deleteTableLoading = $state(false);
+
+    let showItemEditor = $state(false);
+    let itemEditorMode = $state<"create" | "edit">("create");
+    let itemEditorJson = $state("");
+    let itemEditorLoading = $state(false);
+
+    let itemToDelete = $state<any>(null);
+    let deleteItemLoading = $state(false);
 
     // --- Item Details Modal ---
     let viewingItem = $state<any>(null);
@@ -150,6 +176,150 @@
             error = e as string;
         }
     });
+
+    // --- Mutating Operations ---
+    async function handleCreateTable() {
+        if (!client || !newTableName || !newPkName) return;
+        try {
+            createTableLoading = true;
+            error = "";
+            actionMsg = "";
+
+            const AttributeDefinitions = [
+                { AttributeName: newPkName, AttributeType: newPkType },
+            ];
+            const KeySchema = [
+                { AttributeName: newPkName, KeyType: "HASH" },
+            ];
+
+            if (hasSk && newSkName) {
+                AttributeDefinitions.push({ AttributeName: newSkName, AttributeType: newSkType });
+                KeySchema.push({ AttributeName: newSkName, KeyType: "RANGE" });
+            }
+
+            const input: any = {
+                TableName: newTableName,
+                AttributeDefinitions,
+                KeySchema,
+                BillingMode: billingMode,
+            };
+
+            if (billingMode === "PROVISIONED") {
+                input.ProvisionedThroughput = {
+                    ReadCapacityUnits: 5,
+                    WriteCapacityUnits: 5,
+                };
+            }
+
+            await client.send(new CreateTableCommand(input));
+            actionMsg = `Successfully requested creation of table ${newTableName}.`;
+            showCreateTable = false;
+            // Reset state
+            newTableName = "";
+            newPkName = "";
+            newPkType = "S";
+            hasSk = false;
+            newSkName = "";
+            newSkType = "S";
+            billingMode = "PAY_PER_REQUEST";
+            loadTables();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            createTableLoading = false;
+        }
+    }
+
+    async function confirmDeleteTable() {
+        if (!client || !tableToDelete) return;
+        try {
+            deleteTableLoading = true;
+            error = "";
+            actionMsg = "";
+            await client.send(new DeleteTableCommand({ TableName: tableToDelete }));
+            actionMsg = `Successfully deleted table ${tableToDelete}.`;
+            tableToDelete = null;
+            tablesTokenMap = [];
+            loadTables();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            deleteTableLoading = false;
+        }
+    }
+
+    function startCreateItem() {
+        if (!activeSchema) return;
+        const pk = activeSchema.KeySchema?.find((k: any) => k.KeyType === "HASH")?.AttributeName;
+        const sk = activeSchema.KeySchema?.find((k: any) => k.KeyType === "RANGE")?.AttributeName;
+
+        const template: any = {};
+        if (pk) template[pk] = "";
+        if (sk) template[sk] = "";
+
+        itemEditorJson = JSON.stringify(template, null, 2);
+        itemEditorMode = "create";
+        showItemEditor = true;
+    }
+
+    function startEditItem(item: any) {
+        itemEditorJson = JSON.stringify(item, null, 2);
+        itemEditorMode = "edit";
+        showItemEditor = true;
+    }
+
+    async function handleSaveItem() {
+        if (!client || !tableName || !itemEditorJson.trim()) return;
+        try {
+            itemEditorLoading = true;
+            error = "";
+            actionMsg = "";
+            const parsed = JSON.parse(itemEditorJson);
+            const marshalled = marshall(parsed, { removeUndefinedValues: true, convertEmptyValues: true });
+            await client.send(new PutItemCommand({
+                TableName: tableName,
+                Item: marshalled
+            }));
+            actionMsg = `Successfully saved item.`;
+            showItemEditor = false;
+            exploreMode === "scan" ? runScan(resultCurrentToken) : runQuery(resultCurrentToken);
+        } catch (e) {
+            error = String(e);
+        } finally {
+            itemEditorLoading = false;
+        }
+    }
+
+    async function confirmDeleteItem() {
+        if (!client || !tableName || !itemToDelete || !activeSchema) return;
+        try {
+            deleteItemLoading = true;
+            error = "";
+            actionMsg = "";
+            const pk = activeSchema.KeySchema?.find((k: any) => k.KeyType === "HASH")?.AttributeName;
+            const sk = activeSchema.KeySchema?.find((k: any) => k.KeyType === "RANGE")?.AttributeName;
+
+            const key: any = {};
+            if (pk && itemToDelete[pk] !== undefined) {
+                key[pk] = itemToDelete[pk];
+            }
+            if (sk && itemToDelete[sk] !== undefined) {
+                key[sk] = itemToDelete[sk];
+            }
+
+            await client.send(new DeleteItemCommand({
+                TableName: tableName,
+                Key: marshall(key)
+            }));
+            actionMsg = `Successfully deleted item.`;
+            itemToDelete = null;
+            exploreMode === "scan" ? runScan(resultCurrentToken) : runQuery(resultCurrentToken);
+        } catch (e) {
+            error = String(e);
+        } finally {
+            deleteItemLoading = false;
+        }
+    }
 
     // --- Tables API ---
     async function loadTables(token?: string) {
@@ -364,6 +534,14 @@
                     { key: "size_bytes", label: "Size", format: formatBytes },
                 ]}
             >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={() => showCreateTable = true}
+                        class="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1"
+                    >
+                        + Create Table
+                    </button>
+                {/snippet}
                 {#snippet actionsSnippet(item)}
                     <button
                         onclick={() => {
@@ -382,6 +560,11 @@
                         }}
                         class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition ml-1"
                         >Query</button
+                    >
+                    <button
+                        onclick={() => tableToDelete = item.name}
+                        class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition ml-1"
+                        >Delete</button
                     >
                 {/snippet}
             </PaginatedTable>
@@ -644,6 +827,16 @@
                         }}
                         columns={allColumns}
                     >
+                        {#snippet headerActionsSnippet()}
+                            {#if tableName}
+                                <button
+                                    onclick={startCreateItem}
+                                    class="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1"
+                                >
+                                    + Create Item
+                                </button>
+                            {/if}
+                        {/snippet}
                         {#snippet actionsSnippet(item)}
                             <button
                                 onclick={() => viewingItem = item}
@@ -651,12 +844,141 @@
                             >
                                 View
                             </button>
+                            <button
+                                onclick={() => startEditItem(item)}
+                                class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition ml-1"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                onclick={() => itemToDelete = item}
+                                class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition ml-1"
+                            >
+                                Delete
+                            </button>
                         {/snippet}
                     </PaginatedTable>
                 </div>
             </div>
         {/if}
     </div>
+
+    <!-- Modals -->
+    {#if showCreateTable}
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-md flex flex-col">
+                <div class="flex items-center justify-between p-4 border-b border-gray-800 shrink-0">
+                    <h3 class="font-bold text-gray-200">Create Table</h3>
+                    <button onclick={() => showCreateTable = false} class="text-gray-400 hover:text-gray-200 transition-colors">✕</button>
+                </div>
+                <div class="p-4 space-y-4 overflow-y-auto max-h-[70vh]">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Table Name</label>
+                        <input bind:value={newTableName} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" placeholder="MyTable" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Partition Key</label>
+                        <div class="flex gap-2">
+                            <input bind:value={newPkName} class="flex-1 bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" placeholder="PK Attribute Name" />
+                            <select bind:value={newPkType} class="bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 w-24">
+                                <option value="S">String</option>
+                                <option value="N">Number</option>
+                                <option value="B">Binary</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 text-xs font-bold text-gray-400 mb-2 cursor-pointer hover:text-gray-200">
+                            <input type="checkbox" bind:checked={hasSk} class="accent-blue-500" />
+                            Add Sort Key
+                        </label>
+                        {#if hasSk}
+                            <div class="flex gap-2">
+                                <input bind:value={newSkName} class="flex-1 bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" placeholder="SK Attribute Name" />
+                                <select bind:value={newSkType} class="bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 w-24">
+                                    <option value="S">String</option>
+                                    <option value="N">Number</option>
+                                    <option value="B">Binary</option>
+                                </select>
+                            </div>
+                        {/if}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Capacity Mode</label>
+                        <select bind:value={billingMode} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500">
+                            <option value="PAY_PER_REQUEST">On-demand (PAY_PER_REQUEST)</option>
+                            <option value="PROVISIONED">Provisioned (5 RCU / 5 WCU default)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-gray-800 shrink-0 flex justify-end gap-2">
+                    <button onclick={() => showCreateTable = false} class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
+                    <button onclick={handleCreateTable} disabled={createTableLoading || !newTableName || !newPkName} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2">
+                        {#if createTableLoading}<span class="animate-spin">⟳</span>{/if} Create
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if tableToDelete}
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-sm flex flex-col">
+                <div class="p-4 border-b border-gray-800">
+                    <h3 class="font-bold text-red-400">Delete Table</h3>
+                </div>
+                <div class="p-4">
+                    <p class="text-sm text-gray-300">Are you sure you want to delete table <strong>{tableToDelete}</strong>? This action cannot be undone.</p>
+                </div>
+                <div class="p-4 border-t border-gray-800 flex justify-end gap-2">
+                    <button onclick={() => tableToDelete = null} class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
+                    <button onclick={confirmDeleteTable} disabled={deleteTableLoading} class="bg-red-600 hover:bg-red-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2">
+                        {#if deleteTableLoading}<span class="animate-spin">⟳</span>{/if} Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if showItemEditor}
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-3xl max-h-full flex flex-col">
+                <div class="flex items-center justify-between p-4 border-b border-gray-800 shrink-0">
+                    <h3 class="font-bold text-gray-200">{itemEditorMode === 'create' ? 'Create Item' : 'Edit Item'}</h3>
+                    <button onclick={() => showItemEditor = false} class="text-gray-400 hover:text-gray-200 transition-colors">✕</button>
+                </div>
+                <div class="p-4 overflow-auto min-h-0 flex-1 flex flex-col">
+                    <p class="text-xs text-gray-400 mb-2">Edit the item as plain JSON below. Types will be automatically inferred/marshalled.</p>
+                    <textarea bind:value={itemEditorJson} class="flex-1 w-full bg-black font-mono text-xs p-3 rounded border border-gray-700 text-green-400 outline-none focus:border-blue-500 resize-none"></textarea>
+                </div>
+                <div class="p-4 border-t border-gray-800 shrink-0 flex justify-end gap-2">
+                    <button onclick={() => showItemEditor = false} class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
+                    <button onclick={handleSaveItem} disabled={itemEditorLoading} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2">
+                        {#if itemEditorLoading}<span class="animate-spin">⟳</span>{/if} Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if itemToDelete}
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-sm flex flex-col">
+                <div class="p-4 border-b border-gray-800">
+                    <h3 class="font-bold text-red-400">Delete Item</h3>
+                </div>
+                <div class="p-4">
+                    <p class="text-sm text-gray-300">Are you sure you want to delete this item? This action cannot be undone.</p>
+                </div>
+                <div class="p-4 border-t border-gray-800 flex justify-end gap-2">
+                    <button onclick={() => itemToDelete = null} class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
+                    <button onclick={confirmDeleteItem} disabled={deleteItemLoading} class="bg-red-600 hover:bg-red-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2">
+                        {#if deleteItemLoading}<span class="animate-spin">⟳</span>{/if} Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
 
     {#if viewingItem}
         <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
