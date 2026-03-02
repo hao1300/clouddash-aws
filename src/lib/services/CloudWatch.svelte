@@ -6,6 +6,8 @@
         ListDashboardsCommand,
         GetDashboardCommand,
         ListMetricsCommand,
+        DescribeAlarmHistoryCommand,
+        GetMetricStatisticsCommand,
     } from "@aws-sdk/client-cloudwatch";
     import {
         CloudWatchLogsClient,
@@ -14,6 +16,7 @@
         GetQueryResultsCommand,
         DescribeLogStreamsCommand,
         GetLogEventsCommand,
+        FilterLogEventsCommand,
     } from "@aws-sdk/client-cloudwatch-logs";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -65,12 +68,17 @@
     let alarmsCurrentToken = $state<string | undefined>(undefined);
     let hideAutoScaling = $state(true);
     let selectedAlarm = $state<any>(null);
+    let alarmHistory = $state<any[]>([]);
+    let alarmHistoryLoading = $state(false);
 
     // --- Metrics ---
     let metrics = $state<any[]>([]);
     let metricsLoading = $state(false);
     let metricsTokenMap = $state<string[]>([]);
     let metricsCurrentToken = $state<string | undefined>(undefined);
+    let selectedMetric = $state<any>(null);
+    let metricStats = $state<any[]>([]);
+    let metricStatsLoading = $state(false);
 
     // --- Dashboards ---
     let dashboards = $state<any[]>([]);
@@ -99,6 +107,7 @@
     let logEventsLoading = $state(false);
     let logEventsNextToken = $state<string | undefined>(undefined);
     let logEventsPrevToken = $state<string | undefined>(undefined);
+    let logEventsFilter = $state("");
 
     // --- Logs Insights ---
     let logGroups = $state<any[]>([]);
@@ -149,6 +158,31 @@
     });
 
     // --- Alarms API ---
+    async function loadAlarmHistory(alarmName: string) {
+        if (!cwClient) return;
+        try {
+            alarmHistoryLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await cwClient.send(
+                new DescribeAlarmHistoryCommand({
+                    AlarmName: alarmName,
+                    HistoryItemType: "StateUpdate",
+                    MaxRecords: 50,
+                })
+            );
+            alarmHistory = (resp.AlarmHistoryItems ?? []).map((h) => ({
+                timestamp: h.Timestamp?.toLocaleString() ?? "",
+                summary: h.HistorySummary ?? "",
+                data: h.HistoryData ?? "",
+            }));
+        } catch (e) {
+            error = String(e);
+        } finally {
+            alarmHistoryLoading = false;
+        }
+    }
+
     async function loadAlarms(token?: string) {
         if (!cwClient) return;
         try {
@@ -186,6 +220,46 @@
     }
 
     // --- Metrics API ---
+    async function loadMetricStats(metric: any) {
+        if (!cwClient) return;
+        try {
+            selectedMetric = metric;
+            metricStatsLoading = true;
+            error = "";
+            actionMsg = "";
+
+            const endTime = new Date();
+            const startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000); // Last 24 hours
+
+            const resp = await cwClient.send(
+                new GetMetricStatisticsCommand({
+                    Namespace: metric.namespace,
+                    MetricName: metric.metricName,
+                    Dimensions: metric.rawDimensions,
+                    StartTime: startTime,
+                    EndTime: endTime,
+                    Period: 3600, // 1 hour periods
+                    Statistics: ["Average", "Sum", "Minimum", "Maximum", "SampleCount"],
+                })
+            );
+
+            metricStats = (resp.Datapoints ?? []).map((dp) => ({
+                timestamp: dp.Timestamp?.toLocaleString() ?? "",
+                average: dp.Average?.toFixed(2) ?? "-",
+                sum: dp.Sum?.toFixed(2) ?? "-",
+                min: dp.Minimum?.toFixed(2) ?? "-",
+                max: dp.Maximum?.toFixed(2) ?? "-",
+                count: dp.SampleCount ?? "-",
+                unit: dp.Unit ?? "",
+            })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        } catch (e) {
+            error = String(e);
+        } finally {
+            metricStatsLoading = false;
+        }
+    }
+
     async function loadMetrics(token?: string) {
         if (!cwClient) return;
         try {
@@ -199,6 +273,7 @@
                 namespace: m.Namespace ?? "",
                 metricName: m.MetricName ?? "",
                 dimensions: (m.Dimensions ?? []).map((d) => `${d.Name}=${d.Value}`).join(", "),
+                rawDimensions: m.Dimensions ?? [],
             }));
             pushToken(metricsTokenMap, resp.NextToken);
             metricsCurrentToken = resp.NextToken;
@@ -316,33 +391,58 @@
             error = "";
             actionMsg = "";
 
-            const params: any = {
-                logGroupName,
-                logStreamName,
-                limit: 100,
-            };
+            if (logEventsFilter.trim()) {
+                const params: any = {
+                    logGroupName,
+                    logStreamNames: [logStreamName],
+                    limit: 100,
+                    filterPattern: logEventsFilter.trim(),
+                };
+                if (token) {
+                    params.nextToken = token;
+                }
+                const resp = await logsClient.send(
+                    new FilterLogEventsCommand(params),
+                );
+                logEvents = (resp.events ?? []).map((e) => ({
+                    timestamp: e.timestamp ? new Date(e.timestamp).toLocaleString() : "-",
+                    message: e.message ?? "",
+                }));
+                // FilterLogEvents only pages forward
+                logEventsNextToken = resp.nextToken;
+                logEventsPrevToken = undefined;
+                if (resp.events && resp.events.length === 0) {
+                    actionMsg = "No more matching events found.";
+                }
+            } else {
+                const params: any = {
+                    logGroupName,
+                    logStreamName,
+                    limit: 100,
+                };
 
-            if (token) {
-                params.nextToken = token;
-            } else if (direction === "next" && !token) {
-                 params.startFromHead = true;
-            }
+                if (token) {
+                    params.nextToken = token;
+                } else if (direction === "next" && !token) {
+                     params.startFromHead = true;
+                }
 
-            const resp = await logsClient.send(
-                new GetLogEventsCommand(params),
-            );
+                const resp = await logsClient.send(
+                    new GetLogEventsCommand(params),
+                );
 
-            logEvents = (resp.events ?? []).map((e) => ({
-                timestamp: e.timestamp ? new Date(e.timestamp).toLocaleString() : "-",
-                message: e.message ?? "",
-            }));
+                logEvents = (resp.events ?? []).map((e) => ({
+                    timestamp: e.timestamp ? new Date(e.timestamp).toLocaleString() : "-",
+                    message: e.message ?? "",
+                }));
 
-            // Only update tokens if there are actually events or if it's the first load
-            if (resp.events && resp.events.length > 0 || !token) {
-                logEventsNextToken = resp.nextForwardToken;
-                logEventsPrevToken = resp.nextBackwardToken;
-            } else if (resp.events && resp.events.length === 0) {
-                 actionMsg = direction === "next" ? "No newer log events found." : "No older log events found.";
+                // Only update tokens if there are actually events or if it's the first load
+                if ((resp.events && resp.events.length > 0) || !token) {
+                    logEventsNextToken = resp.nextForwardToken;
+                    logEventsPrevToken = resp.nextBackwardToken;
+                } else if (resp.events && resp.events.length === 0) {
+                     actionMsg = direction === "next" ? "No newer log events found." : "No older log events found.";
+                }
             }
 
         } catch (e) {
@@ -543,7 +643,7 @@
 
                     {#if selectedAlarm.description}
                         <div
-                            class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm shrink-0"
+                            class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm shrink-0 mb-6"
                         >
                             <h3
                                 class="text-xs text-gray-400 uppercase tracking-widest font-bold mb-2"
@@ -557,6 +657,28 @@
                             </p>
                         </div>
                     {/if}
+
+                    <div class="flex-1 min-h-0 bg-gray-900 rounded-lg border border-gray-800 shadow-sm overflow-hidden flex flex-col">
+                        <div class="px-4 py-2 border-b border-gray-800 bg-gray-900/80 shrink-0">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">State Change History</h3>
+                        </div>
+                        <div class="flex-1 overflow-auto bg-gray-950 p-2">
+                            {#if alarmHistoryLoading}
+                                <div class="text-gray-500 italic p-4 text-center">Loading history...</div>
+                            {:else if alarmHistory.length === 0}
+                                <div class="text-gray-500 italic p-4 text-center">No state change history found.</div>
+                            {:else}
+                                <div class="space-y-1">
+                                    {#each alarmHistory as h}
+                                        <div class="p-2 border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors">
+                                            <div class="text-gray-400 text-xs mb-1">{h.timestamp}</div>
+                                            <div class="text-gray-200 text-sm whitespace-pre-wrap">{h.summary}</div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
                 </div>
             {:else}
                 <PaginatedTable
@@ -576,6 +698,7 @@
                             label: "Alarm Name",
                             onClick: (item) => {
                                 selectedAlarm = item;
+                                loadAlarmHistory(item.name);
                             },
                         },
                         {
@@ -615,23 +738,82 @@
                 </PaginatedTable>
             {/if}
         {:else if activeTab === "metrics"}
-            <PaginatedTable
-                items={metrics}
-                loading={metricsLoading}
-                hasNext={!!metricsCurrentToken}
-                hasPrev={metricsTokenMap.length > 0}
-                onNext={() => loadMetrics(metricsCurrentToken)}
-                onPrev={() => loadMetrics(popToken(metricsTokenMap))}
-                onRefresh={() => {
-                    metricsTokenMap = [];
-                    loadMetrics();
-                }}
-                columns={[
-                    { key: "namespace", label: "Namespace" },
-                    { key: "metricName", label: "Metric Name" },
-                    { key: "dimensions", label: "Dimensions" },
-                ]}
-            />
+            {#if selectedMetric}
+                <div class="h-full flex flex-col p-4 pr-1 bg-gray-950">
+                    <div class="flex items-center gap-3 mb-6 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm shrink-0">
+                        <button
+                            onclick={() => { selectedMetric = null; metricStats = []; }}
+                            class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
+                        >← Back to Metrics</button>
+                        <span class="text-sm font-bold text-gray-200 truncate flex-1">{selectedMetric.metricName} <span class="text-xs font-normal text-gray-500 ml-2">({selectedMetric.namespace})</span></span>
+                    </div>
+
+                    <div class="flex-1 min-h-0 bg-gray-900 rounded-lg border border-gray-800 shadow-sm overflow-hidden flex flex-col">
+                        <div class="px-4 py-2 border-b border-gray-800 bg-gray-900/80 flex justify-between items-center shrink-0">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Metric Statistics (Last 24 Hours)</h3>
+                            <button
+                                onclick={() => loadMetricStats(selectedMetric)}
+                                disabled={metricStatsLoading}
+                                class="text-xs text-blue-400 hover:text-blue-300 transition"
+                            >↻ Refresh</button>
+                        </div>
+                        <div class="flex-1 overflow-auto bg-gray-950 p-2">
+                            {#if metricStatsLoading && metricStats.length === 0}
+                                <div class="text-gray-500 italic p-4 text-center">Loading statistics...</div>
+                            {:else if metricStats.length === 0}
+                                <div class="text-gray-500 italic p-4 text-center">No datapoints found in the last 24 hours.</div>
+                            {:else}
+                                <table class="w-full text-xs text-left">
+                                    <thead class="sticky top-0 bg-gray-900 border-b border-gray-800/50 z-10">
+                                        <tr>
+                                            <th class="px-3 py-2 font-semibold text-gray-300">Timestamp</th>
+                                            <th class="px-3 py-2 font-semibold text-gray-300">Average</th>
+                                            <th class="px-3 py-2 font-semibold text-gray-300">Maximum</th>
+                                            <th class="px-3 py-2 font-semibold text-gray-300">Minimum</th>
+                                            <th class="px-3 py-2 font-semibold text-gray-300">Sum</th>
+                                            <th class="px-3 py-2 font-semibold text-gray-300">Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {#each metricStats as stat}
+                                            <tr class="border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors">
+                                                <td class="px-3 py-1.5 text-gray-400">{stat.timestamp}</td>
+                                                <td class="px-3 py-1.5 text-gray-300">{stat.average}</td>
+                                                <td class="px-3 py-1.5 text-gray-300">{stat.max}</td>
+                                                <td class="px-3 py-1.5 text-gray-300">{stat.min}</td>
+                                                <td class="px-3 py-1.5 text-gray-300">{stat.sum}</td>
+                                                <td class="px-3 py-1.5 text-gray-300">{stat.count} {stat.unit}</td>
+                                            </tr>
+                                        {/each}
+                                    </tbody>
+                                </table>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            {:else}
+                <PaginatedTable
+                    items={metrics}
+                    loading={metricsLoading}
+                    hasNext={!!metricsCurrentToken}
+                    hasPrev={metricsTokenMap.length > 0}
+                    onNext={() => loadMetrics(metricsCurrentToken)}
+                    onPrev={() => loadMetrics(popToken(metricsTokenMap))}
+                    onRefresh={() => {
+                        metricsTokenMap = [];
+                        loadMetrics();
+                    }}
+                    columns={[
+                        { key: "namespace", label: "Namespace" },
+                        {
+                            key: "metricName",
+                            label: "Metric Name",
+                            onClick: (item) => loadMetricStats(item),
+                        },
+                        { key: "dimensions", label: "Dimensions" },
+                    ]}
+                />
+            {/if}
         {:else if activeTab === "dashboards"}
             {#if selectedDash}
                 <div class="p-4 pr-1 h-full flex flex-col pt-2">
@@ -696,6 +878,23 @@
                             >{selectedStreamForEvents}</span
                         >
                         <div class="flex-1"></div>
+
+                        <div class="flex items-center gap-2">
+                            <input
+                                type="text"
+                                bind:value={logEventsFilter}
+                                onkeydown={(e) => { if (e.key === 'Enter') loadLogEvents(selectedGroupForStreams, selectedStreamForEvents); }}
+                                placeholder="Filter pattern..."
+                                class="bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs outline-none focus:border-blue-500 text-gray-200 w-48"
+                            />
+                            <button
+                                onclick={() => loadLogEvents(selectedGroupForStreams, selectedStreamForEvents)}
+                                class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1 rounded transition"
+                            >Search</button>
+                        </div>
+
+                        <div class="h-4 border-l border-gray-700 mx-1"></div>
+
                         <button
                             onclick={() => loadLogEvents(selectedGroupForStreams, selectedStreamForEvents, logEventsPrevToken, "prev")}
                             disabled={!logEventsPrevToken || logEventsLoading}
