@@ -13,10 +13,23 @@
         DescribeAddressesCommand,
         DescribeImagesCommand,
         DescribeSnapshotsCommand,
+        DeleteVolumeCommand,
+        DeleteSnapshotCommand,
+        DeleteSecurityGroupCommand,
+        DeleteKeyPairCommand,
+        ReleaseAddressCommand,
+        DeregisterImageCommand,
+        CreateSecurityGroupCommand,
+        CreateKeyPairCommand,
+        AllocateAddressCommand,
+        CreateVolumeCommand,
+        CreateSnapshotCommand,
+        DescribeAvailabilityZonesCommand,
     } from "@aws-sdk/client-ec2";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
+    import Modal from "$lib/components/Modal.svelte";
 
     let items = $state<any[]>([]);
     let loading = $state(false);
@@ -57,6 +70,26 @@
     let snapshotsLoaded = $state(false);
     let snapshotTokenMap = $state<string[]>([]);
     let snapshotCurrentToken = $state<string | undefined>(undefined);
+
+    // --- Create State ---
+    let createSgModalOpen = $state(false);
+    let createSgName = $state("");
+    let createSgDesc = $state("");
+    let createSgVpc = $state(""); // Optional
+
+    let createKpModalOpen = $state(false);
+    let createKpName = $state("");
+    let createKpMaterialModalOpen = $state(false);
+    let createKpMaterial = $state("");
+
+    let createVolModalOpen = $state(false);
+    let createVolSize = $state(8);
+    let createVolAz = $state("");
+    let availableAzs = $state<string[]>([]);
+
+    let createSnapModalOpen = $state(false);
+    let createSnapVolId = $state("");
+    let createSnapDesc = $state("");
 
     // --- Service Layout State ---
     const tabs = [
@@ -322,6 +355,21 @@
         }
     }
 
+    async function loadAzs() {
+        if (!client || availableAzs.length > 0) return;
+        try {
+            const resp = await client.send(
+                new DescribeAvailabilityZonesCommand({}),
+            );
+            availableAzs = (resp.AvailabilityZones ?? [])
+                .map((z) => z.ZoneName ?? "")
+                .filter((n) => n.length > 0);
+            if (availableAzs.length > 0) createVolAz = availableAzs[0];
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
     async function loadElasticIps() {
         if (!client) return;
         try {
@@ -389,6 +437,130 @@
                 );
             actionMsg = `${labels[action]} request sent for ${id}`;
             setTimeout(() => load(currentToken), 2000); // Reload current page
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    async function deleteAction(type: string, id: string, name?: string) {
+        if (!client) return;
+        const displayName = name && name !== "-" ? `${name} (${id})` : id;
+        if (!confirm(`Are you sure you want to delete/release ${type} ${displayName}?`)) return;
+
+        try {
+            error = "";
+            actionMsg = "";
+            if (type === "Volume") {
+                await client.send(new DeleteVolumeCommand({ VolumeId: id }));
+                setTimeout(() => loadVolumes(volCurrentToken), 1000);
+            } else if (type === "Snapshot") {
+                await client.send(new DeleteSnapshotCommand({ SnapshotId: id }));
+                setTimeout(() => loadSnapshots(snapshotCurrentToken), 1000);
+            } else if (type === "Security Group") {
+                await client.send(new DeleteSecurityGroupCommand({ GroupId: id }));
+                setTimeout(() => loadSecurityGroups(sgCurrentToken), 1000);
+            } else if (type === "Key Pair") {
+                await client.send(new DeleteKeyPairCommand({ KeyPairId: id }));
+                setTimeout(() => loadKeyPairs(), 1000);
+            } else if (type === "Elastic IP") {
+                await client.send(new ReleaseAddressCommand({ AllocationId: id }));
+                setTimeout(() => loadElasticIps(), 1000);
+            } else if (type === "AMI") {
+                await client.send(new DeregisterImageCommand({ ImageId: id }));
+                setTimeout(() => loadAmis(amiCurrentToken), 1000);
+            }
+            actionMsg = `${type} ${id} deleted successfully.`;
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    async function submitCreateSg() {
+        if (!client) return;
+        try {
+            error = "";
+            actionMsg = "";
+            await client.send(new CreateSecurityGroupCommand({
+                GroupName: createSgName,
+                Description: createSgDesc,
+                VpcId: createSgVpc || undefined
+            }));
+            actionMsg = `Security Group ${createSgName} created successfully.`;
+            createSgModalOpen = false;
+            createSgName = "";
+            createSgDesc = "";
+            createSgVpc = "";
+            setTimeout(() => loadSecurityGroups(sgCurrentToken), 1000);
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    async function submitCreateKp() {
+        if (!client) return;
+        try {
+            error = "";
+            actionMsg = "";
+            const res = await client.send(new CreateKeyPairCommand({
+                KeyName: createKpName
+            }));
+            actionMsg = `Key Pair ${createKpName} created successfully.`;
+            createKpModalOpen = false;
+            createKpName = "";
+            createKpMaterial = res.KeyMaterial ?? "No key material returned.";
+            createKpMaterialModalOpen = true;
+            setTimeout(() => loadKeyPairs(), 1000);
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    async function submitCreateVol() {
+        if (!client) return;
+        try {
+            error = "";
+            actionMsg = "";
+            await client.send(new CreateVolumeCommand({
+                Size: createVolSize,
+                AvailabilityZone: createVolAz
+            }));
+            actionMsg = `Volume creation initiated.`;
+            createVolModalOpen = false;
+            setTimeout(() => loadVolumes(volCurrentToken), 1000);
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    async function submitCreateSnap() {
+        if (!client) return;
+        try {
+            error = "";
+            actionMsg = "";
+            await client.send(new CreateSnapshotCommand({
+                VolumeId: createSnapVolId,
+                Description: createSnapDesc
+            }));
+            actionMsg = `Snapshot creation initiated for volume ${createSnapVolId}.`;
+            createSnapModalOpen = false;
+            createSnapVolId = "";
+            createSnapDesc = "";
+            setTimeout(() => loadSnapshots(snapshotCurrentToken), 1000);
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    async function allocateEip() {
+        if (!client) return;
+        try {
+            error = "";
+            actionMsg = "";
+            await client.send(new AllocateAddressCommand({
+                Domain: "vpc"
+            }));
+            actionMsg = `Elastic IP allocated successfully.`;
+            setTimeout(() => loadElasticIps(), 1000);
         } catch (e) {
             error = String(e);
         }
@@ -703,7 +875,15 @@
                     loadAmis();
                 }}
                 columns={amiColumns}
-            />
+            >
+                {#snippet actionsSnippet(item)}
+                    <button
+                        onclick={() => deleteAction("AMI", item.id, item.name)}
+                        class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
+                        >Deregister</button
+                    >
+                {/snippet}
+            </PaginatedTable>
         {:else if activeTab === "volumes"}
             <PaginatedTable
                 items={volumes}
@@ -718,7 +898,36 @@
                     loadVolumes();
                 }}
                 columns={volColumns}
-            />
+            >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={async () => {
+                            await loadAzs();
+                            createVolModalOpen = true;
+                        }}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
+                    >
+                        Create Volume
+                    </button>
+                {/snippet}
+                {#snippet actionsSnippet(item)}
+                    <div class="flex gap-1 justify-end">
+                        <button
+                            onclick={() => {
+                                createSnapVolId = item.id;
+                                createSnapModalOpen = true;
+                            }}
+                            class="text-blue-400 hover:text-blue-300 bg-blue-900/40 hover:bg-blue-800/60 px-2 py-1 rounded text-xs transition"
+                            >Snapshot</button
+                        >
+                        <button
+                            onclick={() => deleteAction("Volume", item.id, item.name)}
+                            class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
+                            >Delete</button
+                        >
+                    </div>
+                {/snippet}
+            </PaginatedTable>
         {:else if activeTab === "snapshots"}
             <PaginatedTable
                 items={snapshots}
@@ -733,7 +942,23 @@
                     loadSnapshots();
                 }}
                 columns={snapshotColumns}
-            />
+            >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={() => createSnapModalOpen = true}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
+                    >
+                        Create Snapshot
+                    </button>
+                {/snippet}
+                {#snippet actionsSnippet(item)}
+                    <button
+                        onclick={() => deleteAction("Snapshot", item.id, item.description)}
+                        class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
+                        >Delete</button
+                    >
+                {/snippet}
+            </PaginatedTable>
         {:else if activeTab === "security-groups"}
             <PaginatedTable
                 items={securityGroups}
@@ -748,7 +973,23 @@
                     loadSecurityGroups();
                 }}
                 columns={sgColumns}
-            />
+            >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={() => createSgModalOpen = true}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
+                    >
+                        Create Security Group
+                    </button>
+                {/snippet}
+                {#snippet actionsSnippet(item)}
+                    <button
+                        onclick={() => deleteAction("Security Group", item.id, item.name)}
+                        class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
+                        >Delete</button
+                    >
+                {/snippet}
+            </PaginatedTable>
         {:else if activeTab === "key-pairs"}
             <PaginatedTable
                 items={keyPairs}
@@ -760,7 +1001,23 @@
                     loadKeyPairs();
                 }}
                 columns={kpColumns}
-            />
+            >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={() => createKpModalOpen = true}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
+                    >
+                        Create Key Pair
+                    </button>
+                {/snippet}
+                {#snippet actionsSnippet(item)}
+                    <button
+                        onclick={() => deleteAction("Key Pair", item.id, item.name)}
+                        class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
+                        >Delete</button
+                    >
+                {/snippet}
+            </PaginatedTable>
         {:else if activeTab === "elastic-ips"}
             <PaginatedTable
                 items={elasticIps}
@@ -772,7 +1029,113 @@
                     loadElasticIps();
                 }}
                 columns={eipColumns}
-            />
+            >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={allocateEip}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
+                    >
+                        Allocate Elastic IP
+                    </button>
+                {/snippet}
+                {#snippet actionsSnippet(item)}
+                    <button
+                        onclick={() => deleteAction("Elastic IP", item.id, item.name)}
+                        class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
+                        >Release</button
+                    >
+                {/snippet}
+            </PaginatedTable>
         {/if}
     </div>
 </ServiceLayout>
+
+<!-- Modals -->
+<Modal bind:open={createSgModalOpen} title="Create Security Group">
+    <div class="flex flex-col gap-4">
+        <div>
+            <label for="createSgName" class="block text-xs text-gray-400 mb-1">Security Group Name</label>
+            <input id="createSgName" type="text" bind:value={createSgName} placeholder="e.g. web-server-sg" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+        </div>
+        <div>
+            <label for="createSgDesc" class="block text-xs text-gray-400 mb-1">Description</label>
+            <input id="createSgDesc" type="text" bind:value={createSgDesc} placeholder="e.g. Allow web traffic" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+        </div>
+        <div>
+            <label for="createSgVpc" class="block text-xs text-gray-400 mb-1">VPC ID (Optional)</label>
+            <input id="createSgVpc" type="text" bind:value={createSgVpc} placeholder="Leave blank for default VPC" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+            <button onclick={() => createSgModalOpen = false} class="px-4 py-2 text-sm text-gray-400 hover:text-gray-200">Cancel</button>
+            <button onclick={submitCreateSg} disabled={!createSgName || !createSgDesc} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm transition font-medium">Create</button>
+        </div>
+    </div>
+</Modal>
+
+<Modal bind:open={createKpModalOpen} title="Create Key Pair">
+    <div class="flex flex-col gap-4">
+        <div>
+            <label for="createKpName" class="block text-xs text-gray-400 mb-1">Key Pair Name</label>
+            <input id="createKpName" type="text" bind:value={createKpName} placeholder="e.g. my-key-pair" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+            <p class="text-xs text-gray-500 mt-2">The private key material will be displayed once created. You must copy it immediately as it cannot be retrieved again.</p>
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+            <button onclick={() => createKpModalOpen = false} class="px-4 py-2 text-sm text-gray-400 hover:text-gray-200">Cancel</button>
+            <button onclick={submitCreateKp} disabled={!createKpName} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm transition font-medium">Create</button>
+        </div>
+    </div>
+</Modal>
+
+<Modal bind:open={createKpMaterialModalOpen} title="Private Key Material" maxWidth="max-w-2xl">
+    <div class="flex flex-col gap-4">
+        <p class="text-sm text-yellow-400 bg-yellow-900/20 p-3 rounded border border-yellow-900/50">Save this key material now! You will not be able to retrieve it again after closing this window.</p>
+        <div class="bg-gray-950 p-4 rounded border border-gray-800">
+            <pre class="text-xs text-gray-300 font-mono overflow-x-auto whitespace-pre-wrap">{createKpMaterial}</pre>
+        </div>
+        <div class="flex justify-end mt-4">
+            <button onclick={() => createKpMaterialModalOpen = false} class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm transition font-medium">I have copied the key</button>
+        </div>
+    </div>
+</Modal>
+
+<Modal bind:open={createVolModalOpen} title="Create Volume">
+    <div class="flex flex-col gap-4">
+        <div>
+            <label for="createVolSize" class="block text-xs text-gray-400 mb-1">Size (GiB)</label>
+            <input id="createVolSize" type="number" min="1" bind:value={createVolSize} class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+        </div>
+        <div>
+            <label for="createVolAz" class="block text-xs text-gray-400 mb-1">Availability Zone</label>
+            {#if availableAzs.length > 0}
+                <select id="createVolAz" bind:value={createVolAz} class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500">
+                    {#each availableAzs as az}
+                        <option value={az}>{az}</option>
+                    {/each}
+                </select>
+            {:else}
+                <input id="createVolAz" type="text" bind:value={createVolAz} placeholder="e.g. us-east-1a" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+            {/if}
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+            <button onclick={() => createVolModalOpen = false} class="px-4 py-2 text-sm text-gray-400 hover:text-gray-200">Cancel</button>
+            <button onclick={submitCreateVol} disabled={!createVolSize || !createVolAz} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm transition font-medium">Create</button>
+        </div>
+    </div>
+</Modal>
+
+<Modal bind:open={createSnapModalOpen} title="Create Snapshot">
+    <div class="flex flex-col gap-4">
+        <div>
+            <label for="createSnapVolId" class="block text-xs text-gray-400 mb-1">Volume ID</label>
+            <input id="createSnapVolId" type="text" bind:value={createSnapVolId} placeholder="e.g. vol-0123456789abcdef0" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+        </div>
+        <div>
+            <label for="createSnapDesc" class="block text-xs text-gray-400 mb-1">Description (Optional)</label>
+            <input id="createSnapDesc" type="text" bind:value={createSnapDesc} placeholder="Snapshot description" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+            <button onclick={() => createSnapModalOpen = false} class="px-4 py-2 text-sm text-gray-400 hover:text-gray-200">Cancel</button>
+            <button onclick={submitCreateSnap} disabled={!createSnapVolId} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm transition font-medium">Create</button>
+        </div>
+    </div>
+</Modal>
