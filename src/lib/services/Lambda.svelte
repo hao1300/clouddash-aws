@@ -4,8 +4,6 @@
         LambdaClient,
         ListFunctionsCommand,
         InvokeCommand,
-        GetFunctionConfigurationCommand,
-        UpdateFunctionConfigurationCommand,
         type FunctionConfiguration,
     } from "@aws-sdk/client-lambda";
     import { getAwsCredentials } from "./aws-creds";
@@ -39,9 +37,6 @@
 
     // --- Detail View ---
     let selectedFn = $state<FunctionConfiguration | null>(null);
-    let detailTab = $state<"invoke" | "configuration">("invoke");
-
-    // Invoke state
     let invokeInput = $state("{}");
     let invokeResult = $state<{
         statusCode?: number;
@@ -49,14 +44,6 @@
         error?: string;
     } | null>(null);
     let invokeLoading = $state(false);
-
-    // Config state
-    let isEditingConfig = $state(false);
-    let editMemory = $state(128);
-    let editTimeout = $state(3);
-    let editHandler = $state("");
-    let configLoading = $state(false);
-    let configError = $state("");
 
     onMount(async () => {
         try {
@@ -105,58 +92,10 @@
         loadFunctions(prevToken);
     }
 
-    async function loadFunctionConfig(fnName: string) {
-        if (!client) return;
-        configLoading = true;
-        configError = "";
-        try {
-            const res = await client.send(
-                new GetFunctionConfigurationCommand({
-                    FunctionName: fnName,
-                })
-            );
-            selectedFn = res;
-            editMemory = res.MemorySize || 128;
-            editTimeout = res.Timeout || 3;
-            editHandler = res.Handler || "";
-        } catch (e: any) {
-            configError = e.message || String(e);
-        } finally {
-            configLoading = false;
-        }
-    }
-
-    async function updateFunctionConfig() {
-        if (!client || !selectedFn?.FunctionName) return;
-        configLoading = true;
-        configError = "";
-        try {
-            const res = await client.send(
-                new UpdateFunctionConfigurationCommand({
-                    FunctionName: selectedFn.FunctionName,
-                    MemorySize: editMemory,
-                    Timeout: editTimeout,
-                    Handler: editHandler,
-                })
-            );
-            selectedFn = res;
-            isEditingConfig = false;
-        } catch (e: any) {
-            configError = e.message || String(e);
-        } finally {
-            configLoading = false;
-        }
-    }
-
     function openFunction(fn: FunctionConfiguration) {
         selectedFn = fn;
-        detailTab = "invoke";
-        isEditingConfig = false;
         invokeInput = "{}";
         invokeResult = null;
-        if (fn.FunctionName) {
-            loadFunctionConfig(fn.FunctionName);
-        }
     }
 
     async function invokeFunction() {
@@ -291,35 +230,8 @@
                     </div>
                 </div>
 
-                <!-- Inner Tabs -->
-                <div
-                    class="px-4 sm:px-6 border-b border-gray-800 bg-gray-900 shrink-0 overflow-x-auto scrollbar-hide"
-                >
-                    <nav class="flex gap-4 min-w-max">
-                        <button
-                            onclick={() => (detailTab = "invoke")}
-                            class="py-3 text-sm font-semibold transition border-b-2 whitespace-nowrap {detailTab ===
-                            'invoke'
-                                ? 'border-blue-500 text-blue-400'
-                                : 'border-transparent text-gray-400 hover:text-gray-200'}"
-                        >
-                            Test / Invoke
-                        </button>
-                        <button
-                            onclick={() => (detailTab = "configuration")}
-                            class="py-3 text-sm font-semibold transition border-b-2 whitespace-nowrap {detailTab ===
-                            'configuration'
-                                ? 'border-blue-500 text-blue-400'
-                                : 'border-transparent text-gray-400 hover:text-gray-200'}"
-                        >
-                            Configuration
-                        </button>
-                    </nav>
-                </div>
-
                 <!-- Inner Content -->
-                <div class="flex-1 overflow-auto p-4 sm:p-6 p-rel relative min-h-0">
-                    {#if detailTab === "invoke"}
+                <div class="flex-1 overflow-auto p-4 sm:p-6">
                     <div class="max-w-3xl space-y-4">
                         <h3 class="text-lg font-bold text-gray-100 mb-4">
                             Invoke Function
@@ -413,146 +325,6 @@
                             </div>
                         {/if}
                     </div>
-                    {:else if detailTab === "configuration"}
-                        <div class="max-w-4xl space-y-6">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-lg font-bold text-gray-100">
-                                    General Configuration
-                                </h3>
-                                {#if !isEditingConfig}
-                                    <button
-                                        onclick={() => (isEditingConfig = true)}
-                                        class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-4 py-1.5 rounded text-sm font-semibold transition border border-gray-700 shadow-sm"
-                                    >
-                                        Edit
-                                    </button>
-                                {/if}
-                            </div>
-
-                            {#if configError}
-                                <div class="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded text-sm mb-4">
-                                    {configError}
-                                </div>
-                            {/if}
-
-                            <div class="bg-gray-900 border border-gray-800 p-4 sm:p-5 rounded-lg shadow-sm">
-                                {#if configLoading && !selectedFn.Runtime}
-                                    <div class="text-sm text-gray-500 animate-pulse">Loading configuration...</div>
-                                {:else}
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                                        <!-- Readonly Fields -->
-                                        <div>
-                                            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">ARN</h4>
-                                            <span class="text-sm text-gray-300 font-mono break-all">{selectedFn.FunctionArn}</span>
-                                        </div>
-                                        <div>
-                                            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Role</h4>
-                                            <span class="text-sm text-gray-300 font-mono break-all">{selectedFn.Role}</span>
-                                        </div>
-                                        <div>
-                                            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Runtime</h4>
-                                            <span class="text-sm text-gray-300">{selectedFn.Runtime}</span>
-                                        </div>
-                                        <div>
-                                            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Code Size</h4>
-                                            <span class="text-sm text-gray-300">{(selectedFn.CodeSize ? (selectedFn.CodeSize / (1024 * 1024)).toFixed(2) : 0)} MB</span>
-                                        </div>
-                                        <div>
-                                            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Ephemeral Storage</h4>
-                                            <span class="text-sm text-gray-300">{selectedFn.EphemeralStorage?.Size ? selectedFn.EphemeralStorage.Size + " MB" : "-"}</span>
-                                        </div>
-                                        <div>
-                                            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">State</h4>
-                                            <span class="text-sm {selectedFn.State === 'Active' ? 'text-green-400 font-medium' : 'text-gray-300'}">{selectedFn.State}</span>
-                                        </div>
-
-                                        <!-- Editable Fields -->
-                                        <div class="md:col-span-2 border-t border-gray-800 pt-4 mt-2 grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <div>
-                                                <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Memory (MB)</h4>
-                                                {#if isEditingConfig}
-                                                    <input type="number" bind:value={editMemory} class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-sm text-white focus:border-blue-500 outline-none" disabled={configLoading} />
-                                                {:else}
-                                                    <span class="text-sm text-gray-300">{selectedFn.MemorySize} MB</span>
-                                                {/if}
-                                            </div>
-                                            <div>
-                                                <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Timeout (s)</h4>
-                                                {#if isEditingConfig}
-                                                    <input type="number" bind:value={editTimeout} class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-sm text-white focus:border-blue-500 outline-none" disabled={configLoading} />
-                                                {:else}
-                                                    <span class="text-sm text-gray-300">{selectedFn.Timeout} s</span>
-                                                {/if}
-                                            </div>
-                                            <div>
-                                                <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Handler</h4>
-                                                {#if isEditingConfig}
-                                                    <input type="text" bind:value={editHandler} class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-sm text-white focus:border-blue-500 outline-none" disabled={configLoading} />
-                                                {:else}
-                                                    <span class="text-sm text-gray-300 font-mono">{selectedFn.Handler}</span>
-                                                {/if}
-                                            </div>
-                                        </div>
-
-                                        {#if isEditingConfig}
-                                            <div class="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-gray-800">
-                                                <button
-                                                    onclick={() => {
-                                                        isEditingConfig = false;
-                                                        editMemory = selectedFn!.MemorySize || 128;
-                                                        editTimeout = selectedFn!.Timeout || 3;
-                                                        editHandler = selectedFn!.Handler || "";
-                                                        configError = "";
-                                                    }}
-                                                    disabled={configLoading}
-                                                    class="text-gray-400 hover:text-white px-4 py-2 text-sm transition"
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    onclick={updateFunctionConfig}
-                                                    disabled={configLoading}
-                                                    class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-6 py-2 rounded text-sm font-semibold transition shadow flex items-center gap-2"
-                                                >
-                                                    {#if configLoading}<span class="animate-spin">⟳</span>{/if}
-                                                    Save Changes
-                                                </button>
-                                            </div>
-                                        {/if}
-                                    </div>
-                                {/if}
-                            </div>
-
-                            <!-- Environment Variables (Readonly mapping) -->
-                            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-sm overflow-hidden mt-6">
-                                <div class="px-4 py-3 border-b border-gray-800 bg-gray-900/80">
-                                    <h4 class="text-sm font-bold text-gray-300">Environment Variables</h4>
-                                </div>
-                                <div class="p-4 bg-gray-950 overflow-x-auto">
-                                    {#if selectedFn.Environment?.Variables && Object.keys(selectedFn.Environment.Variables).length > 0}
-                                        <table class="w-full text-left text-sm">
-                                            <thead>
-                                                <tr>
-                                                    <th class="px-3 py-2 text-gray-400 font-semibold border-b border-gray-800 w-1/3">Key</th>
-                                                    <th class="px-3 py-2 text-gray-400 font-semibold border-b border-gray-800 w-2/3">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {#each Object.entries(selectedFn.Environment.Variables) as [key, value]}
-                                                    <tr class="border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors">
-                                                        <td class="px-3 py-2 text-gray-300 font-mono font-medium">{key}</td>
-                                                        <td class="px-3 py-2 text-green-400 font-mono break-all">{value}</td>
-                                                    </tr>
-                                                {/each}
-                                            </tbody>
-                                        </table>
-                                    {:else}
-                                        <div class="text-sm text-gray-500 italic p-2 text-center">No environment variables configured.</div>
-                                    {/if}
-                                </div>
-                            </div>
-                        </div>
-                    {/if}
                 </div>
             </div>
         {/if}

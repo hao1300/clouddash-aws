@@ -3,10 +3,6 @@
     import {
         ElasticBeanstalkClient,
         DescribeEnvironmentsCommand,
-        DescribeApplicationsCommand,
-        DescribeApplicationVersionsCommand,
-        type ApplicationDescription,
-        type ApplicationVersionDescription,
         type EnvironmentDescription,
     } from "@aws-sdk/client-elastic-beanstalk";
     import { getAwsCredentials } from "./aws-creds";
@@ -19,34 +15,8 @@
     let actionMsg = $state("");
 
     // --- Service Layout State ---
-    const tabs = [
-        { id: "environments", label: "Environments" },
-        { id: "applications", label: "Applications" },
-        { id: "application-versions", label: "Application Versions" }
-    ];
+    const tabs = [{ id: "environments", label: "Environments" }];
     let activeTab = $state("environments");
-
-
-
-    // --- Resources State ---
-    let environmentsLoaded = $state(false);
-
-    let applications = $state<ApplicationDescription[]>([]);
-    let applicationsLoading = $state(false);
-    let applicationsLoaded = $state(false);
-
-    let applicationVersions = $state<ApplicationVersionDescription[]>([]);
-    let appVersionsLoading = $state(false);
-    let appVersionsLoaded = $state(false);
-    let appVersionTokenMap = $state<string[]>([]);
-    let appVersionCurrentToken = $state<string | undefined>(undefined);
-
-    $effect(() => {
-        if (!client) return;
-        if (activeTab === "environments" && !environmentsLoaded) loadEnvironments();
-        else if (activeTab === "applications" && !applicationsLoaded) loadApplications();
-        else if (activeTab === "application-versions" && !appVersionsLoaded) loadApplicationVersions();
-    });
 
     // --- Pagination Shared Helpers ---
     function pushToken(history: string[], currentNextToken?: string) {
@@ -68,16 +38,14 @@
         try {
             const creds = await getAwsCredentials();
             client = new ElasticBeanstalkClient({
-                region: creds.region || "us-east-1",
+                region: creds.region,
                 credentials: {
                     accessKeyId: creds.access_key_id,
                     secretAccessKey: creds.secret_access_key,
-                    ...(creds.session_token
-                        ? { sessionToken: creds.session_token }
-                        : {}),
+                    sessionToken: creds.session_token || undefined,
                 },
             });
-            // loadEnvironments will be called by $effect
+            await loadEnvironments();
         } catch (e: any) {
             error = e.message || String(e);
         }
@@ -98,62 +66,8 @@
             error = e.message || String(e);
         } finally {
             loading = false;
-            environmentsLoaded = true;
         }
     }
-
-
-    async function loadApplications() {
-        if (!client) return;
-        applicationsLoading = true;
-        error = "";
-        actionMsg = "";
-        try {
-            const res = await client.send(
-                new DescribeApplicationsCommand({}),
-            );
-            applications = res.Applications || [];
-        } catch (e: any) {
-            error = e.message || String(e);
-        } finally {
-            applicationsLoading = false;
-            applicationsLoaded = true;
-        }
-    }
-
-    async function loadApplicationVersions(token?: string) {
-        if (!client) return;
-        appVersionsLoading = true;
-        error = "";
-        actionMsg = "";
-        try {
-            const res = await client.send(
-                new DescribeApplicationVersionsCommand({ NextToken: token }),
-            );
-            applicationVersions = res.ApplicationVersions || [];
-            appVersionCurrentToken = res.NextToken;
-        } catch (e: any) {
-            error = e.message || String(e);
-        } finally {
-            appVersionsLoading = false;
-            appVersionsLoaded = true;
-        }
-    }
-
-    const appColumns = [
-        { label: "Application Name", key: "ApplicationName", sortable: true },
-        { label: "Description", key: "Description", sortable: true },
-        { label: "Date Created", key: "DateCreated", sortable: true },
-        { label: "Date Updated", key: "DateUpdated", sortable: true },
-    ];
-
-    const appVersionColumns = [
-        { label: "Version Label", key: "VersionLabel", sortable: true },
-        { label: "Application Name", key: "ApplicationName", sortable: true },
-        { label: "Description", key: "Description", sortable: true },
-        { label: "Status", key: "Status", sortable: true },
-        { label: "Date Created", key: "DateCreated", sortable: true },
-    ];
 
     function handleNext() {
         if (currentToken) {
@@ -168,7 +82,7 @@
     }
 </script>
 
-<ServiceLayout title="Elastic Beanstalk" {tabs} bind:activeTab>
+<ServiceLayout {tabs} bind:activeTab>
     {#if error}<div class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30">{error}</div>{/if}
     {#if actionMsg}<div class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30">{actionMsg}</div>{/if}
     {#if activeTab === "environments"}
@@ -196,7 +110,6 @@
                 onPrev={handlePrev}
                 onRefresh={() => {
                     tokenMap = [];
-                    environmentsLoaded = false;
                     loadEnvironments();
                 }}
             >
@@ -234,70 +147,6 @@
                         >
                             {env.Health || "Unknown"}
                         </span>
-                    </td>
-                {/snippet}
-            </PaginatedTable>
-        </div>
-    {:else if activeTab === "applications"}
-        <div class="h-full {error || actionMsg ? 'pt-8' : ''}">
-            <PaginatedTable
-                items={applications}
-                loading={applicationsLoading}
-                columns={appColumns}
-                hasNext={false}
-                hasPrev={false}
-                onRefresh={() => {
-                    applicationsLoaded = false;
-                    loadApplications();
-                }}
-            >
-                {#snippet children(app: any)}
-                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-blue-400">{app.ApplicationName}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-400 truncate max-w-[200px]">{app.Description || "-"}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-400">
-                        {app.DateCreated ? new Date(app.DateCreated).toLocaleString() : ""}
-                    </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-400">
-                        {app.DateUpdated ? new Date(app.DateUpdated).toLocaleString() : ""}
-                    </td>
-                {/snippet}
-            </PaginatedTable>
-        </div>
-    {:else if activeTab === "application-versions"}
-        <div class="h-full {error || actionMsg ? 'pt-8' : ''}">
-            <PaginatedTable
-                items={applicationVersions}
-                loading={appVersionsLoading}
-                columns={appVersionColumns}
-                hasNext={!!appVersionCurrentToken}
-                hasPrev={appVersionTokenMap.length > 0}
-                onNext={() => {
-                    if (appVersionCurrentToken) {
-                        pushToken(appVersionTokenMap, appVersionCurrentToken);
-                        loadApplicationVersions(appVersionCurrentToken);
-                    }
-                }}
-                onPrev={() => {
-                    const prevToken = popToken(appVersionTokenMap);
-                    loadApplicationVersions(prevToken);
-                }}
-                onRefresh={() => {
-                    appVersionTokenMap = [];
-                    appVersionsLoaded = false;
-                    loadApplicationVersions();
-                }}
-            >
-                {#snippet children(ver: any)}
-                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-blue-400">{ver.VersionLabel}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-300">{ver.ApplicationName}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-400 truncate max-w-[200px]">{ver.Description || "-"}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm">
-                        <span class="px-2 py-0.5 rounded text-xs {ver.Status === 'PROCESSED' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}">
-                            {ver.Status}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-400">
-                        {ver.DateCreated ? new Date(ver.DateCreated).toLocaleString() : ""}
                     </td>
                 {/snippet}
             </PaginatedTable>
