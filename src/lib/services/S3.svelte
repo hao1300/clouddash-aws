@@ -10,6 +10,8 @@
         DeleteObjectCommand,
         CreateBucketCommand,
         DeleteBucketCommand,
+        DeleteObjectsCommand,
+        CopyObjectCommand,
     } from "@aws-sdk/client-s3";
     import { fetch } from "@tauri-apps/plugin-http";
     import { getAwsCredentials } from "./aws-creds";
@@ -44,6 +46,7 @@
     let previewContent = $state("");
     let previewLoading = $state(false);
     let previewType = $state("");
+    let previewSize = $state<number | null>(null);
 
     // --- Modals & Uploads ---
     let showCreateBucket = $state(false);
@@ -65,6 +68,23 @@
         name: string;
     } | null>(null);
     let deleteLoading = $state(false);
+
+    let showRenamePrompt = $state(false);
+    let itemToRename = $state<{
+        type: "file";
+        key: string;
+        name: string;
+    } | null>(null);
+    let newObjectName = $state("");
+    let renameLoading = $state(false);
+
+    let showEmptyConfirm = $state(false);
+    let itemToEmpty = $state<{
+        type: "bucket";
+        name: string;
+    } | null>(null);
+    let emptyLoading = $state(false);
+    let emptyProgressText = $state("");
 
     function makeS3Client(region: string, creds: any): S3Client {
         return new S3Client({
@@ -235,6 +255,55 @@
         }
     }
 
+    async function emptyBucket(name: string) {
+        if (!s3Client) return;
+        try {
+            emptyLoading = true;
+            emptyProgressText = "Initializing...";
+            error = "";
+
+            const bc = await clientForBucket(name);
+            let token: string | undefined = undefined;
+            let totalDeleted = 0;
+
+            do {
+                emptyProgressText = `Listing objects... (deleted ${totalDeleted})`;
+                const resp: any = await bc.send(
+                    new ListObjectsV2Command({
+                        Bucket: name,
+                        ContinuationToken: token,
+                    })
+                );
+
+                const objects = resp.Contents || [];
+                if (objects.length > 0) {
+                    emptyProgressText = `Deleting ${objects.length} objects... (total ${totalDeleted})`;
+                    await bc.send(
+                        new DeleteObjectsCommand({
+                            Bucket: name,
+                            Delete: {
+                                Objects: objects.map((o: any) => ({ Key: o.Key! })),
+                                Quiet: true
+                            }
+                        })
+                    );
+                    totalDeleted += objects.length;
+                }
+
+                token = resp.NextContinuationToken;
+            } while (token);
+
+            showEmptyConfirm = false;
+            itemToEmpty = null;
+            await loadBuckets(); // reload in case something changes
+        } catch (e) {
+            error = String(e);
+        } finally {
+            emptyLoading = false;
+            emptyProgressText = "";
+        }
+    }
+
     async function loadBuckets() {
         if (!s3Client) return;
         try {
@@ -302,6 +371,50 @@
             loadObjects();
         } else {
             selectedBucket = "";
+        }
+    }
+
+    async function renameObject() {
+        if (!newObjectName || !selectedBucket || !itemToRename) return;
+        if (newObjectName === itemToRename.name) {
+            showRenamePrompt = false;
+            return;
+        }
+
+        try {
+            renameLoading = true;
+            error = "";
+            const bc = await clientForBucket(selectedBucket);
+            const sourceKey = itemToRename.key;
+            // The new key should preserve the current prefix (path)
+            const destKey = prefix + newObjectName;
+
+            // 1. Copy object to new key
+            await bc.send(
+                new CopyObjectCommand({
+                    Bucket: selectedBucket,
+                    CopySource: encodeURI(`${selectedBucket}/${sourceKey}`),
+                    Key: destKey,
+                })
+            );
+
+            // 2. Delete original object
+            await bc.send(
+                new DeleteObjectCommand({
+                    Bucket: selectedBucket,
+                    Key: sourceKey,
+                })
+            );
+
+            showRenamePrompt = false;
+            itemToRename = null;
+            newObjectName = "";
+            if (previewKey === sourceKey) previewKey = destKey;
+            await loadObjects();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            renameLoading = false;
         }
     }
 
@@ -442,6 +555,7 @@
     async function previewFile(key: string) {
         previewKey = key;
         previewContent = "";
+        previewSize = null;
         previewLoading = true;
         error = "";
         try {
@@ -454,6 +568,7 @@
             );
             const contentType = resp.ContentType || "application/octet-stream";
             const body = resp.Body;
+            previewSize = resp.ContentLength ?? null;
 
             if (!body) {
                 previewContent = "(empty)";
@@ -579,8 +694,9 @@
                 </h3>
 
                 <div class="mb-3">
-                    <label class="block text-xs text-gray-400 mb-1">Bucket Name</label>
+                    <label for="newBucketName" class="block text-xs text-gray-400 mb-1">Bucket Name</label>
                     <input
+                        id="newBucketName"
                         type="text"
                         bind:value={newBucketName}
                         placeholder="my-cool-bucket"
@@ -589,8 +705,9 @@
                 </div>
 
                 <div class="mb-4">
-                    <label class="block text-xs text-gray-400 mb-1">Region</label>
+                    <label for="newBucketRegion" class="block text-xs text-gray-400 mb-1">Region</label>
                     <select
+                        id="newBucketRegion"
                         bind:value={newBucketRegion}
                         class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors"
                     >
@@ -640,6 +757,48 @@
         </div>
     {/if}
 
+    {#if showRenamePrompt && itemToRename}
+        <div
+            class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        >
+            <div
+                class="bg-gray-900 border border-gray-700 rounded-lg p-6 w-96 shadow-2xl"
+            >
+                <h3 class="text-lg font-semibold text-white mb-4">
+                    Rename Object
+                </h3>
+                <label for="newObjectName" class="text-xs text-gray-400 mb-4 block">
+                    Renaming <span class="font-mono text-blue-300">{itemToRename.name}</span>
+                </label>
+                <input
+                    id="newObjectName"
+                    type="text"
+                    bind:value={newObjectName}
+                    placeholder="New file name"
+                    class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors mb-4"
+                />
+                <div class="flex justify-end gap-2">
+                    <button
+                        onclick={() => {
+                            showRenamePrompt = false;
+                            newObjectName = "";
+                            itemToRename = null;
+                        }}
+                        class="px-4 py-2 rounded text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition"
+                        >Cancel</button
+                    >
+                    <button
+                        onclick={renameObject}
+                        disabled={!newObjectName || renameLoading}
+                        class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-bold transition shadow"
+                    >
+                        {renameLoading ? "Renaming..." : "Rename"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
     {#if showCreateFolder}
         <div
             class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
@@ -650,13 +809,14 @@
                 <h3 class="text-lg font-semibold text-white mb-4">
                     Create Folder
                 </h3>
-                <p class="text-xs text-gray-400 mb-4">
+                <label for="newFolderName" class="text-xs text-gray-400 mb-4 block">
                     Creates an empty 0-byte object with a trailing slash in
                     <span class="font-mono text-blue-300"
                         >{selectedBucket}/{prefix}</span
                     >
-                </p>
+                </label>
                 <input
+                    id="newFolderName"
                     type="text"
                     bind:value={newFolderName}
                     placeholder="Folder name"
@@ -677,6 +837,58 @@
                         class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-bold transition shadow"
                     >
                         {newFolderLoading ? "Creating..." : "Create Folder"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if showEmptyConfirm && itemToEmpty}
+        <div
+            class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        >
+            <div
+                class="bg-gray-900 border border-gray-700 rounded-lg p-6 w-96 shadow-2xl"
+            >
+                <h3 class="text-lg font-semibold text-yellow-400 mb-4">
+                    Confirm Empty Bucket
+                </h3>
+                <p class="text-sm text-gray-300 mb-4 break-all">
+                    Are you sure you want to empty the bucket:
+                    <br />
+                    <span class="font-mono text-yellow-300 mt-2 block"
+                        >{itemToEmpty.name}</span
+                    >
+                </p>
+                <p class="text-xs text-red-400 mb-4">
+                    Warning: This will permanently delete all objects in the bucket. This action cannot be undone!
+                </p>
+                {#if emptyLoading}
+                    <p class="text-xs text-blue-400 mb-4 font-mono">
+                        {emptyProgressText}
+                    </p>
+                {/if}
+                <div class="flex justify-end gap-2">
+                    <button
+                        onclick={() => {
+                            if (!emptyLoading) {
+                                showEmptyConfirm = false;
+                                itemToEmpty = null;
+                            }
+                        }}
+                        disabled={emptyLoading}
+                        class="px-4 py-2 rounded text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition disabled:opacity-50"
+                        >Cancel</button
+                    >
+                    <button
+                        onclick={() => {
+                            if (!itemToEmpty) return;
+                            emptyBucket(itemToEmpty.name);
+                        }}
+                        disabled={emptyLoading}
+                        class="bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-bold transition shadow"
+                    >
+                        {emptyLoading ? "Emptying..." : "Empty"}
                     </button>
                 </div>
             </div>
@@ -751,7 +963,7 @@
 
         {#if previewKey}
             <!-- Preview View -->
-            <div class="h-full flex flex-col p-4 pr-1 bg-gray-950">
+            <div class="h-full flex flex-col p-4 bg-gray-950">
                 <div
                     class="flex items-center gap-3 mb-4 shrink-0 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm"
                 >
@@ -771,32 +983,110 @@
                     >
                 </div>
 
-                <div
-                    class="flex-1 overflow-auto bg-gray-900 rounded-lg border border-gray-800 text-sm shadow-inner p-4 pr-1 relative"
-                >
-                    {#if previewLoading}
-                        <div
-                            class="h-full flex items-center justify-center text-gray-500"
-                        >
-                            <span class="animate-spin text-2xl mr-3">⟳</span> Loading
-                            preview...
-                        </div>
-                    {:else if previewType === "text"}
-                        <pre
-                            class="text-gray-300 whitespace-pre-wrap break-all font-mono text-xs">{previewContent}</pre>
-                    {:else}
-                        <div
-                            class="h-full flex flex-col items-center justify-center text-gray-500 space-y-4"
-                        >
-                            <span class="text-4xl">📦</span>
-                            <p>Binary file preview not supported.</p>
-                            <button
-                                onclick={() => downloadFile(previewKey)}
-                                class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold shadow transition"
-                                >Download File</button
+                <div class="flex-1 flex flex-col md:flex-row gap-4 min-h-0">
+                    <!-- Preview Area -->
+                    <div
+                        class="flex-[2] overflow-auto bg-gray-900 rounded-lg border border-gray-800 text-sm shadow-inner p-4 relative"
+                    >
+                        {#if previewLoading}
+                            <div
+                                class="h-full flex items-center justify-center text-gray-500"
                             >
+                                <span class="animate-spin text-2xl mr-3">⟳</span> Loading
+                                preview...
+                            </div>
+                        {:else if previewType === "text"}
+                            <pre
+                                class="text-gray-300 whitespace-pre-wrap break-all font-mono text-xs">{previewContent}</pre>
+                        {:else}
+                            <div
+                                class="h-full flex flex-col items-center justify-center text-gray-500 space-y-4"
+                            >
+                                <span class="text-4xl">📦</span>
+                                <p>Binary file preview not supported.</p>
+                                <button
+                                    onclick={() => downloadFile(previewKey)}
+                                    class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold shadow transition"
+                                    >Download File</button
+                                >
+                            </div>
+                        {/if}
+                    </div>
+
+                    <!-- Properties Sidebar -->
+                    <div class="flex-1 overflow-auto bg-gray-900 rounded-lg border border-gray-800 p-4 shrink-0 md:max-w-xs">
+                        <h3 class="text-sm font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">Properties</h3>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Bucket</label>
+                                <div class="text-sm text-gray-300 font-mono break-all">{selectedBucket}</div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Key</label>
+                                <div class="text-sm text-gray-300 font-mono break-all">{previewKey}</div>
+                            </div>
+
+                            {#if previewSize !== null}
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Size</label>
+                                <div class="text-sm text-gray-300 font-mono">{formatSize(previewSize)}</div>
+                            </div>
+                            {/if}
+
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">S3 URI</label>
+                                <div class="flex gap-2 items-center">
+                                    <input
+                                        type="text"
+                                        readonly
+                                        value={`s3://${selectedBucket}/${previewKey}`}
+                                        class="flex-1 bg-gray-950 border border-gray-800 rounded px-2 py-1 text-xs text-gray-400 font-mono"
+                                    />
+                                    <button
+                                        onclick={() => navigator.clipboard.writeText(`s3://${selectedBucket}/${previewKey}`)}
+                                        class="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 p-1.5 rounded transition"
+                                        title="Copy S3 URI"
+                                    >📋</button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Object URL</label>
+                                <div class="flex gap-2 items-center">
+                                    <input
+                                        type="text"
+                                        readonly
+                                        value={`https://${selectedBucket}.s3.amazonaws.com/${previewKey}`}
+                                        class="flex-1 bg-gray-950 border border-gray-800 rounded px-2 py-1 text-xs text-gray-400 font-mono"
+                                    />
+                                    <button
+                                        onclick={() => navigator.clipboard.writeText(`https://${selectedBucket}.s3.amazonaws.com/${previewKey}`)}
+                                        class="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 p-1.5 rounded transition"
+                                        title="Copy Object URL"
+                                    >📋</button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Amazon Resource Name (ARN)</label>
+                                <div class="flex gap-2 items-center">
+                                    <input
+                                        type="text"
+                                        readonly
+                                        value={`arn:aws:s3:::${selectedBucket}/${previewKey}`}
+                                        class="flex-1 bg-gray-950 border border-gray-800 rounded px-2 py-1 text-xs text-gray-400 font-mono"
+                                    />
+                                    <button
+                                        onclick={() => navigator.clipboard.writeText(`arn:aws:s3:::${selectedBucket}/${previewKey}`)}
+                                        class="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 p-1.5 rounded transition"
+                                        title="Copy ARN"
+                                    >📋</button>
+                                </div>
+                            </div>
                         </div>
-                    {/if}
+                    </div>
                 </div>
             </div>
         {:else if selectedBucket}
@@ -860,6 +1150,32 @@
                             <div class="flex justify-end gap-2">
                                 {#if item.type !== "folder"}
                                     <button
+                                        onclick={() => navigator.clipboard.writeText(`s3://${selectedBucket}/${item.key}`)}
+                                        class="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded text-xs transition"
+                                        title="Copy S3 URI"
+                                        >📋 URI</button
+                                    >
+                                    <button
+                                        onclick={() => navigator.clipboard.writeText(`https://${selectedBucket}.s3.amazonaws.com/${item.key}`)}
+                                        class="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded text-xs transition"
+                                        title="Copy URL"
+                                        >📋 URL</button
+                                    >
+                                    <button
+                                        onclick={() => {
+                                            itemToRename = {
+                                                type: "file",
+                                                key: item.key,
+                                                name: item.name,
+                                            };
+                                            newObjectName = item.name;
+                                            showRenamePrompt = true;
+                                        }}
+                                        class="text-blue-400 hover:text-white bg-blue-900/30 hover:bg-blue-800 px-3 py-1 rounded text-xs transition"
+                                        title="Rename"
+                                        >✏️</button
+                                    >
+                                    <button
                                         onclick={() => downloadFile(item.key)}
                                         class="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs transition"
                                         title="Download"
@@ -910,6 +1226,18 @@
                 {/snippet}
                 {#snippet actionsSnippet(item)}
                     <div class="flex justify-end gap-2">
+                        <button
+                            onclick={() => {
+                                itemToEmpty = {
+                                    type: "bucket",
+                                    name: item.name,
+                                };
+                                showEmptyConfirm = true;
+                            }}
+                            class="text-yellow-400 hover:text-white bg-yellow-900/30 hover:bg-yellow-800 px-3 py-1 rounded text-xs transition"
+                            title="Empty Bucket"
+                            >🧹</button
+                        >
                         <button
                             onclick={() => {
                                 itemToDelete = {

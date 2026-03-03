@@ -1,0 +1,345 @@
+
+> tpl@0.1.0 check
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /app
+Getting Svelte diagnostics...
+
+/app/src/lib/services/S3.svelte:697:21
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                <div class="mb-3">
+                    <label class="block text-xs text-gray-400 mb-1">Bucket Name</label>
+                    <input
+
+/app/src/lib/services/S3.svelte:707:21
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                <div class="mb-4">
+                    <label class="block text-xs text-gray-400 mb-1">Region</label>
+                    <select
+
+/app/src/lib/services/S3.svelte:1018:33
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Bucket</label>
+                                <div class="text-sm text-gray-300 font-mono break-all">{selectedBucket}</div>
+
+/app/src/lib/services/S3.svelte:1023:33
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Key</label>
+                                <div class="text-sm text-gray-300 font-mono break-all">{previewKey}</div>
+
+/app/src/lib/services/S3.svelte:1029:33
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Size</label>
+                                <div class="text-sm text-gray-300 font-mono">{formatSize(previewSize)}</div>
+
+/app/src/lib/services/S3.svelte:1035:33
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">S3 URI</label>
+                                <div class="flex gap-2 items-center">
+
+/app/src/lib/services/S3.svelte:1052:33
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Object URL</label>
+                                <div class="flex gap-2 items-center">
+
+/app/src/lib/services/S3.svelte:1069:33
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Amazon Resource Name (ARN)</label>
+                                <div class="flex gap-2 items-center">
+
+/app/src/lib/services/DynamoDB.svelte:1158:25
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Table Name</label>
+                        <input bind:value={newTableName} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" placeholder="MyTable" />
+
+/app/src/lib/services/DynamoDB.svelte:1162:25
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Partition Key</label>
+                        <div class="flex gap-2">
+
+/app/src/lib/services/DynamoDB.svelte:1189:25
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Capacity Mode</label>
+                        <select bind:value={billingMode} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500">
+
+/app/src/lib/services/DynamoDB.svelte:1300:25
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Capacity Mode</label>
+                        <select bind:value={editBillingMode} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500">
+
+/app/src/lib/services/DynamoDB.svelte:1309:33
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                            <div class="flex-1">
+                                <label class="block text-xs font-bold text-gray-400 mb-1">Read Capacity (RCU)</label>
+                                <input type="number" min="1" bind:value={editReadCapacity} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" />
+
+/app/src/lib/services/DynamoDB.svelte:1313:33
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                            <div class="flex-1">
+                                <label class="block text-xs font-bold text-gray-400 mb-1">Write Capacity (WCU)</label>
+                                <input type="number" min="1" bind:value={editWriteCapacity} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" />
+
+/app/src/lib/services/DynamoDB.svelte:1338:25
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Index Name</label>
+                        <input bind:value={newIndexName} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" placeholder="MyGSI" />
+
+/app/src/lib/services/DynamoDB.svelte:1342:25
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Partition Key</label>
+                        <div class="flex gap-2">
+
+/app/src/lib/services/DynamoDB.svelte:1369:25
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Projection Type</label>
+                        <select bind:value={newIndexProjectionType} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500">
+
+/app/src/lib/services/SQS.svelte:432:25
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-300 mb-1"
+                            >Queue Name</label
+                        >
+                        <input
+
+/app/src/lib/services/SQS.svelte:449:25
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-300 mb-1"
+                            >Type</label
+                        >
+                        <select
+
+/app/src/lib/services/SQS.svelte:470:29
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-1"
+                                >Visibility Timeout (seconds)</label
+                            >
+                            <input
+
+/app/src/lib/services/SQS.svelte:481:29
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-1"
+                                >Message Retention Period (seconds)</label
+                            >
+                            <input
+
+/app/src/lib/services/SQS.svelte:492:29
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-1"
+                                >Delivery Delay (seconds)</label
+                            >
+                            <input
+
+/app/src/lib/services/SQS.svelte:503:29
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-1"
+                                >Maximum Message Size (bytes)</label
+                            >
+                            <input
+
+/app/src/lib/services/SQS.svelte:514:29
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                        <div class="md:col-span-2">
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-1"
+                                >Receive Message Wait Time (seconds)</label
+                            >
+                            <input
+
+/app/src/lib/services/SQS.svelte:733:37
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-gray-400 mb-1"
+                                        >Visibility Timeout (seconds)</label
+                                    >
+                                    <input
+
+/app/src/lib/services/SQS.svelte:746:37
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-gray-400 mb-1"
+                                        >Message Retention Period (seconds)</label
+                                    >
+                                    <input
+
+/app/src/lib/services/SQS.svelte:759:37
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-gray-400 mb-1"
+                                        >Delivery Delay (seconds)</label
+                                    >
+                                    <input
+
+/app/src/lib/services/SQS.svelte:772:37
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-gray-400 mb-1"
+                                        >Maximum Message Size (bytes)</label
+                                    >
+                                    <input
+
+/app/src/lib/services/SQS.svelte:785:37
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                                <div class="md:col-span-2">
+                                    <label
+                                        class="block text-xs font-medium text-gray-400 mb-1"
+                                        >Receive Message Wait Time (seconds)</label
+                                    >
+                                    <input
+
+/app/src/lib/services/SNS.svelte:374:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Topic Name</label>
+            <input
+
+/app/src/lib/services/SNS.svelte:411:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Topic ARN</label>
+            {#if topics.length > 0}
+
+/app/src/lib/services/SNS.svelte:432:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Protocol</label>
+            <select
+
+/app/src/lib/services/SNS.svelte:449:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Endpoint</label>
+            <input
+
+/app/src/lib/services/SNS.svelte:479:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Topic ARN</label>
+            <input
+
+/app/src/lib/services/SNS.svelte:488:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Subject (Optional)</label>
+            <input
+
+/app/src/lib/services/SNS.svelte:497:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Message Body</label>
+            <textarea
+
+/app/src/lib/services/SES.svelte:361:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Identity Type</label>
+            <select
+
+/app/src/lib/services/SES.svelte:371:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">{verifyIdentityType === 'Email' ? 'Email Address' : 'Domain Name'}</label>
+            <input
+
+/app/src/lib/services/SES.svelte:401:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">From</label>
+            <input
+
+/app/src/lib/services/SES.svelte:410:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">To (comma-separated)</label>
+            <input
+
+/app/src/lib/services/SES.svelte:419:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Subject</label>
+            <input
+
+/app/src/lib/services/SES.svelte:428:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Body (Text)</label>
+            <textarea
+
+/app/src/lib/components/ReorderableList.svelte:24:29
+Warn: This reference only captures the initial value of `wrappedItems`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+    // Provide local state for intermediate dragging steps
+    let localItems = $state(wrappedItems);
+
+====================================
+svelte-check found 0 errors and 43 warnings in 6 files
