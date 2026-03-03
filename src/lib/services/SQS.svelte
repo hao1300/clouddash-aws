@@ -64,6 +64,12 @@
     let sendBody = $state("");
     let sendLoading = $state(false);
 
+    let sendDelaySeconds = $state("");
+    let sendGroupId = $state("");
+    let sendDeduplicationId = $state("");
+    let sendAttributes = $state<{ name: string; type: string; value: string }[]>([]);
+    let showAdvancedSend = $state(false);
+
     onMount(async () => {
         try {
             const creds = await getAwsCredentials();
@@ -300,6 +306,9 @@
                 body: m.Body,
                 receipt: m.ReceiptHandle,
                 sentTimestamp: m.Attributes?.SentTimestamp,
+                messageAttributes: m.MessageAttributes,
+                groupId: m.Attributes?.MessageGroupId,
+                deduplicationId: m.Attributes?.MessageDeduplicationId,
             }));
             if (messages.length === 0) actionMsg = "No messages available.";
         } catch (e) {
@@ -331,14 +340,51 @@
             sendLoading = true;
             error = "";
             actionMsg = "";
-            await client.send(
-                new SendMessageCommand({
-                    QueueUrl: selectedQueue.url,
-                    MessageBody: sendBody,
-                }),
-            );
+
+            const cmdInput: any = {
+                QueueUrl: selectedQueue.url,
+                MessageBody: sendBody,
+            };
+
+            if (sendDelaySeconds) {
+                cmdInput.DelaySeconds = Number(sendDelaySeconds);
+            }
+
+            if (selectedQueue.name.endsWith('.fifo')) {
+                if (sendGroupId) cmdInput.MessageGroupId = sendGroupId;
+                if (sendDeduplicationId) cmdInput.MessageDeduplicationId = sendDeduplicationId;
+            }
+
+            if (sendAttributes.length > 0) {
+                const attrs: Record<string, any> = {};
+                for (const attr of sendAttributes) {
+                    if (!attr.name || !attr.value) continue;
+
+                    if (attr.type === "Binary") {
+                        attrs[attr.name] = {
+                            DataType: attr.type,
+                            BinaryValue: new TextEncoder().encode(attr.value)
+                        };
+                    } else {
+                        attrs[attr.name] = {
+                            DataType: attr.type,
+                            StringValue: attr.value
+                        };
+                    }
+                }
+                if (Object.keys(attrs).length > 0) {
+                    cmdInput.MessageAttributes = attrs;
+                }
+            }
+
+            await client.send(new SendMessageCommand(cmdInput));
+
             actionMsg = "Message sent!";
             sendBody = "";
+            sendDelaySeconds = "";
+            sendGroupId = "";
+            sendDeduplicationId = "";
+            sendAttributes = [];
         } catch (e) {
             error = String(e);
         } finally {
@@ -430,10 +476,12 @@
                 >
                     <div>
                         <label
+                            for="cq-name"
                             class="block text-sm font-medium text-gray-300 mb-1"
                             >Queue Name</label
                         >
                         <input
+                            id="cq-name"
                             type="text"
                             bind:value={createParams.QueueName}
                             placeholder="MyQueue"
@@ -447,10 +495,12 @@
 
                     <div>
                         <label
+                            for="cq-type"
                             class="block text-sm font-medium text-gray-300 mb-1"
                             >Type</label
                         >
                         <select
+                            id="cq-type"
                             bind:value={createParams.Type}
                             class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
                         >
@@ -468,10 +518,12 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label
+                                for="cq-vis"
                                 class="block text-sm font-medium text-gray-300 mb-1"
                                 >Visibility Timeout (seconds)</label
                             >
                             <input
+                                id="cq-vis"
                                 type="number"
                                 bind:value={createParams.VisibilityTimeout}
                                 class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
@@ -479,10 +531,12 @@
                         </div>
                         <div>
                             <label
+                                for="cq-ret"
                                 class="block text-sm font-medium text-gray-300 mb-1"
                                 >Message Retention Period (seconds)</label
                             >
                             <input
+                                id="cq-ret"
                                 type="number"
                                 bind:value={createParams.MessageRetentionPeriod}
                                 class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
@@ -490,10 +544,12 @@
                         </div>
                         <div>
                             <label
+                                for="cq-del"
                                 class="block text-sm font-medium text-gray-300 mb-1"
                                 >Delivery Delay (seconds)</label
                             >
                             <input
+                                id="cq-del"
                                 type="number"
                                 bind:value={createParams.DeliveryDelay}
                                 class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
@@ -501,10 +557,12 @@
                         </div>
                         <div>
                             <label
+                                for="cq-max"
                                 class="block text-sm font-medium text-gray-300 mb-1"
                                 >Maximum Message Size (bytes)</label
                             >
                             <input
+                                id="cq-max"
                                 type="number"
                                 bind:value={createParams.MaximumMessageSize}
                                 class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
@@ -512,10 +570,12 @@
                         </div>
                         <div class="md:col-span-2">
                             <label
+                                for="cq-wait"
                                 class="block text-sm font-medium text-gray-300 mb-1"
                                 >Receive Message Wait Time (seconds)</label
                             >
                             <input
+                                id="cq-wait"
                                 type="number"
                                 bind:value={
                                     createParams.ReceiveMessageWaitTimeSeconds
@@ -617,22 +677,74 @@
                 {#if queueDetailTab === "messages"}
                     <!-- Send Message -->
                     <div
-                        class="flex gap-2 mb-4 shrink-0 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm"
+                        class="mb-4 shrink-0 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm flex flex-col gap-2"
                     >
-                        <textarea
-                            bind:value={sendBody}
-                            placeholder="Message body (JSON or text)"
-                            rows="2"
-                            class="flex-1 bg-black text-xs p-3 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 resize-none font-mono shadow-inner"
-                        ></textarea>
-                        <button
-                            onclick={sendMessage}
-                            disabled={!sendBody.trim() || sendLoading}
-                            class="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white px-6 rounded text-xs font-bold transition shadow flex items-center gap-2"
-                        >
-                            {#if sendLoading}<span class="animate-spin">⟳</span
-                                >{/if} Send
-                        </button>
+                        <div class="flex gap-2">
+                            <textarea
+                                bind:value={sendBody}
+                                placeholder="Message body (JSON or text)"
+                                rows="2"
+                                class="flex-1 bg-black text-xs p-3 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 resize-none font-mono shadow-inner"
+                            ></textarea>
+                            <button
+                                onclick={sendMessage}
+                                disabled={!sendBody.trim() || sendLoading}
+                                class="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white px-6 rounded text-xs font-bold transition shadow flex items-center gap-2 h-[auto]"
+                            >
+                                {#if sendLoading}<span class="animate-spin">⟳</span
+                                    >{/if} Send
+                            </button>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <button
+                                onclick={() => showAdvancedSend = !showAdvancedSend}
+                                class="text-xs text-blue-400 hover:text-blue-300 font-medium transition"
+                            >
+                                {showAdvancedSend ? "− Hide Advanced Options" : "+ Show Advanced Options"}
+                            </button>
+                        </div>
+                        {#if showAdvancedSend}
+                            <div class="p-3 bg-black rounded border border-gray-800 grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                                <div>
+                                    <label for="adv-delay" class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Delay Seconds</label>
+                                    <input id="adv-delay" type="number" bind:value={sendDelaySeconds} class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500" placeholder="0 - 900" />
+                                </div>
+                                {#if selectedQueue.name.endsWith('.fifo')}
+                                    <div>
+                                        <label for="adv-group" class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Message Group ID *</label>
+                                        <input id="adv-group" type="text" bind:value={sendGroupId} class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500" placeholder="Required for FIFO" />
+                                    </div>
+                                    <div>
+                                        <label for="adv-dedup" class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Message Deduplication ID</label>
+                                        <input id="adv-dedup" type="text" bind:value={sendDeduplicationId} class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500" placeholder="Optional" />
+                                    </div>
+                                {/if}
+                                <div class="md:col-span-3 border-t border-gray-800 pt-3 mt-1">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Message Attributes</label>
+                                        <button onclick={() => sendAttributes = [...sendAttributes, {name: '', type: 'String', value: ''}]} class="text-[10px] bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2 py-0.5 rounded transition font-bold">+ Add Attribute</button>
+                                    </div>
+                                    {#if sendAttributes.length === 0}
+                                        <div class="text-[10px] text-gray-600 italic">No attributes added.</div>
+                                    {:else}
+                                        <div class="space-y-2">
+                                            {#each sendAttributes as attr, i}
+                                                <div class="flex gap-2 items-center">
+                                                    <input type="text" bind:value={attr.name} placeholder="Name" class="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500" />
+                                                    <select bind:value={attr.type} class="w-24 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500">
+                                                        <option value="String">String</option>
+                                                        <option value="Number">Number</option>
+                                                        <option value="Binary">Binary</option>
+                                                    </select>
+                                                    <input type="text" bind:value={attr.value} placeholder="Value" class="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500" />
+                                                    <button onclick={() => sendAttributes = sendAttributes.filter((_, idx) => idx !== i)} class="text-red-400 hover:text-red-300 px-2 text-lg leading-none" title="Remove Attribute">×</button>
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+                        {/if}
                     </div>
 
                     <!-- Messages Table -->
@@ -688,6 +800,29 @@
                                             </div>
                                             <pre
                                                 class="text-xs text-gray-300 whitespace-pre-wrap break-all bg-black p-2 rounded border border-gray-800 max-h-40 overflow-auto">{msg.body}</pre>
+
+                                            {#if msg.groupId || msg.deduplicationId}
+                                                <div class="mt-2 text-[10px] text-gray-400 flex gap-4">
+                                                    {#if msg.groupId}<span><strong class="text-gray-500 uppercase tracking-wider">Group ID:</strong> {msg.groupId}</span>{/if}
+                                                    {#if msg.deduplicationId}<span><strong class="text-gray-500 uppercase tracking-wider">Deduplication ID:</strong> {msg.deduplicationId}</span>{/if}
+                                                </div>
+                                            {/if}
+
+                                            {#if msg.messageAttributes && Object.keys(msg.messageAttributes).length > 0}
+                                                <div class="mt-2 bg-black/50 border border-gray-800 rounded p-2">
+                                                    <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 border-b border-gray-800 pb-1">Message Attributes</div>
+                                                    <ul class="space-y-1">
+                                                        {#each Object.entries(msg.messageAttributes) as [k, v]}
+                                                            <li class="text-[10px] flex">
+                                                                <span class="text-blue-400 font-mono w-1/4 truncate" title={k}>{k}</span>
+                                                                <span class="text-gray-500 w-16">[{((v as any).DataType)}]</span>
+                                                                <span class="text-gray-300 font-mono flex-1 truncate" title={((v as any).StringValue) || (((v as any).BinaryValue) ? new TextDecoder().decode(((v as any).BinaryValue)) : "")}>{((v as any).StringValue) || (((v as any).BinaryValue) ? new TextDecoder().decode(((v as any).BinaryValue)) : "-")}</span>
+                                                            </li>
+                                                        {/each}
+                                                    </ul>
+                                                </div>
+                                            {/if}
+
                                             {#if msg.sentTimestamp}<div
                                                     class="text-xs text-gray-600 mt-2 text-right"
                                                 >
@@ -731,10 +866,12 @@
                             >
                                 <div>
                                     <label
+                                        for="conf-vis"
                                         class="block text-xs font-medium text-gray-400 mb-1"
                                         >Visibility Timeout (seconds)</label
                                     >
                                     <input
+                                        id="conf-vis"
                                         type="number"
                                         bind:value={
                                             queueAttributes.VisibilityTimeout
@@ -744,10 +881,12 @@
                                 </div>
                                 <div>
                                     <label
+                                        for="conf-ret"
                                         class="block text-xs font-medium text-gray-400 mb-1"
                                         >Message Retention Period (seconds)</label
                                     >
                                     <input
+                                        id="conf-ret"
                                         type="number"
                                         bind:value={
                                             queueAttributes.MessageRetentionPeriod
@@ -757,10 +896,12 @@
                                 </div>
                                 <div>
                                     <label
+                                        for="conf-del"
                                         class="block text-xs font-medium text-gray-400 mb-1"
                                         >Delivery Delay (seconds)</label
                                     >
                                     <input
+                                        id="conf-del"
                                         type="number"
                                         bind:value={
                                             queueAttributes.DelaySeconds
@@ -770,10 +911,12 @@
                                 </div>
                                 <div>
                                     <label
+                                        for="conf-max"
                                         class="block text-xs font-medium text-gray-400 mb-1"
                                         >Maximum Message Size (bytes)</label
                                     >
                                     <input
+                                        id="conf-max"
                                         type="number"
                                         bind:value={
                                             queueAttributes.MaximumMessageSize
@@ -783,10 +926,12 @@
                                 </div>
                                 <div class="md:col-span-2">
                                     <label
+                                        for="conf-wait"
                                         class="block text-xs font-medium text-gray-400 mb-1"
                                         >Receive Message Wait Time (seconds)</label
                                     >
                                     <input
+                                        id="conf-wait"
                                         type="number"
                                         bind:value={
                                             queueAttributes.ReceiveMessageWaitTimeSeconds
