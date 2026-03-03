@@ -8,6 +8,9 @@
         ListMetricsCommand,
         DescribeAlarmHistoryCommand,
         GetMetricStatisticsCommand,
+        DeleteAlarmsCommand,
+        SetAlarmStateCommand,
+        DeleteDashboardsCommand,
     } from "@aws-sdk/client-cloudwatch";
     import {
         CloudWatchLogsClient,
@@ -17,6 +20,11 @@
         DescribeLogStreamsCommand,
         GetLogEventsCommand,
         FilterLogEventsCommand,
+        CreateLogGroupCommand,
+        DeleteLogGroupCommand,
+        PutRetentionPolicyCommand,
+        DeleteRetentionPolicyCommand,
+        DeleteLogStreamCommand,
     } from "@aws-sdk/client-cloudwatch-logs";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -52,6 +60,7 @@
 
     // --- Alarms ---
     let alarms = $state<any[]>([]);
+    let alarmSearchPrefix = $state("");
     let filteredAlarms = $derived.by(() => {
         let res = alarms;
         if (hideAutoScaling) {
@@ -73,6 +82,8 @@
 
     // --- Metrics ---
     let metrics = $state<any[]>([]);
+    let metricNamespaceFilter = $state("");
+    let metricNameFilter = $state("");
     let metricsLoading = $state(false);
     let metricsTokenMap = $state<string[]>([]);
     let metricsCurrentToken = $state<string | undefined>(undefined);
@@ -90,6 +101,7 @@
 
     // --- Log Groups (Table View) ---
     let logGroupsTable = $state<any[]>([]);
+    let logGroupSearchPrefix = $state("");
     let logGroupsLoading = $state(false);
     let logGroupsTokenMap = $state<string[]>([]);
     let logGroupsCurrentToken = $state<string | undefined>(undefined);
@@ -97,6 +109,7 @@
 
     // --- Log Streams ---
     let logStreams = $state<any[]>([]);
+    let logStreamSearchPrefix = $state("");
     let logStreamsLoading = $state(false);
     let logStreamsTokenMap = $state<string[]>([]);
     let logStreamsCurrentToken = $state<string | undefined>(undefined);
@@ -158,6 +171,49 @@
     });
 
     // --- Alarms API ---
+    async function deleteAlarm(alarmName: string) {
+        if (!cwClient) return;
+        if (!confirm(`Are you sure you want to delete alarm "${alarmName}"?`)) return;
+        try {
+            alarmsLoading = true;
+            error = "";
+            actionMsg = "";
+            await cwClient.send(new DeleteAlarmsCommand({ AlarmNames: [alarmName] }));
+            actionMsg = `Alarm "${alarmName}" deleted.`;
+            selectedAlarm = null;
+            alarmsTokenMap = [];
+            await loadAlarms();
+        } catch (e) {
+            error = String(e);
+            alarmsLoading = false;
+        }
+    }
+
+    async function setAlarmState(alarmName: string, state: "OK" | "ALARM" | "INSUFFICIENT_DATA") {
+        if (!cwClient) return;
+        try {
+            alarmsLoading = true;
+            error = "";
+            actionMsg = "";
+            await cwClient.send(new SetAlarmStateCommand({
+                AlarmName: alarmName,
+                StateValue: state,
+                StateReason: `Manually set to ${state}`
+            }));
+            actionMsg = `Alarm "${alarmName}" state set to ${state}.`;
+            // Refresh
+            alarmsTokenMap = [];
+            await loadAlarms();
+            // Update selected alarm state locally if it's the one we're viewing
+            if (selectedAlarm && selectedAlarm.name === alarmName) {
+                selectedAlarm.state = state;
+            }
+        } catch (e) {
+            error = String(e);
+            alarmsLoading = false;
+        }
+    }
+
     async function loadAlarmHistory(alarmName: string) {
         if (!cwClient) return;
         try {
@@ -189,8 +245,12 @@
             alarmsLoading = true;
             error = "";
             actionMsg = "";
+            const params: any = { MaxRecords: 50, NextToken: token };
+            if (alarmSearchPrefix.trim()) {
+                params.AlarmNamePrefix = alarmSearchPrefix.trim();
+            }
             const resp = await cwClient.send(
-                new DescribeAlarmsCommand({ MaxRecords: 50, NextToken: token }),
+                new DescribeAlarmsCommand(params),
             );
             let fetched = (resp.MetricAlarms ?? []).map((a) => ({
                 name: a.AlarmName ?? "Unknown",
@@ -266,8 +326,15 @@
             metricsLoading = true;
             error = "";
             actionMsg = "";
+            const params: any = { NextToken: token };
+            if (metricNamespaceFilter.trim()) {
+                params.Namespace = metricNamespaceFilter.trim();
+            }
+            if (metricNameFilter.trim()) {
+                params.MetricName = metricNameFilter.trim();
+            }
             const resp = await cwClient.send(
-                new ListMetricsCommand({ NextToken: token }),
+                new ListMetricsCommand(params),
             );
             metrics = (resp.Metrics ?? []).map((m) => ({
                 namespace: m.Namespace ?? "",
@@ -285,6 +352,24 @@
     }
 
     // --- Dashboards API ---
+    async function deleteDashboard(dashboardName: string) {
+        if (!cwClient) return;
+        if (!confirm(`Are you sure you want to delete dashboard "${dashboardName}"?`)) return;
+        try {
+            dashLoading = true;
+            error = "";
+            actionMsg = "";
+            await cwClient.send(new DeleteDashboardsCommand({ DashboardNames: [dashboardName] }));
+            actionMsg = `Dashboard "${dashboardName}" deleted.`;
+            selectedDash = "";
+            dashTokenMap = [];
+            await loadDashboards();
+        } catch (e) {
+            error = String(e);
+            dashLoading = false;
+        }
+    }
+
     async function loadDashboards(token?: string) {
         if (!cwClient) return;
         try {
@@ -328,14 +413,78 @@
     }
 
     // --- Log Groups / Streams / Events API ---
+    async function createLogGroup() {
+        if (!logsClient) return;
+        const name = prompt("Enter new Log Group Name:");
+        if (!name) return;
+        try {
+            logGroupsLoading = true;
+            error = "";
+            actionMsg = "";
+            await logsClient.send(new CreateLogGroupCommand({ logGroupName: name }));
+            actionMsg = `Log Group "${name}" created.`;
+            logGroupsTokenMap = [];
+            await loadLogGroupsTable();
+        } catch (e) {
+            error = String(e);
+            logGroupsLoading = false;
+        }
+    }
+
+    async function deleteLogGroup(name: string) {
+        if (!logsClient) return;
+        if (!confirm(`Are you sure you want to delete log group "${name}" and all its logs?`)) return;
+        try {
+            logGroupsLoading = true;
+            error = "";
+            actionMsg = "";
+            await logsClient.send(new DeleteLogGroupCommand({ logGroupName: name }));
+            actionMsg = `Log Group "${name}" deleted.`;
+            logGroupsTokenMap = [];
+            await loadLogGroupsTable();
+        } catch (e) {
+            error = String(e);
+            logGroupsLoading = false;
+        }
+    }
+
+    async function setRetention(name: string) {
+        if (!logsClient) return;
+        const daysStr = prompt("Enter retention in days (e.g. 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653). Leave empty to never expire:");
+        if (daysStr === null) return;
+        try {
+            logGroupsLoading = true;
+            error = "";
+            actionMsg = "";
+            if (daysStr.trim() === "") {
+                await logsClient.send(new DeleteRetentionPolicyCommand({ logGroupName: name }));
+                actionMsg = `Retention policy removed from "${name}".`;
+            } else {
+                const days = parseInt(daysStr, 10);
+                if (isNaN(days)) throw new Error("Invalid days");
+                await logsClient.send(new PutRetentionPolicyCommand({ logGroupName: name, retentionInDays: days }));
+                actionMsg = `Retention for "${name}" set to ${days} days.`;
+            }
+            logGroupsTokenMap = [];
+            await loadLogGroupsTable();
+        } catch (e) {
+            error = String(e);
+            logGroupsLoading = false;
+        }
+    }
+
     async function loadLogGroupsTable(token?: string) {
         if (!logsClient) return;
         try {
             logGroupsLoading = true;
             error = "";
             actionMsg = "";
+            const params: any = { limit: 50, nextToken: token };
+            if (logGroupSearchPrefix.trim()) {
+                params.logGroupNamePrefix = logGroupSearchPrefix.trim();
+            }
             const resp = await logsClient.send(
-                new DescribeLogGroupsCommand({ limit: 50, nextToken: token }),
+                new DescribeLogGroupsCommand(params),
             );
             logGroupsTable = (resp.logGroups ?? []).map((g) => ({
                 name: g.logGroupName ?? "",
@@ -352,6 +501,26 @@
         }
     }
 
+    async function deleteLogStream(logGroupName: string, logStreamName: string) {
+        if (!logsClient) return;
+        if (!confirm(`Are you sure you want to delete log stream "${logStreamName}"?`)) return;
+        try {
+            logStreamsLoading = true;
+            error = "";
+            actionMsg = "";
+            await logsClient.send(new DeleteLogStreamCommand({
+                logGroupName,
+                logStreamName
+            }));
+            actionMsg = `Log Stream "${logStreamName}" deleted.`;
+            logStreamsTokenMap = [];
+            await loadLogStreams(logGroupName);
+        } catch (e) {
+            error = String(e);
+            logStreamsLoading = false;
+        }
+    }
+
     async function loadLogStreams(logGroupName: string, token?: string) {
         if (!logsClient) return;
         try {
@@ -359,14 +528,21 @@
             logStreamsLoading = true;
             error = "";
             actionMsg = "";
+            const params: any = {
+                logGroupName,
+                limit: 50,
+                nextToken: token,
+                orderBy: "LastEventTime",
+                descending: true,
+            };
+            if (logStreamSearchPrefix.trim()) {
+                params.logStreamNamePrefix = logStreamSearchPrefix.trim();
+                // logStreamNamePrefix cannot be used with orderBy 'LastEventTime'
+                delete params.orderBy;
+                delete params.descending;
+            }
             const resp = await logsClient.send(
-                new DescribeLogStreamsCommand({
-                    logGroupName,
-                    limit: 50,
-                    nextToken: token,
-                    orderBy: "LastEventTime",
-                    descending: true,
-                }),
+                new DescribeLogStreamsCommand(params),
             );
             logStreams = (resp.logStreams ?? []).map((s) => ({
                 name: s.logStreamName ?? "",
@@ -579,6 +755,26 @@
                             class="text-sm font-bold text-gray-200 truncate flex-1"
                             >{selectedAlarm.name}</span
                         >
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-500 uppercase font-bold mr-1">Set State:</span>
+                            <button
+                                onclick={() => setAlarmState(selectedAlarm.name, 'OK')}
+                                class="text-xs bg-green-600/20 text-green-400 hover:bg-green-600/40 border border-green-600/30 px-2 py-1 rounded transition"
+                            >OK</button>
+                            <button
+                                onclick={() => setAlarmState(selectedAlarm.name, 'ALARM')}
+                                class="text-xs bg-red-600/20 text-red-400 hover:bg-red-600/40 border border-red-600/30 px-2 py-1 rounded transition"
+                            >ALARM</button>
+                            <button
+                                onclick={() => setAlarmState(selectedAlarm.name, 'INSUFFICIENT_DATA')}
+                                class="text-xs bg-gray-600/20 text-gray-400 hover:bg-gray-600/40 border border-gray-600/30 px-2 py-1 rounded transition"
+                            >INSUFFICIENT_DATA</button>
+                        </div>
+                        <div class="h-4 border-l border-gray-800 mx-1"></div>
+                        <button
+                            onclick={() => deleteAlarm(selectedAlarm.name)}
+                            class="text-xs bg-red-600/10 text-red-400 hover:bg-red-600/20 px-3 py-1.5 rounded transition border border-red-600/20 hover:border-red-600/40"
+                        >Delete</button>
                     </div>
 
                     <div
@@ -722,6 +918,24 @@
                     ]}
                 >
                     {#snippet headerActionsSnippet()}
+                        <button
+                            onclick={createLogGroup}
+                            class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded transition font-bold"
+                        >+ Create Log Group</button>
+                        <div class="h-4 border-l border-gray-700 mx-2"></div>
+                        <div class="flex items-center gap-2 mr-4">
+                            <input
+                                type="text"
+                                bind:value={alarmSearchPrefix}
+                                onkeydown={(e) => { if (e.key === 'Enter') { alarmsTokenMap = []; loadAlarms(); } }}
+                                placeholder="Alarm prefix..."
+                                class="bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs outline-none focus:border-blue-500 text-gray-200"
+                            />
+                            <button
+                                onclick={() => { alarmsTokenMap = []; loadAlarms(); }}
+                                class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded transition"
+                            >Search</button>
+                        </div>
                         <label
                             class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 hover:text-white transition mr-2 bg-gray-950 px-3 py-1.5 rounded border border-gray-800"
                         >
@@ -734,6 +948,13 @@
                                 >Hide Auto-Scaling</span
                             >
                         </label>
+                    {/snippet}
+                    {#snippet actionsSnippet(item)}
+                        <button
+                            onclick={(e) => { e.stopPropagation(); deleteAlarm(item.name); }}
+                            class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
+                            >Delete</button
+                        >
                     {/snippet}
                 </PaginatedTable>
             {/if}
@@ -812,7 +1033,42 @@
                         },
                         { key: "dimensions", label: "Dimensions" },
                     ]}
-                />
+                >
+                    {#snippet headerActionsSnippet()}
+                        <div class="flex items-center gap-2 mr-4">
+                            <input
+                                type="text"
+                                bind:value={metricNamespaceFilter}
+                                onkeydown={(e) => { if (e.key === 'Enter') { metricsTokenMap = []; loadMetrics(); } }}
+                                placeholder="Namespace (e.g., AWS/EC2)..."
+                                class="bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs outline-none focus:border-blue-500 text-gray-200"
+                            />
+                            <input
+                                type="text"
+                                bind:value={metricNameFilter}
+                                onkeydown={(e) => { if (e.key === 'Enter') { metricsTokenMap = []; loadMetrics(); } }}
+                                placeholder="Metric Name..."
+                                class="bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs outline-none focus:border-blue-500 text-gray-200"
+                            />
+                            <button
+                                onclick={() => { metricsTokenMap = []; loadMetrics(); }}
+                                class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded transition"
+                            >Search</button>
+                        </div>
+                    {/snippet}
+                    {#snippet actionsSnippet(item)}
+                        <button
+                            onclick={(e) => { e.stopPropagation(); setRetention(item.name); }}
+                            class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition mr-2"
+                            >Set Retention</button
+                        >
+                        <button
+                            onclick={(e) => { e.stopPropagation(); deleteLogGroup(item.name); }}
+                            class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
+                            >Delete</button
+                        >
+                    {/snippet}
+                </PaginatedTable>
             {/if}
         {:else if activeTab === "dashboards"}
             {#if selectedDash}
@@ -856,8 +1112,13 @@
                     {#snippet actionsSnippet(item)}
                         <button
                             onclick={() => viewDashboard(item.name)}
-                            class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition"
+                            class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition mr-2"
                             >View Source</button
+                        >
+                        <button
+                            onclick={(e) => { e.stopPropagation(); deleteDashboard(item.name); }}
+                            class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
+                            >Delete</button
                         >
                     {/snippet}
                 </PaginatedTable>
@@ -965,7 +1226,30 @@
                             { key: "lastEventTime", label: "Last Event Time" },
                             { key: "storedBytes", label: "Stored Bytes", format: formatBytes },
                         ]}
-                    />
+                    >
+                        {#snippet headerActionsSnippet()}
+                            <div class="flex items-center gap-2 mr-4">
+                                <input
+                                    type="text"
+                                    bind:value={logStreamSearchPrefix}
+                                    onkeydown={(e) => { if (e.key === 'Enter') { logStreamsTokenMap = []; loadLogStreams(selectedGroupForStreams); } }}
+                                    placeholder="Log Stream Prefix..."
+                                    class="bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs outline-none focus:border-blue-500 text-gray-200"
+                                />
+                                <button
+                                    onclick={() => { logStreamsTokenMap = []; loadLogStreams(selectedGroupForStreams); }}
+                                    class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded transition"
+                                >Search</button>
+                            </div>
+                        {/snippet}
+                        {#snippet actionsSnippet(item)}
+                            <button
+                                onclick={(e) => { e.stopPropagation(); deleteLogStream(selectedGroupForStreams, item.name); }}
+                                class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
+                                >Delete</button
+                            >
+                        {/snippet}
+                    </PaginatedTable>
                 </div>
             {:else}
                 <PaginatedTable
@@ -991,7 +1275,23 @@
                         { key: "creationTime", label: "Creation Time" },
                         { key: "storedBytes", label: "Stored Bytes", format: formatBytes },
                     ]}
-                />
+                >
+                    {#snippet headerActionsSnippet()}
+                        <div class="flex items-center gap-2 mr-4">
+                            <input
+                                type="text"
+                                bind:value={logGroupSearchPrefix}
+                                onkeydown={(e) => { if (e.key === 'Enter') { logGroupsTokenMap = []; loadLogGroupsTable(); } }}
+                                placeholder="Log Group Prefix..."
+                                class="bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs outline-none focus:border-blue-500 text-gray-200"
+                            />
+                            <button
+                                onclick={() => { logGroupsTokenMap = []; loadLogGroupsTable(); }}
+                                class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded transition"
+                            >Search</button>
+                        </div>
+                    {/snippet}
+                </PaginatedTable>
             {/if}
         {:else if activeTab === "logs"}
             <div class="h-full flex flex-col p-4 pr-1 bg-gray-950">
