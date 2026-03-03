@@ -7,6 +7,7 @@
         StartExecutionCommand,
         DescribeExecutionCommand,
         GetExecutionHistoryCommand,
+        DescribeStateMachineCommand,
         type StateMachineListItem,
         type ExecutionListItem,
         type HistoryEvent,
@@ -42,7 +43,8 @@
 
     // --- Detail View ---
     let selectedSM = $state<StateMachineListItem | null>(null);
-    let detailTab = $state<"executions" | "start">("executions");
+    let detailTab = $state<"executions" | "start" | "definition">("executions");
+    let smDetails = $state<any>(null);
 
     // Executions
     let executions = $state<ExecutionListItem[]>([]);
@@ -179,7 +181,23 @@
         execCurrentToken = undefined;
         executions = [];
         selectedExecution = null;
+        smDetails = null;
+        loadStateMachineDetails();
         loadExecutions();
+    }
+
+    async function loadStateMachineDetails() {
+        if (!client || !selectedSM?.stateMachineArn) return;
+        try {
+            const res = await client.send(
+                new DescribeStateMachineCommand({
+                    stateMachineArn: selectedSM.stateMachineArn,
+                }),
+            );
+            smDetails = res;
+        } catch (e: any) {
+            error = e.message || String(e);
+        }
     }
 
     function openExecution(exec: ExecutionListItem) {
@@ -345,6 +363,15 @@
                                 : 'border-transparent text-gray-400 hover:text-gray-200'}"
                         >
                             Start Execution
+                        </button>
+                        <button
+                            onclick={() => (detailTab = "definition")}
+                            class="py-3 text-sm font-semibold transition border-b-2 whitespace-nowrap {detailTab ===
+                            'definition'
+                                ? 'border-blue-500 text-blue-400'
+                                : 'border-transparent text-gray-400 hover:text-gray-200'}"
+                        >
+                            Definition
                         </button>
                     </nav>
                 </div>
@@ -542,6 +569,48 @@
                                 </div>
                             </div>
                         {/if}
+                    {:else if detailTab === "definition"}
+                        <div class="max-w-4xl space-y-6">
+                            <h3 class="text-lg font-bold text-gray-100 mb-4">
+                                Definition & Details
+                            </h3>
+
+                            {#if smDetails}
+                                <div class="bg-gray-900 border border-gray-800 p-4 sm:p-5 rounded-lg shadow-sm space-y-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Status</h4>
+                                            <span class="text-sm text-gray-300 {smDetails.status === 'ACTIVE' ? 'text-green-400 font-medium' : ''}">
+                                                {smDetails.status}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Creation Date</h4>
+                                            <span class="text-sm text-gray-300">
+                                                {smDetails.creationDate ? new Date(smDetails.creationDate).toLocaleString() : "-"}
+                                            </span>
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">State Machine ARN</h4>
+                                            <span class="text-sm text-gray-300 font-mono break-all">{smDetails.stateMachineArn}</span>
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Role ARN</h4>
+                                            <span class="text-sm text-gray-300 font-mono break-all">{smDetails.roleArn}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="pt-4 border-t border-gray-800">
+                                        <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Definition (ASL)</h4>
+                                        <div class="bg-gray-950 p-3 rounded border border-gray-800 overflow-x-auto">
+                                            <pre class="text-xs text-green-400 font-mono whitespace-pre-wrap">{smDetails.definition ? JSON.stringify(JSON.parse(smDetails.definition), null, 2) : "Loading definition..."}</pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            {:else}
+                                <div class="text-sm text-gray-500 animate-pulse">Loading definition...</div>
+                            {/if}
+                        </div>
                     {:else if detailTab === "start"}
                         <div class="max-w-3xl space-y-4">
                             <h3 class="text-lg font-bold text-gray-100 mb-4">
