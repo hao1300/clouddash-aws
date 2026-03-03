@@ -10,6 +10,7 @@
         DeleteTableCommand,
         PutItemCommand,
         DeleteItemCommand,
+        UpdateTableCommand,
     } from "@aws-sdk/client-dynamodb";
     import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
     import { getAwsCredentials } from "./aws-creds";
@@ -20,11 +21,17 @@
     let error = $state("");
     let actionMsg = $state("");
 
+    // --- Scan / Query shared ---
+    let tableName = $state("");
+
     // --- Service Layout State ---
-    const tabs = [
+    let tabs = $derived([
         { id: "tables", label: "Tables" },
-        { id: "explore", label: "Explore Items" },
-    ];
+        ...(tableName ? [
+            { id: "details", label: "Details" },
+            { id: "explore", label: "Explore Items" }
+        ] : [])
+    ]);
     let activeTab = $state("tables");
 
     // --- Explore Items Mode ---
@@ -55,6 +62,26 @@
     // --- Item Details Modal ---
     let viewingItem = $state<any>(null);
 
+    // --- Details Tab Modals ---
+    let showEditCapacity = $state(false);
+    let editBillingMode = $state("PAY_PER_REQUEST");
+    let editReadCapacity = $state(5);
+    let editWriteCapacity = $state(5);
+    let editCapacityLoading = $state(false);
+
+    let showCreateIndex = $state(false);
+    let newIndexName = $state("");
+    let newIndexPkName = $state("");
+    let newIndexPkType = $state("S");
+    let newIndexHasSk = $state(false);
+    let newIndexSkName = $state("");
+    let newIndexSkType = $state("S");
+    let newIndexProjectionType = $state("ALL");
+    let createIndexLoading = $state(false);
+
+    let indexToDelete = $state<string | null>(null);
+    let deleteIndexLoading = $state(false);
+
     // --- Pagination Shared Helpers ---
     function pushToken(history: any[], currentNextToken?: any) {
         if (!currentNextToken) return;
@@ -79,7 +106,6 @@
     let tableSchemas = $state<Record<string, any>>({});
 
     // --- Scan / Query shared ---
-    let tableName = $state("");
     let results = $state<any[]>([]);
     let resultLoading = $state(false);
     let resultTokenMap = $state<Record<string, any>[]>([]);
@@ -227,6 +253,134 @@
             error = String(e);
         } finally {
             createTableLoading = false;
+        }
+    }
+
+    async function handleUpdateCapacity() {
+        if (!client || !tableName) return;
+        try {
+            editCapacityLoading = true;
+            error = "";
+            actionMsg = "";
+
+            const input: any = {
+                TableName: tableName,
+                BillingMode: editBillingMode,
+            };
+
+            if (editBillingMode === "PROVISIONED") {
+                input.ProvisionedThroughput = {
+                    ReadCapacityUnits: editReadCapacity,
+                    WriteCapacityUnits: editWriteCapacity,
+                };
+            }
+
+            await client.send(new UpdateTableCommand(input));
+            actionMsg = `Successfully requested capacity update for ${tableName}.`;
+            showEditCapacity = false;
+            loadTables();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            editCapacityLoading = false;
+        }
+    }
+
+    async function handleCreateIndex() {
+        if (!client || !tableName || !newIndexName || !newIndexPkName) return;
+        try {
+            createIndexLoading = true;
+            error = "";
+            actionMsg = "";
+
+            const AttributeDefinitions = [
+                { AttributeName: newIndexPkName, AttributeType: newIndexPkType },
+            ];
+            const KeySchema = [
+                { AttributeName: newIndexPkName, KeyType: "HASH" },
+            ];
+
+            if (newIndexHasSk && newIndexSkName) {
+                AttributeDefinitions.push({ AttributeName: newIndexSkName, AttributeType: newIndexSkType });
+                KeySchema.push({ AttributeName: newIndexSkName, KeyType: "RANGE" });
+            }
+
+            // Need to merge new attribute definitions with existing ones
+            // For simplicity in this UI, we just send the ones needed for this index,
+            // but DynamoDB UpdateTable requires all AttributeDefinitions referenced by the table and ALL indexes to be present.
+            // We get existing from activeSchema.
+            const existingDefs = activeSchema?.AttributeDefinitions || [];
+            const mergedDefs = [...existingDefs];
+            for (const def of AttributeDefinitions) {
+                if (!mergedDefs.find((d: any) => d.AttributeName === def.AttributeName)) {
+                    mergedDefs.push(def);
+                }
+            }
+
+            const Create: any = {
+                IndexName: newIndexName,
+                KeySchema,
+                Projection: { ProjectionType: newIndexProjectionType },
+            };
+
+            // If table is PROVISIONED, index must specify ProvisionedThroughput.
+            const isProvisioned = activeSchema?.BillingModeSummary?.BillingMode === "PROVISIONED" || !activeSchema?.BillingModeSummary?.BillingMode;
+            if (isProvisioned) {
+                Create.ProvisionedThroughput = {
+                    ReadCapacityUnits: 5,
+                    WriteCapacityUnits: 5,
+                };
+            }
+
+            const input: any = {
+                TableName: tableName,
+                AttributeDefinitions: mergedDefs,
+                GlobalSecondaryIndexUpdates: [{ Create }],
+            };
+
+            await client.send(new UpdateTableCommand(input));
+            actionMsg = `Successfully requested creation of index ${newIndexName}.`;
+            showCreateIndex = false;
+
+            // Reset state
+            newIndexName = "";
+            newIndexPkName = "";
+            newIndexPkType = "S";
+            newIndexHasSk = false;
+            newIndexSkName = "";
+            newIndexSkType = "S";
+            newIndexProjectionType = "ALL";
+
+            loadTables();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            createIndexLoading = false;
+        }
+    }
+
+    async function confirmDeleteIndex() {
+        if (!client || !tableName || !indexToDelete) return;
+        try {
+            deleteIndexLoading = true;
+            error = "";
+            actionMsg = "";
+
+            const input: any = {
+                TableName: tableName,
+                GlobalSecondaryIndexUpdates: [{
+                    Delete: { IndexName: indexToDelete }
+                }],
+            };
+
+            await client.send(new UpdateTableCommand(input));
+            actionMsg = `Successfully requested deletion of index ${indexToDelete}.`;
+            indexToDelete = null;
+            loadTables();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            deleteIndexLoading = false;
         }
     }
 
@@ -516,8 +670,7 @@
                         label: "Table Name",
                         onClick: (item) => {
                             tableName = item.name;
-                            activeTab = "explore";
-                            exploreMode = "scan";
+                            activeTab = "details";
                         },
                     },
                     {
@@ -546,20 +699,19 @@
                     <button
                         onclick={() => {
                             tableName = item.name;
-                            activeTab = "explore";
-                            exploreMode = "scan";
+                            activeTab = "details";
                         }}
                         class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition"
-                        >Scan</button
+                        >Details</button
                     >
                     <button
                         onclick={() => {
                             tableName = item.name;
                             activeTab = "explore";
-                            exploreMode = "query";
+                            exploreMode = "scan";
                         }}
                         class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition ml-1"
-                        >Query</button
+                        >Explore</button
                     >
                     <button
                         onclick={() => tableToDelete = item.name}
@@ -587,11 +739,9 @@
 
                     {#if exploreMode === "scan"}
                         <div class="flex gap-2">
-                            <input
-                                bind:value={tableName}
-                                placeholder="Table name"
-                                class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-                            />
+                            <div class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-400 font-mono flex items-center">
+                                <span>Table: <strong class="text-blue-300">{tableName}</strong></span>
+                            </div>
                             <button
                                 onclick={() => runScan()}
                                 disabled={!tableName || resultLoading}
@@ -616,11 +766,9 @@
                         </div>
                     {:else}
                         <div class="flex gap-2">
-                            <input
-                                bind:value={tableName}
-                                placeholder="Table name"
-                                class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-                            />
+                            <div class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-400 font-mono flex items-center">
+                                <span>Table: <strong class="text-blue-300">{tableName}</strong></span>
+                            </div>
                             {#if activeSchema?.GlobalSecondaryIndexes}
                                 <select
                                     bind:value={queryIndex}
@@ -860,6 +1008,140 @@
                     </PaginatedTable>
                 </div>
             </div>
+        {:else if activeTab === "details" && activeSchema}
+            <div class="h-full flex flex-col p-4 pr-1 bg-gray-950 overflow-auto">
+                <div class="space-y-4 max-w-5xl">
+                    <!-- Basic Info -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 shadow-sm">
+                        <h3 class="text-sm font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">Table Details</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+                            <div>
+                                <div class="text-gray-500 font-medium mb-1">Table Name</div>
+                                <div class="text-gray-300">{activeSchema.TableName}</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-500 font-medium mb-1">Status</div>
+                                <div class="text-gray-300">
+                                    <span class={activeSchema.TableStatus === 'ACTIVE' ? 'text-green-400' : 'text-yellow-400'}>
+                                        {activeSchema.TableStatus === 'ACTIVE' ? '🟢' : '⚪'} {activeSchema.TableStatus}
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-gray-500 font-medium mb-1">Creation Date</div>
+                                <div class="text-gray-300">{activeSchema.CreationDateTime ? new Date(activeSchema.CreationDateTime).toLocaleString() : '-'}</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-500 font-medium mb-1">Item Count</div>
+                                <div class="text-gray-300">{activeSchema.ItemCount ? Number(activeSchema.ItemCount).toLocaleString() : 0}</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-500 font-medium mb-1">Table Size</div>
+                                <div class="text-gray-300">{formatBytes(activeSchema.TableSizeBytes || 0)}</div>
+                            </div>
+                            <div class="col-span-2 md:col-span-3">
+                                <div class="text-gray-500 font-medium mb-1">Table ARN</div>
+                                <div class="text-gray-300 font-mono text-[10px] break-all bg-black/50 p-1.5 rounded">{activeSchema.TableArn || '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Capacity and Billing -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 shadow-sm">
+                        <div class="flex items-center justify-between mb-4 border-b border-gray-800 pb-2">
+                            <h3 class="text-sm font-bold text-gray-200">Capacity and Billing</h3>
+                            <button
+                                onclick={() => {
+                                    editBillingMode = activeSchema.BillingModeSummary?.BillingMode || "PROVISIONED";
+                                    editReadCapacity = activeSchema.ProvisionedThroughput?.ReadCapacityUnits || 5;
+                                    editWriteCapacity = activeSchema.ProvisionedThroughput?.WriteCapacityUnits || 5;
+                                    showEditCapacity = true;
+                                }}
+                                class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs font-medium text-gray-200 transition-colors"
+                            >
+                                Edit Capacity
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+                            <div>
+                                <div class="text-gray-500 font-medium mb-1">Billing Mode</div>
+                                <div class="text-gray-300">
+                                    {activeSchema.BillingModeSummary?.BillingMode || 'PROVISIONED'}
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-gray-500 font-medium mb-1">Read Capacity (RCU)</div>
+                                <div class="text-gray-300">
+                                    {(activeSchema.BillingModeSummary?.BillingMode === 'PAY_PER_REQUEST') ? '-' : (activeSchema.ProvisionedThroughput?.ReadCapacityUnits ?? '-')}
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-gray-500 font-medium mb-1">Write Capacity (WCU)</div>
+                                <div class="text-gray-300">
+                                    {(activeSchema.BillingModeSummary?.BillingMode === 'PAY_PER_REQUEST') ? '-' : (activeSchema.ProvisionedThroughput?.WriteCapacityUnits ?? '-')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Global Secondary Indexes -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 shadow-sm">
+                        <div class="flex items-center justify-between mb-4 border-b border-gray-800 pb-2">
+                            <h3 class="text-sm font-bold text-gray-200">Global Secondary Indexes</h3>
+                            <button
+                                onclick={() => showCreateIndex = true}
+                                class="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-xs font-bold text-white transition-colors"
+                            >
+                                + Create Index
+                            </button>
+                        </div>
+
+                        {#if !activeSchema.GlobalSecondaryIndexes || activeSchema.GlobalSecondaryIndexes.length === 0}
+                            <div class="text-xs text-gray-500 italic py-2">No Global Secondary Indexes found.</div>
+                        {:else}
+                            <div class="space-y-4">
+                                {#each activeSchema.GlobalSecondaryIndexes as gsi}
+                                    <div class="border border-gray-800 rounded p-3 bg-gray-950 flex flex-col md:flex-row gap-4 items-start md:items-center">
+                                        <div class="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                            <div>
+                                                <div class="text-gray-500 font-medium mb-1">Index Name</div>
+                                                <div class="text-gray-300 font-mono text-[11px]">{gsi.IndexName}</div>
+                                            </div>
+                                            <div>
+                                                <div class="text-gray-500 font-medium mb-1">Status</div>
+                                                <div class="text-gray-300">
+                                                    <span class={gsi.IndexStatus === 'ACTIVE' ? 'text-green-400' : 'text-yellow-400'}>
+                                                        {gsi.IndexStatus === 'ACTIVE' ? '🟢' : '⚪'} {gsi.IndexStatus || '-'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div class="text-gray-500 font-medium mb-1">Projection</div>
+                                                <div class="text-gray-300">{gsi.Projection?.ProjectionType || '-'}</div>
+                                            </div>
+                                            <div>
+                                                <div class="text-gray-500 font-medium mb-1">Keys</div>
+                                                <div class="text-gray-300 font-mono text-[10px]">
+                                                    PK: {gsi.KeySchema?.find((k: any) => k.KeyType === 'HASH')?.AttributeName || '-'}<br/>
+                                                    SK: {gsi.KeySchema?.find((k: any) => k.KeyType === 'RANGE')?.AttributeName || '-'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="shrink-0 flex gap-2">
+                                            <button
+                                                onclick={() => indexToDelete = gsi.IndexName}
+                                                class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+            </div>
         {/if}
     </div>
 
@@ -1006,4 +1288,118 @@
             </div>
         </div>
     {/if}
+    {#if showEditCapacity}
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-md flex flex-col">
+                <div class="flex items-center justify-between p-4 border-b border-gray-800 shrink-0">
+                    <h3 class="font-bold text-gray-200">Edit Capacity</h3>
+                    <button onclick={() => showEditCapacity = false} class="text-gray-400 hover:text-gray-200 transition-colors">✕</button>
+                </div>
+                <div class="p-4 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Capacity Mode</label>
+                        <select bind:value={editBillingMode} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500">
+                            <option value="PAY_PER_REQUEST">On-demand (PAY_PER_REQUEST)</option>
+                            <option value="PROVISIONED">Provisioned</option>
+                        </select>
+                    </div>
+                    {#if editBillingMode === "PROVISIONED"}
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <label class="block text-xs font-bold text-gray-400 mb-1">Read Capacity (RCU)</label>
+                                <input type="number" min="1" bind:value={editReadCapacity} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" />
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-xs font-bold text-gray-400 mb-1">Write Capacity (WCU)</label>
+                                <input type="number" min="1" bind:value={editWriteCapacity} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" />
+                            </div>
+                        </div>
+                    {/if}
+                </div>
+                <div class="p-4 border-t border-gray-800 shrink-0 flex justify-end gap-2">
+                    <button onclick={() => showEditCapacity = false} class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
+                    <button onclick={handleUpdateCapacity} disabled={editCapacityLoading} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2">
+                        {#if editCapacityLoading}<span class="animate-spin">⟳</span>{/if} Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if showCreateIndex}
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-md flex flex-col">
+                <div class="flex items-center justify-between p-4 border-b border-gray-800 shrink-0">
+                    <h3 class="font-bold text-gray-200">Create Global Secondary Index</h3>
+                    <button onclick={() => showCreateIndex = false} class="text-gray-400 hover:text-gray-200 transition-colors">✕</button>
+                </div>
+                <div class="p-4 space-y-4 overflow-y-auto max-h-[70vh]">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Index Name</label>
+                        <input bind:value={newIndexName} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" placeholder="MyGSI" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Partition Key</label>
+                        <div class="flex gap-2">
+                            <input bind:value={newIndexPkName} class="flex-1 bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" placeholder="PK Attribute Name" />
+                            <select bind:value={newIndexPkType} class="bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 w-24">
+                                <option value="S">String</option>
+                                <option value="N">Number</option>
+                                <option value="B">Binary</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 text-xs font-bold text-gray-400 mb-2 cursor-pointer hover:text-gray-200">
+                            <input type="checkbox" bind:checked={newIndexHasSk} class="accent-blue-500" />
+                            Add Sort Key
+                        </label>
+                        {#if newIndexHasSk}
+                            <div class="flex gap-2">
+                                <input bind:value={newIndexSkName} class="flex-1 bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" placeholder="SK Attribute Name" />
+                                <select bind:value={newIndexSkType} class="bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 w-24">
+                                    <option value="S">String</option>
+                                    <option value="N">Number</option>
+                                    <option value="B">Binary</option>
+                                </select>
+                            </div>
+                        {/if}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Projection Type</label>
+                        <select bind:value={newIndexProjectionType} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500">
+                            <option value="ALL">ALL (All table attributes)</option>
+                            <option value="KEYS_ONLY">KEYS_ONLY (Only index and primary keys)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-gray-800 shrink-0 flex justify-end gap-2">
+                    <button onclick={() => showCreateIndex = false} class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
+                    <button onclick={handleCreateIndex} disabled={createIndexLoading || !newIndexName || !newIndexPkName} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2">
+                        {#if createIndexLoading}<span class="animate-spin">⟳</span>{/if} Create Index
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if indexToDelete}
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-sm flex flex-col">
+                <div class="p-4 border-b border-gray-800">
+                    <h3 class="font-bold text-red-400">Delete Index</h3>
+                </div>
+                <div class="p-4">
+                    <p class="text-sm text-gray-300">Are you sure you want to delete the index <strong>{indexToDelete}</strong>? This action cannot be undone.</p>
+                </div>
+                <div class="p-4 border-t border-gray-800 flex justify-end gap-2">
+                    <button onclick={() => indexToDelete = null} class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
+                    <button onclick={confirmDeleteIndex} disabled={deleteIndexLoading} class="bg-red-600 hover:bg-red-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2">
+                        {#if deleteIndexLoading}<span class="animate-spin">⟳</span>{/if} Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
 </ServiceLayout>
