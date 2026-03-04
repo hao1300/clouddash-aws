@@ -11,6 +11,8 @@
         PutItemCommand,
         DeleteItemCommand,
         UpdateTableCommand,
+        DescribeTimeToLiveCommand,
+        UpdateTimeToLiveCommand,
     } from "@aws-sdk/client-dynamodb";
     import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
     import { getAwsCredentials } from "./aws-creds";
@@ -114,6 +116,8 @@
     // Scan params
     let scanFilter = $state("");
     let scanValues = $state(""); // Changed to string for input
+    let scanLimit = $state(25);
+    let scanConsistentRead = $state(false);
 
     // Query params
     let queryKeyCond = $state("");
@@ -121,6 +125,15 @@
     let queryFilter = $state("");
     let queryValues = $state("");
     let queryIndex = $state("");
+    let queryLimit = $state(25);
+    let queryConsistentRead = $state(false);
+    let queryScanIndexForward = $state(true); // true = ascending, false = descending
+
+    let tableTtl = $state<any>(null);
+    let tableTtlLoading = $state(false);
+
+    let newTableClass = $state("STANDARD");
+    let newDeletionProtectionEnabled = $state(false);
 
     // Schema UI Helpers
     let partitionKeyInput = $state("");
@@ -228,6 +241,8 @@
                 AttributeDefinitions,
                 KeySchema,
                 BillingMode: billingMode,
+                DeletionProtectionEnabled: newDeletionProtectionEnabled,
+                TableClass: newTableClass,
             };
 
             if (billingMode === "PROVISIONED") {
@@ -248,6 +263,8 @@
             newSkName = "";
             newSkType = "S";
             billingMode = "PAY_PER_REQUEST";
+            newDeletionProtectionEnabled = false;
+            newTableClass = "STANDARD";
             loadTables();
         } catch (e) {
             error = String(e);
@@ -475,6 +492,70 @@
         }
     }
 
+    // --- TTL API ---
+    async function loadTtl() {
+        if (!client || !tableName) return;
+        try {
+            tableTtlLoading = true;
+            error = "";
+            const resp = await client.send(
+                new DescribeTimeToLiveCommand({ TableName: tableName })
+            );
+            tableTtl = resp.TimeToLiveDescription;
+        } catch (e) {
+            error = String(e);
+            tableTtl = null;
+        } finally {
+            tableTtlLoading = false;
+        }
+    }
+
+    $effect(() => {
+        if (activeTab === "details" && tableName && client) {
+            loadTtl();
+        }
+    });
+
+    async function toggleDeletionProtection() {
+        if (!client || !tableName || !activeSchema) return;
+        try {
+            error = "";
+            actionMsg = "";
+            const currentState = activeSchema.DeletionProtectionEnabled || false;
+            await client.send(
+                new UpdateTableCommand({
+                    TableName: tableName,
+                    DeletionProtectionEnabled: !currentState
+                })
+            );
+            actionMsg = `Successfully ${!currentState ? 'enabled' : 'disabled'} deletion protection for ${tableName}.`;
+            // Reload tables/schemas to update the details tab
+            loadTables();
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    async function toggleTableClass() {
+        if (!client || !tableName || !activeSchema) return;
+        try {
+            error = "";
+            actionMsg = "";
+            const currentClass = activeSchema.TableClassSummary?.TableClass || "STANDARD";
+            const newClass = currentClass === "STANDARD" ? "STANDARD_INFREQUENT_ACCESS" : "STANDARD";
+            await client.send(
+                new UpdateTableCommand({
+                    TableName: tableName,
+                    TableClass: newClass
+                })
+            );
+            actionMsg = `Successfully requested table class update to ${newClass} for ${tableName}.`;
+            loadTables();
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
     // --- Tables API ---
     async function loadTables(token?: string) {
         if (!client) return;
@@ -545,7 +626,8 @@
             const resp = await client.send(
                 new ScanCommand({
                     TableName: tableName,
-                    Limit: 25,
+                    Limit: scanLimit,
+                    ConsistentRead: scanConsistentRead,
                     FilterExpression: scanFilter || undefined,
                     ExpressionAttributeValues: exprVals,
                     ExclusiveStartKey: token,
@@ -581,6 +663,17 @@
                     exprVals = marshalValues(parsed);
             }
 
+            let consistentRead = queryConsistentRead;
+            // GSI does not support ConsistentRead=true
+            if (queryIndex) {
+                const isGsi = activeSchema?.GlobalSecondaryIndexes?.some(
+                    (i: any) => i.IndexName === queryIndex
+                );
+                if (isGsi) {
+                    consistentRead = false;
+                }
+            }
+
             const resp = await client.send(
                 new QueryCommand({
                     TableName: tableName,
@@ -590,7 +683,9 @@
                     ExpressionAttributeNames: Object.keys(queryNames).length ? queryNames : undefined,
                     ExpressionAttributeValues: exprVals,
                     ExclusiveStartKey: token,
-                    Limit: 25,
+                    Limit: queryLimit,
+                    ConsistentRead: consistentRead,
+                    ScanIndexForward: queryScanIndexForward,
                 }),
             );
             results = (resp.Items ?? []).map((i) => unmarshall(i));
@@ -763,6 +858,16 @@
                                 placeholder="Expression JSON (e.g. &quot;:status&quot;: &quot;active&quot;)"
                                 class="bg-black font-mono text-xs p-2 rounded border border-gray-700 text-green-400 outline-none focus:border-blue-500"
                             />
+                        </div>
+                        <div class="flex items-center gap-4 mt-2">
+                            <label class="flex items-center gap-2 text-xs text-gray-400">
+                                Limit:
+                                <input type="number" min="1" max="1000" bind:value={scanLimit} class="w-20 bg-gray-950 text-xs p-1 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" />
+                            </label>
+                            <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-gray-200">
+                                <input type="checkbox" bind:checked={scanConsistentRead} class="accent-blue-500" />
+                                Consistent Read
+                            </label>
                         </div>
                     {:else}
                         <div class="flex gap-2">
@@ -956,6 +1061,21 @@
                             placeholder="Expression JSON"
                             class="w-full bg-black font-mono text-xs p-2 rounded border border-gray-700 text-green-400 outline-none focus:border-blue-500 resize-none drop-shadow-inner"
                         ></textarea>
+
+                            <div class="flex items-center gap-4 mt-2">
+                                <label class="flex items-center gap-2 text-xs text-gray-400">
+                                    Limit:
+                                    <input type="number" min="1" max="1000" bind:value={queryLimit} class="w-20 bg-gray-950 text-xs p-1 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" />
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-gray-200" title="Not available for Global Secondary Indexes">
+                                    <input type="checkbox" bind:checked={queryConsistentRead} class="accent-blue-500" />
+                                    Consistent Read
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-gray-200">
+                                    <input type="checkbox" bind:checked={queryScanIndexForward} class="accent-blue-500" />
+                                    Sort Ascending
+                                </label>
+                            </div>
                     {/if}
                 </div>
 
@@ -1043,6 +1163,53 @@
                                 <div class="text-gray-500 font-medium mb-1">Table ARN</div>
                                 <div class="text-gray-300 font-mono text-[10px] break-all bg-black/50 p-1.5 rounded">{activeSchema.TableArn || '-'}</div>
                             </div>
+                            <div class="flex items-center gap-2 mt-2 col-span-2 md:col-span-3">
+                                <div class="text-gray-500 font-medium">Deletion Protection:</div>
+                                <div class="text-gray-300">
+                                    <span class={activeSchema.DeletionProtectionEnabled ? 'text-green-400' : 'text-gray-500'}>
+                                        {activeSchema.DeletionProtectionEnabled ? 'Enabled' : 'Disabled'}
+                                    </span>
+                                </div>
+                                <button
+                                    onclick={toggleDeletionProtection}
+                                    class="bg-gray-800 hover:bg-gray-700 px-2 py-0.5 rounded text-[10px] font-medium text-gray-200 transition-colors ml-2"
+                                >
+                                    Toggle
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-2 col-span-2 md:col-span-3">
+                                <div class="text-gray-500 font-medium">Table Class:</div>
+                                <div class="text-gray-300 font-mono text-[11px]">
+                                    {activeSchema.TableClassSummary?.TableClass || 'STANDARD'}
+                                </div>
+                                <button
+                                    onclick={toggleTableClass}
+                                    class="bg-gray-800 hover:bg-gray-700 px-2 py-0.5 rounded text-[10px] font-medium text-gray-200 transition-colors ml-2"
+                                >
+                                    Toggle
+                                </button>
+                            </div>
+
+                            <!-- TTL Information -->
+                            <div class="flex items-center gap-2 col-span-2 md:col-span-3 mt-2 border-t border-gray-800 pt-2">
+                                <div class="text-gray-500 font-medium">Time To Live (TTL):</div>
+                                {#if tableTtlLoading}
+                                    <div class="text-gray-400 animate-pulse text-xs">Loading...</div>
+                                {:else if tableTtl}
+                                    <div class="text-gray-300 flex items-center gap-2 text-xs">
+                                        <span class={tableTtl.TimeToLiveStatus === 'ENABLED' ? 'text-green-400' : tableTtl.TimeToLiveStatus === 'DISABLED' ? 'text-red-400' : 'text-yellow-400'}>
+                                            {tableTtl.TimeToLiveStatus || 'UNKNOWN'}
+                                        </span>
+                                        {#if tableTtl.AttributeName}
+                                            <span class="text-gray-500">|</span>
+                                            <span>Attribute: <code class="bg-black px-1 rounded font-mono text-blue-300">{tableTtl.AttributeName}</code></span>
+                                        {/if}
+                                    </div>
+                                {:else}
+                                    <div class="text-gray-500 text-xs">Not Configured / Unknown</div>
+                                {/if}
+                            </div>
+
                         </div>
                     </div>
 
@@ -1140,6 +1307,50 @@
                             </div>
                         {/if}
                     </div>
+
+                    <!-- Local Secondary Indexes -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 shadow-sm">
+                        <div class="flex items-center justify-between mb-4 border-b border-gray-800 pb-2">
+                            <h3 class="text-sm font-bold text-gray-200">Local Secondary Indexes</h3>
+                        </div>
+
+                        {#if !activeSchema.LocalSecondaryIndexes || activeSchema.LocalSecondaryIndexes.length === 0}
+                            <div class="text-xs text-gray-500 italic py-2">No Local Secondary Indexes found.</div>
+                        {:else}
+                            <div class="space-y-4">
+                                {#each activeSchema.LocalSecondaryIndexes as lsi}
+                                    <div class="border border-gray-800 rounded p-3 bg-gray-950 flex flex-col md:flex-row gap-4 items-start md:items-center">
+                                        <div class="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                            <div>
+                                                <div class="text-gray-500 font-medium mb-1">Index Name</div>
+                                                <div class="text-gray-300 font-mono text-[11px]">{lsi.IndexName}</div>
+                                            </div>
+                                            <div>
+                                                <div class="text-gray-500 font-medium mb-1">Status</div>
+                                                <div class="text-gray-300">
+                                                    <span class={lsi.IndexStatus === 'ACTIVE' ? 'text-green-400' : 'text-yellow-400'}>
+                                                        {lsi.IndexStatus === 'ACTIVE' ? '🟢' : '⚪'} {lsi.IndexStatus || '-'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div class="text-gray-500 font-medium mb-1">Projection</div>
+                                                <div class="text-gray-300">{lsi.Projection?.ProjectionType || '-'}</div>
+                                            </div>
+                                            <div>
+                                                <div class="text-gray-500 font-medium mb-1">Keys</div>
+                                                <div class="text-gray-300 font-mono text-[10px]">
+                                                    PK: {lsi.KeySchema?.find((k: any) => k.KeyType === 'HASH')?.AttributeName || '-'}<br/>
+                                                    SK: {lsi.KeySchema?.find((k: any) => k.KeyType === 'RANGE')?.AttributeName || '-'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                    </div>
+
                 </div>
             </div>
         {/if}
@@ -1191,6 +1402,19 @@
                             <option value="PAY_PER_REQUEST">On-demand (PAY_PER_REQUEST)</option>
                             <option value="PROVISIONED">Provisioned (5 RCU / 5 WCU default)</option>
                         </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Table Class</label>
+                        <select bind:value={newTableClass} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500">
+                            <option value="STANDARD">Standard</option>
+                            <option value="STANDARD_INFREQUENT_ACCESS">Standard-Infrequent Access</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 text-xs font-bold text-gray-400 cursor-pointer hover:text-gray-200">
+                            <input type="checkbox" bind:checked={newDeletionProtectionEnabled} class="accent-blue-500" />
+                            Enable Deletion Protection
+                        </label>
                     </div>
                 </div>
                 <div class="p-4 border-t border-gray-800 shrink-0 flex justify-end gap-2">
