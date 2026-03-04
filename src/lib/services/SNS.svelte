@@ -2,6 +2,10 @@
     import { onMount } from "svelte";
     import {
         SNSClient,
+        ListPlatformApplicationsCommand,
+        CreatePlatformApplicationCommand,
+        DeletePlatformApplicationCommand,
+        type PlatformApplication,
         ListTopicsCommand,
         ListSubscriptionsCommand,
         CreateTopicCommand,
@@ -24,6 +28,7 @@
 
     // --- Service Layout State ---
     const tabs = [
+        { id: "platform-applications", label: "Platform Applications" },
         { id: "topics", label: "Topics" },
         { id: "subscriptions", label: "Subscriptions" }
     ];
@@ -33,6 +38,7 @@
         if (!client) return;
         if (activeTab === "topics" && !hasLoadedTopics) loadTopics();
         else if (activeTab === "subscriptions" && !hasLoadedSubscriptions) loadSubscriptions();
+        else if (activeTab === "platform-applications" && !hasLoadedPlatformApplications) loadPlatformApplications();
     });
 
     // --- Pagination Shared Helpers ---
@@ -71,6 +77,20 @@
     let subLoading = $state(false);
     let subTokenMap = $state<string[]>([]);
     let subCurrentToken = $state<string | undefined>(undefined);
+    // --- Platform Applications ---
+    let platformApplications = $state<PlatformApplication[]>([]);
+    let hasLoadedPlatformApplications = $state(false);
+    let paLoading = $state(false);
+    let paTokenMap = $state<string[]>([]);
+    let paCurrentToken = $state<string | undefined>(undefined);
+
+    // --- Create Platform Application Modal ---
+    let showCreatePlatformAppModal = $state(false);
+    let newPaName = $state("");
+    let newPaPlatform = $state("GCM");
+    let newPaPrincipal = $state("");
+    let newPaCredential = $state("");
+    let creatingPlatformApp = $state(false);
 
     // --- Create Subscription Modal ---
     let showCreateSubscriptionModal = $state(false);
@@ -259,6 +279,74 @@
         const prevToken = popToken(tokenMap);
         loadTopics(prevToken);
     }
+
+    async function createPlatformApplication() {
+        if (!client || !newPaName || !newPaPlatform || !newPaPrincipal || !newPaCredential) return;
+        creatingPlatformApp = true;
+        error = "";
+        actionMsg = "";
+        try {
+            await client.send(
+                new CreatePlatformApplicationCommand({
+                    Name: newPaName,
+                    Platform: newPaPlatform,
+                    Attributes: {
+                        ...(newPaPrincipal ? { PlatformPrincipal: newPaPrincipal } : {}),
+                        PlatformCredential: newPaCredential
+                    }
+                })
+            );
+            actionMsg = `Platform application ${newPaName} created.`;
+            showCreatePlatformAppModal = false;
+            newPaName = "";
+            newPaPlatform = "GCM";
+            newPaPrincipal = "";
+            newPaCredential = "";
+            paTokenMap = [];
+            loadPlatformApplications();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            creatingPlatformApp = false;
+        }
+    }
+
+    async function deletePlatformApplication(arn: string) {
+        if (!client) return;
+        if (!confirm(`Are you sure you want to delete platform application ${arn}?`)) return;
+        paLoading = true;
+        error = "";
+        actionMsg = "";
+        try {
+            await client.send(new DeletePlatformApplicationCommand({ PlatformApplicationArn: arn }));
+            actionMsg = `Platform application deleted.`;
+            paTokenMap = [];
+            loadPlatformApplications();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            paLoading = false;
+        }
+    }
+
+    async function loadPlatformApplications(token?: string) {
+        if (!client) return;
+        paLoading = true;
+        error = "";
+        actionMsg = "";
+        try {
+            const res = await client.send(
+                new ListPlatformApplicationsCommand({ NextToken: token }),
+            );
+            platformApplications = res.PlatformApplications || [];
+            paCurrentToken = res.NextToken;
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            paLoading = false;
+            hasLoadedPlatformApplications = true;
+        }
+    }
 </script>
 
 <ServiceLayout {tabs} bind:activeTab>
@@ -308,6 +396,54 @@
                             class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
                             title="Delete Topic"
                             disabled={!item.TopicArn}
+                        >
+                            Delete
+                        </button>
+                    </div>
+                {/snippet}
+            </PaginatedTable>
+        {:else if activeTab === "platform-applications"}
+            <PaginatedTable
+                items={platformApplications}
+                loading={paLoading}
+                columns={[
+                    { label: "Application ARN", key: "PlatformApplicationArn", sortable: true },
+                ]}
+                hasNext={!!paCurrentToken}
+                hasPrev={paTokenMap.length > 0}
+                onNext={() => {
+                    if (paCurrentToken) {
+                        pushToken(paTokenMap, paCurrentToken);
+                        loadPlatformApplications(paCurrentToken);
+                    }
+                }}
+                onPrev={() => loadPlatformApplications(popToken(paTokenMap))}
+                onRefresh={() => {
+                    paTokenMap = [];
+                    loadPlatformApplications();
+                }}
+            >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={() => {
+                            newPaName = "";
+                            newPaPlatform = "GCM";
+                            newPaPrincipal = "";
+                            newPaCredential = "";
+                            showCreatePlatformAppModal = true;
+                        }}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
+                    >
+                        Create Platform Application
+                    </button>
+                {/snippet}
+                {#snippet actionsSnippet(item)}
+                    <div class="flex gap-2 justify-end">
+                        <button
+                            onclick={() => deletePlatformApplication(item.PlatformApplicationArn!)}
+                            class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
+                            title="Delete Platform Application"
+                            disabled={!item.PlatformApplicationArn}
                         >
                             Delete
                         </button>
@@ -516,6 +652,73 @@
             >
                 {#if publishingMessage}<span class="animate-spin">⟳</span>{/if}
                 Publish
+            </button>
+        </div>
+    </div>
+</Modal>
+
+<Modal bind:open={showCreatePlatformAppModal} title="Create Platform Application" maxWidth="max-w-md">
+    <div class="space-y-4">
+        <div>
+            <label for="newPaName" class="block text-sm font-medium text-gray-300 mb-1">Application Name</label>
+            <input
+                id="newPaName"
+                type="text"
+                bind:value={newPaName}
+                placeholder="MyPlatformApp"
+                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+            />
+        </div>
+        <div>
+            <label for="newPaPlatform" class="block text-sm font-medium text-gray-300 mb-1">Platform</label>
+            <select
+                id="newPaPlatform"
+                bind:value={newPaPlatform}
+                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+            >
+                <option value="ADM">ADM</option>
+                <option value="APNS">APNS</option>
+                <option value="APNS_SANDBOX">APNS_SANDBOX</option>
+                <option value="BAIDU">BAIDU</option>
+                <option value="GCM">GCM</option>
+                <option value="MPNS">MPNS</option>
+                <option value="WNS">WNS</option>
+            </select>
+        </div>
+        <div>
+            <label for="newPaPrincipal" class="block text-sm font-medium text-gray-300 mb-1">Platform Principal</label>
+            <input
+                id="newPaPrincipal"
+                type="text"
+                bind:value={newPaPrincipal}
+                placeholder="e.g. Server API Key or Certificate..."
+                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+            />
+        </div>
+        <div>
+            <label for="newPaCredential" class="block text-sm font-medium text-gray-300 mb-1">Platform Credential</label>
+            <textarea
+                id="newPaCredential"
+                bind:value={newPaCredential}
+                rows="3"
+                placeholder="e.g. Private Key or Client Secret..."
+                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 font-mono"
+            ></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+            <button
+                onclick={() => showCreatePlatformAppModal = false}
+                class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition"
+            >
+                Cancel
+            </button>
+            <button
+                onclick={createPlatformApplication}
+                disabled={creatingPlatformApp || !newPaName || !newPaCredential}
+                class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium transition flex items-center gap-2"
+            >
+                {#if creatingPlatformApp}<span class="animate-spin">⟳</span>{/if}
+                Create
             </button>
         </div>
     </div>

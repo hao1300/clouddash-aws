@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { SESClient, ListIdentitiesCommand, GetIdentityVerificationAttributesCommand, ListConfigurationSetsCommand, ListTemplatesCommand, VerifyEmailIdentityCommand, VerifyDomainIdentityCommand, DeleteIdentityCommand, SendEmailCommand } from "@aws-sdk/client-ses";
+    import { SESClient, ListIdentitiesCommand, GetIdentityVerificationAttributesCommand, ListConfigurationSetsCommand, ListTemplatesCommand, VerifyEmailIdentityCommand, VerifyDomainIdentityCommand, DeleteIdentityCommand, SendEmailCommand, CreateTemplateCommand, DeleteTemplateCommand } from "@aws-sdk/client-ses";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
@@ -70,6 +70,14 @@
     let tplLoading = $state(false);
     let tplTokenMap = $state<string[]>([]);
     let tplCurrentToken = $state<string | undefined>(undefined);
+
+    // --- Create Template Modal ---
+    let showCreateTemplateModal = $state(false);
+    let templateName = $state("");
+    let templateSubjectPart = $state("");
+    let templateHtmlPart = $state("");
+    let templateTextPart = $state("");
+    let creatingTemplate = $state(false);
 
     onMount(async () => {
         try {
@@ -242,6 +250,55 @@
         const prevToken = popToken(tokenMap);
         loadIdentities(prevToken);
     }
+
+    async function createTemplate() {
+        if (!client || !templateName || !templateSubjectPart) return;
+        creatingTemplate = true;
+        error = "";
+        actionMsg = "";
+        try {
+            await client.send(
+                new CreateTemplateCommand({
+                    Template: {
+                        TemplateName: templateName,
+                        SubjectPart: templateSubjectPart,
+                        HtmlPart: templateHtmlPart || undefined,
+                        TextPart: templateTextPart || undefined,
+                    }
+                })
+            );
+            actionMsg = `Template ${templateName} created.`;
+            showCreateTemplateModal = false;
+            templateName = "";
+            templateSubjectPart = "";
+            templateHtmlPart = "";
+            templateTextPart = "";
+            tplTokenMap = [];
+            loadTemplates();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            creatingTemplate = false;
+        }
+    }
+
+    async function deleteTemplate(name: string) {
+        if (!client) return;
+        if (!confirm(`Are you sure you want to delete template ${name}?`)) return;
+        tplLoading = true;
+        error = "";
+        actionMsg = "";
+        try {
+            await client.send(new DeleteTemplateCommand({ TemplateName: name }));
+            actionMsg = `Template ${name} deleted.`;
+            tplTokenMap = [];
+            loadTemplates();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            tplLoading = false;
+        }
+    }
 </script>
 
 <ServiceLayout {tabs} bind:activeTab>
@@ -350,7 +407,33 @@
                     tplTokenMap = [];
                     loadTemplates();
                 }}
-            />
+            >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={() => {
+                            templateName = "";
+                            templateSubjectPart = "";
+                            templateHtmlPart = "";
+                            templateTextPart = "";
+                            showCreateTemplateModal = true;
+                        }}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
+                    >
+                        Create Template
+                    </button>
+                {/snippet}
+                {#snippet actionsSnippet(item)}
+                    <div class="flex gap-2 justify-end">
+                        <button
+                            onclick={() => deleteTemplate(item.Name)}
+                            class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
+                            title="Delete Template"
+                        >
+                            Delete
+                        </button>
+                    </div>
+                {/snippet}
+            </PaginatedTable>
         {/if}
     </div>
 </ServiceLayout>
@@ -446,6 +529,67 @@
             >
                 {#if sendingEmail}<span class="animate-spin">⟳</span>{/if}
                 Send Email
+            </button>
+        </div>
+    </div>
+</Modal>
+
+<Modal bind:open={showCreateTemplateModal} title="Create Template" maxWidth="max-w-lg">
+    <div class="space-y-4">
+        <div>
+            <label for="templateName" class="block text-sm font-medium text-gray-300 mb-1">Template Name</label>
+            <input
+                id="templateName"
+                type="text"
+                bind:value={templateName}
+                placeholder="MyTemplate"
+                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+            />
+        </div>
+        <div>
+            <label for="templateSubjectPart" class="block text-sm font-medium text-gray-300 mb-1">Subject Part</label>
+            <input
+                id="templateSubjectPart"
+                type="text"
+                bind:value={templateSubjectPart}
+                placeholder="Subject of the email..."
+                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+            />
+        </div>
+        <div>
+            <label for="templateTextPart" class="block text-sm font-medium text-gray-300 mb-1">Text Part</label>
+            <textarea
+                id="templateTextPart"
+                bind:value={templateTextPart}
+                rows="3"
+                placeholder="Plain text version of the email..."
+                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 font-mono"
+            ></textarea>
+        </div>
+        <div>
+            <label for="templateHtmlPart" class="block text-sm font-medium text-gray-300 mb-1">HTML Part</label>
+            <textarea
+                id="templateHtmlPart"
+                bind:value={templateHtmlPart}
+                rows="4"
+                placeholder="<p>HTML version of the email...</p>"
+                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 font-mono"
+            ></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+            <button
+                onclick={() => showCreateTemplateModal = false}
+                class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition"
+            >
+                Cancel
+            </button>
+            <button
+                onclick={createTemplate}
+                disabled={creatingTemplate || !templateName || !templateSubjectPart}
+                class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium transition flex items-center gap-2"
+            >
+                {#if creatingTemplate}<span class="animate-spin">⟳</span>{/if}
+                Create
             </button>
         </div>
     </div>
