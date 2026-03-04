@@ -11,6 +11,7 @@
         DeleteAlarmsCommand,
         SetAlarmStateCommand,
         DeleteDashboardsCommand,
+        PutDashboardCommand,
     } from "@aws-sdk/client-cloudwatch";
     import {
         CloudWatchLogsClient,
@@ -25,6 +26,7 @@
         PutRetentionPolicyCommand,
         DeleteRetentionPolicyCommand,
         DeleteLogStreamCommand,
+        CreateLogStreamCommand,
     } from "@aws-sdk/client-cloudwatch-logs";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -352,6 +354,27 @@
     }
 
     // --- Dashboards API ---
+    async function createDashboard() {
+        if (!cwClient) return;
+        const name = prompt("Enter new Dashboard Name:");
+        if (!name) return;
+        try {
+            dashLoading = true;
+            error = "";
+            actionMsg = "";
+            await cwClient.send(new PutDashboardCommand({
+                DashboardName: name,
+                DashboardBody: JSON.stringify({ widgets: [] })
+            }));
+            actionMsg = `Dashboard "${name}" created.`;
+            dashTokenMap = [];
+            await loadDashboards();
+        } catch (e) {
+            error = String(e);
+            dashLoading = false;
+        }
+    }
+
     async function deleteDashboard(dashboardName: string) {
         if (!cwClient) return;
         if (!confirm(`Are you sure you want to delete dashboard "${dashboardName}"?`)) return;
@@ -498,6 +521,27 @@
             error = String(e);
         } finally {
             logGroupsLoading = false;
+        }
+    }
+
+    async function createLogStream(logGroupName: string) {
+        if (!logsClient) return;
+        const name = prompt("Enter new Log Stream Name:");
+        if (!name) return;
+        try {
+            logStreamsLoading = true;
+            error = "";
+            actionMsg = "";
+            await logsClient.send(new CreateLogStreamCommand({
+                logGroupName,
+                logStreamName: name
+            }));
+            actionMsg = `Log Stream "${name}" created.`;
+            logStreamsTokenMap = [];
+            await loadLogStreams(logGroupName);
+        } catch (e) {
+            error = String(e);
+            logStreamsLoading = false;
         }
     }
 
@@ -918,11 +962,6 @@
                     ]}
                 >
                     {#snippet headerActionsSnippet()}
-                        <button
-                            onclick={createLogGroup}
-                            class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded transition font-bold"
-                        >+ Create Log Group</button>
-                        <div class="h-4 border-l border-gray-700 mx-2"></div>
                         <div class="flex items-center gap-2 mr-4">
                             <input
                                 type="text"
@@ -1056,18 +1095,6 @@
                             >Search</button>
                         </div>
                     {/snippet}
-                    {#snippet actionsSnippet(item)}
-                        <button
-                            onclick={(e) => { e.stopPropagation(); setRetention(item.name); }}
-                            class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition mr-2"
-                            >Set Retention</button
-                        >
-                        <button
-                            onclick={(e) => { e.stopPropagation(); deleteLogGroup(item.name); }}
-                            class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
-                            >Delete</button
-                        >
-                    {/snippet}
                 </PaginatedTable>
             {/if}
         {:else if activeTab === "dashboards"}
@@ -1109,6 +1136,12 @@
                         },
                     ]}
                 >
+                    {#snippet headerActionsSnippet()}
+                        <button
+                            onclick={createDashboard}
+                            class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded transition font-bold"
+                        >+ Create Dashboard</button>
+                    {/snippet}
                     {#snippet actionsSnippet(item)}
                         <button
                             onclick={() => viewDashboard(item.name)}
@@ -1228,6 +1261,11 @@
                         ]}
                     >
                         {#snippet headerActionsSnippet()}
+                            <button
+                                onclick={() => createLogStream(selectedGroupForStreams)}
+                                class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded transition font-bold"
+                            >+ Create Log Stream</button>
+                            <div class="h-4 border-l border-gray-700 mx-2"></div>
                             <div class="flex items-center gap-2 mr-4">
                                 <input
                                     type="text"
@@ -1277,6 +1315,11 @@
                     ]}
                 >
                     {#snippet headerActionsSnippet()}
+                        <button
+                            onclick={createLogGroup}
+                            class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded transition font-bold"
+                        >+ Create Log Group</button>
+                        <div class="h-4 border-l border-gray-700 mx-2"></div>
                         <div class="flex items-center gap-2 mr-4">
                             <input
                                 type="text"
@@ -1290,6 +1333,18 @@
                                 class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded transition"
                             >Search</button>
                         </div>
+                    {/snippet}
+                    {#snippet actionsSnippet(item)}
+                        <button
+                            onclick={(e) => { e.stopPropagation(); setRetention(item.name); }}
+                            class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition mr-2"
+                            >Set Retention</button
+                        >
+                        <button
+                            onclick={(e) => { e.stopPropagation(); deleteLogGroup(item.name); }}
+                            class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
+                            >Delete</button
+                        >
                     {/snippet}
                 </PaginatedTable>
             {/if}
