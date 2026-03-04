@@ -52,17 +52,39 @@
         DeliveryDelay: "0",
         MaximumMessageSize: "262144",
         ReceiveMessageWaitTimeSeconds: "0",
+        SqsManagedSseEnabled: "true",
+        ContentBasedDeduplication: "false",
+        UseDeadLetterQueue: false,
+        DeadLetterTargetArn: "",
+        MaxReceiveCount: "10",
     });
 
     // --- Queue Detail View ---
     let selectedQueue = $state<any>(null);
     let queueDetailTab = $state<"messages" | "configuration">("messages");
     let queueAttributes = $state<Record<string, string>>({});
+    let configForm = $state({
+        VisibilityTimeout: "30",
+        MessageRetentionPeriod: "345600",
+        DelaySeconds: "0",
+        MaximumMessageSize: "262144",
+        ReceiveMessageWaitTimeSeconds: "0",
+        SqsManagedSseEnabled: "true",
+        ContentBasedDeduplication: "false",
+        UseDeadLetterQueue: false,
+        DeadLetterTargetArn: "",
+        MaxReceiveCount: "10"
+    });
     let attributesLoading = $state(false);
     let messages = $state<any[]>([]);
     let msgLoading = $state(false);
     let sendBody = $state("");
     let sendLoading = $state(false);
+
+    let pollSettings = $state({
+        MaxNumberOfMessages: 10,
+        WaitTimeSeconds: 3,
+    });
 
     let sendDelaySeconds = $state("");
     let sendGroupId = $state("");
@@ -171,6 +193,32 @@
                 }),
             );
             queueAttributes = attrs.Attributes ?? {};
+
+            configForm = {
+                VisibilityTimeout: queueAttributes.VisibilityTimeout ?? "30",
+                MessageRetentionPeriod: queueAttributes.MessageRetentionPeriod ?? "345600",
+                DelaySeconds: queueAttributes.DelaySeconds ?? "0",
+                MaximumMessageSize: queueAttributes.MaximumMessageSize ?? "262144",
+                ReceiveMessageWaitTimeSeconds: queueAttributes.ReceiveMessageWaitTimeSeconds ?? "0",
+                SqsManagedSseEnabled: queueAttributes.SqsManagedSseEnabled ?? "true",
+                ContentBasedDeduplication: queueAttributes.ContentBasedDeduplication ?? "false",
+                UseDeadLetterQueue: false,
+                DeadLetterTargetArn: "",
+                MaxReceiveCount: "10",
+            };
+
+            if (queueAttributes.RedrivePolicy) {
+                try {
+                    const rp = JSON.parse(queueAttributes.RedrivePolicy);
+                    if (rp.deadLetterTargetArn) {
+                        configForm.UseDeadLetterQueue = true;
+                        configForm.DeadLetterTargetArn = rp.deadLetterTargetArn;
+                        configForm.MaxReceiveCount = String(rp.maxReceiveCount ?? "10");
+                    }
+                } catch {
+                    // skip parsing errors
+                }
+            }
         } catch (e) {
             error = String(e);
         } finally {
@@ -187,16 +235,26 @@
 
             // Only update the ones we care about changing
             const attributesToUpdate: Record<string, string> = {
-                VisibilityTimeout: String(queueAttributes.VisibilityTimeout),
-                DelaySeconds: String(queueAttributes.DelaySeconds),
-                ReceiveMessageWaitTimeSeconds: String(
-                    queueAttributes.ReceiveMessageWaitTimeSeconds,
-                ),
-                MessageRetentionPeriod: String(
-                    queueAttributes.MessageRetentionPeriod,
-                ),
-                MaximumMessageSize: String(queueAttributes.MaximumMessageSize),
+                VisibilityTimeout: String(configForm.VisibilityTimeout),
+                DelaySeconds: String(configForm.DelaySeconds),
+                ReceiveMessageWaitTimeSeconds: String(configForm.ReceiveMessageWaitTimeSeconds),
+                MessageRetentionPeriod: String(configForm.MessageRetentionPeriod),
+                MaximumMessageSize: String(configForm.MaximumMessageSize),
+                SqsManagedSseEnabled: String(configForm.SqsManagedSseEnabled),
             };
+
+            if (selectedQueue.name.endsWith('.fifo')) {
+                attributesToUpdate.ContentBasedDeduplication = String(configForm.ContentBasedDeduplication);
+            }
+
+            if (configForm.UseDeadLetterQueue && configForm.DeadLetterTargetArn) {
+                attributesToUpdate.RedrivePolicy = JSON.stringify({
+                    deadLetterTargetArn: configForm.DeadLetterTargetArn,
+                    maxReceiveCount: Number(configForm.MaxReceiveCount),
+                });
+            } else {
+                attributesToUpdate.RedrivePolicy = ""; // Remove DLQ
+            }
 
             await client.send(
                 new SetQueueAttributesCommand({
@@ -265,6 +323,16 @@
 
             if (createParams.Type === "FIFO") {
                 attributes.FifoQueue = "true";
+                attributes.ContentBasedDeduplication = createParams.ContentBasedDeduplication;
+            }
+
+            attributes.SqsManagedSseEnabled = createParams.SqsManagedSseEnabled;
+
+            if (createParams.UseDeadLetterQueue && createParams.DeadLetterTargetArn) {
+                attributes.RedrivePolicy = JSON.stringify({
+                    deadLetterTargetArn: createParams.DeadLetterTargetArn,
+                    maxReceiveCount: Number(createParams.MaxReceiveCount),
+                });
             }
 
             await client.send(
@@ -295,8 +363,8 @@
             const resp = await client.send(
                 new ReceiveMessageCommand({
                     QueueUrl: selectedQueue.url,
-                    MaxNumberOfMessages: 10,
-                    WaitTimeSeconds: 3,
+                    MaxNumberOfMessages: pollSettings.MaxNumberOfMessages,
+                    WaitTimeSeconds: pollSettings.WaitTimeSeconds,
                     MessageAttributeNames: ["All"],
                     AttributeNames: ["All"],
                 }),
@@ -471,130 +539,112 @@
                     </h2>
                 </div>
 
-                <div
-                    class="bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-5"
-                >
-                    <div>
-                        <label
-                            for="cq-name"
-                            class="block text-sm font-medium text-gray-300 mb-1"
-                            >Queue Name</label
-                        >
-                        <input
-                            id="cq-name"
-                            type="text"
-                            bind:value={createParams.QueueName}
-                            placeholder="MyQueue"
-                            class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                        />
-                        <p class="text-xs text-gray-500 mt-1">
-                            FIFO queues will automatically have '.fifo' appended
-                            if not provided.
-                        </p>
-                    </div>
+                <div class="space-y-6">
+                    <!-- Details -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                        <h3 class="text-lg font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">Details</h3>
+                        <div class="space-y-5">
+                            <div>
+                                <label for="cq-type" class="block text-sm font-medium text-gray-300 mb-1">Type</label>
+                                <select id="cq-type" bind:value={createParams.Type} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500">
+                                    <option value="Standard">Standard (at-least-once delivery, best-effort ordering)</option>
+                                    <option value="FIFO">FIFO (first-in-first-out delivery, exact-once processing)</option>
+                                </select>
+                            </div>
 
-                    <div>
-                        <label
-                            for="cq-type"
-                            class="block text-sm font-medium text-gray-300 mb-1"
-                            >Type</label
-                        >
-                        <select
-                            id="cq-type"
-                            bind:value={createParams.Type}
-                            class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                        >
-                            <option value="Standard"
-                                >Standard (at-least-once delivery, best-effort
-                                ordering)</option
-                            >
-                            <option value="FIFO"
-                                >FIFO (first-in-first-out delivery, exact-once
-                                processing)</option
-                            >
-                        </select>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label
-                                for="cq-vis"
-                                class="block text-sm font-medium text-gray-300 mb-1"
-                                >Visibility Timeout (seconds)</label
-                            >
-                            <input
-                                id="cq-vis"
-                                type="number"
-                                bind:value={createParams.VisibilityTimeout}
-                                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                            />
-                        </div>
-                        <div>
-                            <label
-                                for="cq-ret"
-                                class="block text-sm font-medium text-gray-300 mb-1"
-                                >Message Retention Period (seconds)</label
-                            >
-                            <input
-                                id="cq-ret"
-                                type="number"
-                                bind:value={createParams.MessageRetentionPeriod}
-                                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                            />
-                        </div>
-                        <div>
-                            <label
-                                for="cq-del"
-                                class="block text-sm font-medium text-gray-300 mb-1"
-                                >Delivery Delay (seconds)</label
-                            >
-                            <input
-                                id="cq-del"
-                                type="number"
-                                bind:value={createParams.DeliveryDelay}
-                                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                            />
-                        </div>
-                        <div>
-                            <label
-                                for="cq-max"
-                                class="block text-sm font-medium text-gray-300 mb-1"
-                                >Maximum Message Size (bytes)</label
-                            >
-                            <input
-                                id="cq-max"
-                                type="number"
-                                bind:value={createParams.MaximumMessageSize}
-                                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                            />
-                        </div>
-                        <div class="md:col-span-2">
-                            <label
-                                for="cq-wait"
-                                class="block text-sm font-medium text-gray-300 mb-1"
-                                >Receive Message Wait Time (seconds)</label
-                            >
-                            <input
-                                id="cq-wait"
-                                type="number"
-                                bind:value={
-                                    createParams.ReceiveMessageWaitTimeSeconds
-                                }
-                                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                            />
+                            <div>
+                                <label for="cq-name" class="block text-sm font-medium text-gray-300 mb-1">Queue Name</label>
+                                <input id="cq-name" type="text" bind:value={createParams.QueueName} placeholder="MyQueue" class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                <p class="text-xs text-gray-500 mt-1">FIFO queues will automatically have '.fifo' appended if not provided.</p>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="pt-4 flex justify-end">
+                    <!-- Configuration -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                        <h3 class="text-lg font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">Configuration</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="cq-vis" class="block text-sm font-medium text-gray-300 mb-1">Visibility Timeout (seconds)</label>
+                                <input id="cq-vis" type="number" bind:value={createParams.VisibilityTimeout} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                            </div>
+                            <div>
+                                <label for="cq-ret" class="block text-sm font-medium text-gray-300 mb-1">Message Retention Period (seconds)</label>
+                                <input id="cq-ret" type="number" bind:value={createParams.MessageRetentionPeriod} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                            </div>
+                            <div>
+                                <label for="cq-del" class="block text-sm font-medium text-gray-300 mb-1">Delivery Delay (seconds)</label>
+                                <input id="cq-del" type="number" bind:value={createParams.DeliveryDelay} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                            </div>
+                            <div>
+                                <label for="cq-max" class="block text-sm font-medium text-gray-300 mb-1">Maximum Message Size (bytes)</label>
+                                <input id="cq-max" type="number" bind:value={createParams.MaximumMessageSize} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                            </div>
+                            <div class="md:col-span-2">
+                                <label for="cq-wait" class="block text-sm font-medium text-gray-300 mb-1">Receive Message Wait Time (seconds)</label>
+                                <input id="cq-wait" type="number" bind:value={createParams.ReceiveMessageWaitTimeSeconds} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {#if createParams.Type === 'FIFO'}
+                    <!-- FIFO Settings -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                        <h3 class="text-lg font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">FIFO Settings</h3>
+                        <div>
+                            <label for="cq-dedup" class="block text-sm font-medium text-gray-300 mb-1">Content-Based Deduplication</label>
+                            <select id="cq-dedup" bind:value={createParams.ContentBasedDeduplication} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500">
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">If enabled, Amazon SQS uses a SHA-256 hash to generate the message deduplication ID using the body of the message.</p>
+                        </div>
+                    </div>
+                    {/if}
+
+                    <!-- Encryption -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                        <h3 class="text-lg font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">Encryption</h3>
+                        <div>
+                            <label for="cq-sse" class="block text-sm font-medium text-gray-300 mb-1">Server-Side Encryption (SQS managed key)</label>
+                            <select id="cq-sse" bind:value={createParams.SqsManagedSseEnabled} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500">
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Dead-letter queue -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                        <h3 class="text-lg font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">Dead-letter queue</h3>
+                        <div class="space-y-4">
+                            <label for="cq-dlq" class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                                <input id="cq-dlq" type="checkbox" bind:checked={createParams.UseDeadLetterQueue} class="rounded bg-black border-gray-700 text-blue-500 focus:ring-blue-500" />
+                                Enabled
+                            </label>
+                            {#if createParams.UseDeadLetterQueue}
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6 border-l-2 border-gray-800">
+                                <div>
+                                    <label for="cq-dlq-arn" class="block text-sm font-medium text-gray-300 mb-1">Dead-letter queue ARN</label>
+                                    <input id="cq-dlq-arn" type="text" bind:value={createParams.DeadLetterTargetArn} placeholder="arn:aws:sqs:..." class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                </div>
+                                <div>
+                                    <label for="cq-dlq-max" class="block text-sm font-medium text-gray-300 mb-1">Maximum receives</label>
+                                    <input id="cq-dlq-max" type="number" bind:value={createParams.MaxReceiveCount} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" min="1" max="1000" />
+                                </div>
+                            </div>
+                            {/if}
+                        </div>
+                    </div>
+
+                    <!-- Action -->
+                    <div class="pt-2 flex justify-end">
                         <button
                             onclick={createQueue}
-                            disabled={createLoading ||
-                                !createParams.QueueName.trim()}
+                            disabled={createLoading || !createParams.QueueName.trim()}
                             class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-6 py-2 rounded text-sm font-bold transition flex items-center gap-2"
                         >
-                            {#if createLoading}<span class="animate-spin"
-                                    >⟳</span
-                                >{/if}
+                            {#if createLoading}<span class="animate-spin">⟳</span>{/if}
                             Create Queue
                         </button>
                     </div>
@@ -747,6 +797,23 @@
                         {/if}
                     </div>
 
+                    <!-- Poll Settings -->
+                    <div class="mb-4 shrink-0 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm flex flex-col gap-2">
+                        <div class="flex justify-between items-center mb-1">
+                            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Poll Settings</h3>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="poll-max" class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Max Messages (1-10)</label>
+                                <input id="poll-max" type="number" min="1" max="10" bind:value={pollSettings.MaxNumberOfMessages} class="w-full bg-black border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500" />
+                            </div>
+                            <div>
+                                <label for="poll-wait" class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Wait Time Seconds (0-20)</label>
+                                <input id="poll-wait" type="number" min="0" max="20" bind:value={pollSettings.WaitTimeSeconds} class="w-full bg-black border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500" />
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Messages Table -->
                     <div
                         class="flex-1 min-h-0 bg-gray-900 rounded-lg border border-gray-800 flex flex-col shadow-sm overflow-hidden"
@@ -856,88 +923,81 @@
                                 Loading Configuration...
                             </div>
                         {:else}
-                            <h3
-                                class="text-sm font-bold text-gray-200 mb-6 border-b border-gray-800 pb-2"
-                            >
-                                Queue Configuration
-                            </h3>
-                            <div
-                                class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl"
-                            >
-                                <div>
-                                    <label
-                                        for="conf-vis"
-                                        class="block text-xs font-medium text-gray-400 mb-1"
-                                        >Visibility Timeout (seconds)</label
-                                    >
-                                    <input
-                                        id="conf-vis"
-                                        type="number"
-                                        bind:value={
-                                            queueAttributes.VisibilityTimeout
-                                        }
-                                        class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                                    />
+                            <div class="space-y-6">
+                                <!-- Configuration -->
+                                <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                                    <h3 class="text-sm font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">Configuration</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+                                        <div>
+                                            <label for="conf-vis" class="block text-xs font-medium text-gray-400 mb-1">Visibility Timeout (seconds)</label>
+                                            <input id="conf-vis" type="number" bind:value={configForm.VisibilityTimeout} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                        </div>
+                                        <div>
+                                            <label for="conf-ret" class="block text-xs font-medium text-gray-400 mb-1">Message Retention Period (seconds)</label>
+                                            <input id="conf-ret" type="number" bind:value={configForm.MessageRetentionPeriod} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                        </div>
+                                        <div>
+                                            <label for="conf-del" class="block text-xs font-medium text-gray-400 mb-1">Delivery Delay (seconds)</label>
+                                            <input id="conf-del" type="number" bind:value={configForm.DelaySeconds} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                        </div>
+                                        <div>
+                                            <label for="conf-max" class="block text-xs font-medium text-gray-400 mb-1">Maximum Message Size (bytes)</label>
+                                            <input id="conf-max" type="number" bind:value={configForm.MaximumMessageSize} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <label for="conf-wait" class="block text-xs font-medium text-gray-400 mb-1">Receive Message Wait Time (seconds)</label>
+                                            <input id="conf-wait" type="number" bind:value={configForm.ReceiveMessageWaitTimeSeconds} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label
-                                        for="conf-ret"
-                                        class="block text-xs font-medium text-gray-400 mb-1"
-                                        >Message Retention Period (seconds)</label
-                                    >
-                                    <input
-                                        id="conf-ret"
-                                        type="number"
-                                        bind:value={
-                                            queueAttributes.MessageRetentionPeriod
-                                        }
-                                        class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                                    />
+
+                                {#if selectedQueue.name.endsWith('.fifo')}
+                                <!-- FIFO Settings -->
+                                <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                                    <h3 class="text-sm font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">FIFO Settings</h3>
+                                    <div class="max-w-3xl">
+                                        <label for="conf-dedup" class="block text-xs font-medium text-gray-400 mb-1">Content-Based Deduplication</label>
+                                        <select id="conf-dedup" bind:value={configForm.ContentBasedDeduplication} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500">
+                                            <option value="true">Enabled</option>
+                                            <option value="false">Disabled</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label
-                                        for="conf-del"
-                                        class="block text-xs font-medium text-gray-400 mb-1"
-                                        >Delivery Delay (seconds)</label
-                                    >
-                                    <input
-                                        id="conf-del"
-                                        type="number"
-                                        bind:value={
-                                            queueAttributes.DelaySeconds
-                                        }
-                                        class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                                    />
+                                {/if}
+
+                                <!-- Encryption -->
+                                <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                                    <h3 class="text-sm font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">Encryption</h3>
+                                    <div class="max-w-3xl">
+                                        <label for="conf-sse" class="block text-xs font-medium text-gray-400 mb-1">Server-Side Encryption (SQS managed key)</label>
+                                        <select id="conf-sse" bind:value={configForm.SqsManagedSseEnabled} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500">
+                                            <option value="true">Enabled</option>
+                                            <option value="false">Disabled</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label
-                                        for="conf-max"
-                                        class="block text-xs font-medium text-gray-400 mb-1"
-                                        >Maximum Message Size (bytes)</label
-                                    >
-                                    <input
-                                        id="conf-max"
-                                        type="number"
-                                        bind:value={
-                                            queueAttributes.MaximumMessageSize
-                                        }
-                                        class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                                    />
-                                </div>
-                                <div class="md:col-span-2">
-                                    <label
-                                        for="conf-wait"
-                                        class="block text-xs font-medium text-gray-400 mb-1"
-                                        >Receive Message Wait Time (seconds)</label
-                                    >
-                                    <input
-                                        id="conf-wait"
-                                        type="number"
-                                        bind:value={
-                                            queueAttributes.ReceiveMessageWaitTimeSeconds
-                                        }
-                                        class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
-                                    />
+
+                                <!-- Dead-letter queue -->
+                                <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                                    <h3 class="text-sm font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">Dead-letter queue</h3>
+                                    <div class="space-y-4 max-w-3xl">
+                                        <label for="conf-dlq" class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+                                            <input id="conf-dlq" type="checkbox" bind:checked={configForm.UseDeadLetterQueue} class="rounded bg-black border-gray-700 text-blue-500 focus:ring-blue-500" />
+                                            Enabled
+                                        </label>
+                                        {#if configForm.UseDeadLetterQueue}
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6 border-l-2 border-gray-800">
+                                            <div>
+                                                <label for="conf-dlq-arn" class="block text-xs font-medium text-gray-400 mb-1">Dead-letter queue ARN</label>
+                                                <input id="conf-dlq-arn" type="text" bind:value={configForm.DeadLetterTargetArn} placeholder="arn:aws:sqs:..." class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+                                            </div>
+                                            <div>
+                                                <label for="conf-dlq-max" class="block text-xs font-medium text-gray-400 mb-1">Maximum receives</label>
+                                                <input id="conf-dlq-max" type="number" bind:value={configForm.MaxReceiveCount} class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" min="1" max="1000" />
+                                            </div>
+                                        </div>
+                                        {/if}
+                                    </div>
                                 </div>
                             </div>
 
@@ -1011,7 +1071,7 @@
                 onRefresh={() => loadQueues()}
                 columns={queueColumns}
             >
-                {#snippet children(queue: any)}
+                {#snippet headerActionsSnippet()}
                     <button
                         onclick={() => {
                             showCreate = true;
