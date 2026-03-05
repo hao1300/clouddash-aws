@@ -25,6 +25,13 @@
         CreateVolumeCommand,
         CreateSnapshotCommand,
         DescribeAvailabilityZonesCommand,
+        DescribeNetworkInterfacesCommand,
+        DescribePlacementGroupsCommand,
+        CreatePlacementGroupCommand,
+        DeletePlacementGroupCommand,
+        DescribeSubnetsCommand,
+        RunInstancesCommand,
+        CreateTagsCommand,
     } from "@aws-sdk/client-ec2";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -71,7 +78,30 @@
     let snapshotTokenMap = $state<string[]>([]);
     let snapshotCurrentToken = $state<string | undefined>(undefined);
 
+    let networkInterfaces = $state<any[]>([]);
+    let enisLoading = $state(false);
+    let enisLoaded = $state(false);
+    let eniTokenMap = $state<string[]>([]);
+    let eniCurrentToken = $state<string | undefined>(undefined);
+
+    let placementGroups = $state<any[]>([]);
+    let pgLoading = $state(false);
+    let pgLoaded = $state(false);
+
+    // --- Edit State ---
+    let editInstanceNameMode = $state(false);
+    let newInstanceName = $state("");
+
     // --- Create State ---
+    let launchModalOpen = $state(false);
+    let launchName = $state("");
+    let launchAmi = $state("");
+    let launchType = $state("t2.micro");
+    let launchKey = $state("");
+    let launchSubnet = $state("");
+    let launchSg = $state("");
+    let availableSubnets = $state<any[]>([]);
+
     let createSgModalOpen = $state(false);
     let createSgName = $state("");
     let createSgDesc = $state("");
@@ -97,9 +127,11 @@
         { id: "amis", label: "AMIs" },
         { id: "volumes", label: "Volumes" },
         { id: "snapshots", label: "Snapshots" },
+        { id: "network-interfaces", label: "Network Interfaces" },
         { id: "security-groups", label: "Security Groups" },
         { id: "key-pairs", label: "Key Pairs" },
-        { id: "elastic-ips", label: "Elastic IPs" }
+        { id: "elastic-ips", label: "Elastic IPs" },
+        { id: "placement-groups", label: "Placement Groups" }
     ];
     let activeTab = $state("instances");
     let selectedInstance = $state<any>(null);
@@ -110,9 +142,11 @@
         else if (activeTab === "amis" && !amisLoaded) loadAmis();
         else if (activeTab === "volumes" && !volumesLoaded) loadVolumes();
         else if (activeTab === "snapshots" && !snapshotsLoaded) loadSnapshots();
+        else if (activeTab === "network-interfaces" && !enisLoaded) loadNetworkInterfaces();
         else if (activeTab === "security-groups" && !sgLoaded) loadSecurityGroups();
         else if (activeTab === "key-pairs" && !kpLoaded) loadKeyPairs();
         else if (activeTab === "elastic-ips" && !eipLoaded) loadElasticIps();
+        else if (activeTab === "placement-groups" && !pgLoaded) loadPlacementGroups();
     });
 
     // --- Pagination Shared Helpers ---
@@ -263,6 +297,66 @@
         }
     }
 
+    async function loadNetworkInterfaces(token?: string) {
+        if (!client) return;
+        try {
+            enisLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await client.send(
+                new DescribeNetworkInterfacesCommand({
+                    MaxResults: 50,
+                    NextToken: token,
+                }),
+            );
+            networkInterfaces = (resp.NetworkInterfaces ?? []).map((eni) => {
+                const nameTag = eni.TagSet?.find((t) => t.Key === "Name");
+                return {
+                    id: eni.NetworkInterfaceId ?? "Unknown",
+                    name: nameTag?.Value ?? "-",
+                    subnet_id: eni.SubnetId ?? "-",
+                    vpc_id: eni.VpcId ?? "-",
+                    private_ip: eni.PrivateIpAddress ?? "-",
+                    status: eni.Status ?? "Unknown",
+                    attachment_id: eni.Attachment?.AttachmentId ?? "-",
+                    instance_id: eni.Attachment?.InstanceId ?? "-",
+                };
+            });
+            pushToken(eniTokenMap, resp.NextToken);
+            eniCurrentToken = resp.NextToken;
+        } catch (e) {
+            error = String(e);
+        } finally {
+            enisLoading = false;
+            enisLoaded = true;
+        }
+    }
+
+    async function loadPlacementGroups() {
+        if (!client) return;
+        try {
+            pgLoading = true;
+            error = "";
+            actionMsg = "";
+            const resp = await client.send(
+                new DescribePlacementGroupsCommand({}),
+            );
+            placementGroups = (resp.PlacementGroups ?? []).map((pg) => {
+                return {
+                    name: pg.GroupName ?? "Unknown",
+                    strategy: pg.Strategy ?? "-",
+                    state: pg.State ?? "-",
+                    partition_count: pg.PartitionCount ?? "-",
+                };
+            });
+        } catch (e) {
+            error = String(e);
+        } finally {
+            pgLoading = false;
+            pgLoaded = true;
+        }
+    }
+
     async function loadSnapshots(token?: string) {
         if (!client) return;
         try {
@@ -370,6 +464,16 @@
         }
     }
 
+    async function loadSubnets() {
+        if (!client || availableSubnets.length > 0) return;
+        try {
+            const resp = await client.send(new DescribeSubnetsCommand({}));
+            availableSubnets = resp.Subnets ?? [];
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
     async function loadElasticIps() {
         if (!client) return;
         try {
@@ -442,6 +546,88 @@
         }
     }
 
+    async function updateInstanceName() {
+        if (!client || !selectedInstance) return;
+        try {
+            error = "";
+            actionMsg = "";
+            await client.send(new CreateTagsCommand({
+                Resources: [selectedInstance.id],
+                Tags: [{ Key: "Name", Value: newInstanceName }]
+            }));
+            actionMsg = `Instance name updated to ${newInstanceName}.`;
+            selectedInstance.name = newInstanceName;
+            editInstanceNameMode = false;
+            // Update in items list as well
+            const idx = items.findIndex(i => i.id === selectedInstance.id);
+            if (idx >= 0) {
+                items[idx].name = newInstanceName;
+            }
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    async function submitLaunchInstance() {
+        if (!client) return;
+        try {
+            error = "";
+            actionMsg = "";
+            const params: any = {
+                ImageId: launchAmi,
+                InstanceType: launchType,
+                MinCount: 1,
+                MaxCount: 1,
+            };
+
+            if (launchKey) params.KeyName = launchKey;
+            if (launchSubnet) params.SubnetId = launchSubnet;
+            if (launchSg) params.SecurityGroupIds = [launchSg];
+
+            if (launchName) {
+                params.TagSpecifications = [{
+                    ResourceType: "instance",
+                    Tags: [{ Key: "Name", Value: launchName }]
+                }];
+            }
+
+            const res = await client.send(new RunInstancesCommand(params));
+            const instanceId = res.Instances?.[0]?.InstanceId ?? "Unknown";
+            actionMsg = `Instance ${instanceId} launched successfully.`;
+            launchModalOpen = false;
+
+            // Reset form
+            launchName = "";
+            launchAmi = "";
+            launchType = "t2.micro";
+            launchKey = "";
+            launchSubnet = "";
+            launchSg = "";
+
+            setTimeout(() => load(), 2000);
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    async function submitCreatePg() {
+        if (!client) return;
+        const name = prompt("Enter Placement Group Name:");
+        if (!name) return;
+        try {
+            error = "";
+            actionMsg = "";
+            await client.send(new CreatePlacementGroupCommand({
+                GroupName: name,
+                Strategy: "cluster" // Defaulting to cluster for simplicity, could add select
+            }));
+            actionMsg = `Placement Group ${name} created successfully.`;
+            setTimeout(() => loadPlacementGroups(), 1000);
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
     async function deleteAction(type: string, id: string, name?: string) {
         if (!client) return;
         const displayName = name && name !== "-" ? `${name} (${id})` : id;
@@ -468,6 +654,9 @@
             } else if (type === "AMI") {
                 await client.send(new DeregisterImageCommand({ ImageId: id }));
                 setTimeout(() => loadAmis(amiCurrentToken), 1000);
+            } else if (type === "Placement Group") {
+                await client.send(new DeletePlacementGroupCommand({ GroupName: id }));
+                setTimeout(() => loadPlacementGroups(), 1000);
             }
             actionMsg = `${type} ${id} deleted successfully.`;
         } catch (e) {
@@ -627,6 +816,35 @@
         { key: "created", label: "Creation Date" },
     ];
 
+    const eniColumns = [
+        { key: "name", label: "Name" },
+        { key: "id", label: "Network interface ID" },
+        { key: "subnet_id", label: "Subnet ID" },
+        { key: "vpc_id", label: "VPC ID" },
+        { key: "private_ip", label: "Private IPv4 address" },
+        { key: "status", label: "Status",
+            format: (v: string) => {
+                if (v === "in-use") return "🟢 in-use";
+                if (v === "available") return "🔵 available";
+                return `🟡 ${v}`;
+            }
+        },
+        { key: "instance_id", label: "Instance ID" },
+    ];
+
+    const pgColumns = [
+        { key: "name", label: "Name" },
+        { key: "strategy", label: "Strategy" },
+        { key: "partition_count", label: "Partition Count" },
+        { key: "state", label: "State",
+            format: (v: string) => {
+                if (v === "available") return "🟢 available";
+                if (v === "pending") return "🟡 pending";
+                return `🔴 ${v}`;
+            }
+        },
+    ];
+
     const eipColumns = [
         { key: "name", label: "Name" },
         { key: "public_ip", label: "Allocated IPv4 address" },
@@ -696,13 +914,24 @@
                         class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
                         >← Back to Instances</button
                     >
-                    <span
-                        class="text-sm font-bold text-gray-200 truncate flex-1"
-                        >{selectedInstance.name || "Unnamed"}
-                        <span class="text-gray-500 font-normal ml-2"
-                            >{selectedInstance.id}</span
-                        ></span
-                    >
+                    <div class="flex-1 flex items-center gap-2">
+                        {#if editInstanceNameMode}
+                            <input
+                                type="text"
+                                bind:value={newInstanceName}
+                                class="bg-gray-950 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 outline-none focus:border-blue-500"
+                                onkeydown={(e) => { if (e.key === 'Enter') updateInstanceName(); if (e.key === 'Escape') editInstanceNameMode = false; }}
+                            />
+                            <button onclick={updateInstanceName} class="text-xs text-green-400 hover:text-green-300">Save</button>
+                            <button onclick={() => editInstanceNameMode = false} class="text-xs text-gray-400 hover:text-gray-300">Cancel</button>
+                        {:else}
+                            <span class="text-sm font-bold text-gray-200 truncate">
+                                {selectedInstance.name || "Unnamed"}
+                                <button onclick={() => { newInstanceName = selectedInstance.name; editInstanceNameMode = true; }} class="ml-2 text-xs text-blue-400 hover:text-blue-300">✎ Edit</button>
+                            </span>
+                        {/if}
+                        <span class="text-gray-500 font-normal ml-2">{selectedInstance.id}</span>
+                    </div>
                 </div>
 
                 <div
@@ -828,6 +1057,19 @@
                 }}
                 {columns}
             >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={async () => {
+                            if (keyPairs.length === 0) loadKeyPairs();
+                            if (securityGroups.length === 0) loadSecurityGroups();
+                            loadSubnets();
+                            launchModalOpen = true;
+                        }}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
+                    >
+                        Launch Instance
+                    </button>
+                {/snippet}
                 {#snippet actionsSnippet(item)}
                     <div class="flex gap-1 justify-end">
                         {#if item.state === "stopped"}
@@ -959,6 +1201,21 @@
                     >
                 {/snippet}
             </PaginatedTable>
+        {:else if activeTab === "network-interfaces"}
+            <PaginatedTable
+                items={networkInterfaces}
+                loading={enisLoading}
+                hasNext={!!eniCurrentToken}
+                hasPrev={eniTokenMap.length > 0}
+                onNext={() => loadNetworkInterfaces(eniCurrentToken)}
+                onPrev={() => loadNetworkInterfaces(popToken(eniTokenMap))}
+                onRefresh={() => {
+                    eniTokenMap = [];
+                    enisLoaded = false;
+                    loadNetworkInterfaces();
+                }}
+                columns={eniColumns}
+            />
         {:else if activeTab === "security-groups"}
             <PaginatedTable
                 items={securityGroups}
@@ -1046,11 +1303,86 @@
                     >
                 {/snippet}
             </PaginatedTable>
+        {:else if activeTab === "placement-groups"}
+            <PaginatedTable
+                items={placementGroups}
+                loading={pgLoading}
+                hasNext={false}
+                hasPrev={false}
+                onRefresh={() => {
+                    pgLoaded = false;
+                    loadPlacementGroups();
+                }}
+                columns={pgColumns}
+            >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={submitCreatePg}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
+                    >
+                        Create Placement Group
+                    </button>
+                {/snippet}
+                {#snippet actionsSnippet(item)}
+                    <button
+                        onclick={() => deleteAction("Placement Group", item.name, item.name)}
+                        class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
+                        >Delete</button
+                    >
+                {/snippet}
+            </PaginatedTable>
         {/if}
     </div>
 </ServiceLayout>
 
 <!-- Modals -->
+<Modal bind:open={launchModalOpen} title="Launch Instance" maxWidth="max-w-2xl">
+    <div class="flex flex-col gap-4">
+        <div>
+            <label for="launchName" class="block text-xs text-gray-400 mb-1">Name</label>
+            <input id="launchName" type="text" bind:value={launchName} placeholder="e.g. WebServer-1" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+        </div>
+        <div>
+            <label for="launchAmi" class="block text-xs text-gray-400 mb-1">AMI ID <span class="text-red-500">*</span></label>
+            <input id="launchAmi" type="text" bind:value={launchAmi} placeholder="e.g. ami-0c55b159cbfafe1f0 (Amazon Linux 2)" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+        </div>
+        <div>
+            <label for="launchType" class="block text-xs text-gray-400 mb-1">Instance Type <span class="text-red-500">*</span></label>
+            <input id="launchType" type="text" bind:value={launchType} placeholder="e.g. t2.micro" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" />
+        </div>
+        <div>
+            <label for="launchKey" class="block text-xs text-gray-400 mb-1">Key Pair (Login)</label>
+            <select id="launchKey" bind:value={launchKey} class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500">
+                <option value="">Proceed without a key pair (Not recommended)</option>
+                {#each keyPairs as kp}
+                    <option value={kp.name}>{kp.name}</option>
+                {/each}
+            </select>
+        </div>
+        <div>
+            <label for="launchSubnet" class="block text-xs text-gray-400 mb-1">Subnet (Optional)</label>
+            <select id="launchSubnet" bind:value={launchSubnet} class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500">
+                <option value="">No preference (default subnet in any AZ)</option>
+                {#each availableSubnets as subnet}
+                    <option value={subnet.SubnetId}>{subnet.SubnetId} ({subnet.AvailabilityZone}) - {subnet.CidrBlock}</option>
+                {/each}
+            </select>
+        </div>
+        <div>
+            <label for="launchSg" class="block text-xs text-gray-400 mb-1">Security Group (Optional)</label>
+            <select id="launchSg" bind:value={launchSg} class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500">
+                <option value="">Create new security group</option>
+                {#each securityGroups as sg}
+                    <option value={sg.id}>{sg.name} ({sg.id})</option>
+                {/each}
+            </select>
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+            <button onclick={() => launchModalOpen = false} class="px-4 py-2 text-sm text-gray-400 hover:text-gray-200">Cancel</button>
+            <button onclick={submitLaunchInstance} disabled={!launchAmi || !launchType} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm transition font-medium">Launch instance</button>
+        </div>
+    </div>
+</Modal>
 <Modal bind:open={createSgModalOpen} title="Create Security Group">
     <div class="flex flex-col gap-4">
         <div>
