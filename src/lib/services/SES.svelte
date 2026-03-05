@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { SESClient, ListIdentitiesCommand, GetIdentityVerificationAttributesCommand, ListConfigurationSetsCommand, ListTemplatesCommand, VerifyEmailIdentityCommand, VerifyDomainIdentityCommand, DeleteIdentityCommand, SendEmailCommand, CreateTemplateCommand, DeleteTemplateCommand } from "@aws-sdk/client-ses";
+    import { SESClient, ListIdentitiesCommand, GetIdentityVerificationAttributesCommand, ListConfigurationSetsCommand, ListTemplatesCommand, VerifyEmailIdentityCommand, VerifyDomainIdentityCommand, DeleteIdentityCommand, SendEmailCommand, CreateTemplateCommand, DeleteTemplateCommand, CreateConfigurationSetCommand, DeleteConfigurationSetCommand } from "@aws-sdk/client-ses";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
@@ -63,6 +63,12 @@
     let confLoading = $state(false);
     let confTokenMap = $state<string[]>([]);
     let confCurrentToken = $state<string | undefined>(undefined);
+
+    // --- Create Configuration Set Modal ---
+    let showCreateConfModal = $state(false);
+    let confName = $state("");
+    let creatingConf = $state(false);
+
 
     // --- Templates ---
     let templates = $state<{ Name: string; CreatedTimestamp?: string }[]>([]);
@@ -195,6 +201,48 @@
         } finally {
             loading = false;
             hasLoadedIdentities = true;
+        }
+    }
+
+
+    async function createConfigurationSet() {
+        if (!client || !confName) return;
+        creatingConf = true;
+        error = "";
+        actionMsg = "";
+        try {
+            await client.send(
+                new CreateConfigurationSetCommand({
+                    ConfigurationSet: { Name: confName }
+                })
+            );
+            actionMsg = `Configuration Set ${confName} created.`;
+            showCreateConfModal = false;
+            confName = "";
+            confTokenMap = [];
+            loadConfigurationSets();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            creatingConf = false;
+        }
+    }
+
+    async function deleteConfigurationSet(name: string) {
+        if (!client) return;
+        if (!confirm(`Are you sure you want to delete configuration set ${name}?`)) return;
+        confLoading = true;
+        error = "";
+        actionMsg = "";
+        try {
+            await client.send(new DeleteConfigurationSetCommand({ ConfigurationSetName: name }));
+            actionMsg = `Configuration Set ${name} deleted.`;
+            confTokenMap = [];
+            loadConfigurationSets();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            confLoading = false;
         }
     }
 
@@ -366,7 +414,7 @@
                 {/snippet}
             </PaginatedTable>
         {:else if activeTab === "configuration-sets"}
-            <PaginatedTable
+                        <PaginatedTable
                 items={configurationSets}
                 loading={confLoading}
                 columns={[
@@ -385,7 +433,30 @@
                     confTokenMap = [];
                     loadConfigurationSets();
                 }}
-            />
+            >
+                {#snippet headerActionsSnippet()}
+                    <button
+                        onclick={() => {
+                            confName = "";
+                            showCreateConfModal = true;
+                        }}
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm transition font-medium"
+                    >
+                        Create Configuration Set
+                    </button>
+                {/snippet}
+                {#snippet actionsSnippet(item)}
+                    <div class="flex gap-2 justify-end">
+                        <button
+                            onclick={() => deleteConfigurationSet(item.Name)}
+                            class="text-red-400 hover:text-red-300 bg-red-900/40 hover:bg-red-800/60 px-2 py-1 rounded text-xs transition"
+                            title="Delete Configuration Set"
+                        >
+                            Delete
+                        </button>
+                    </div>
+                {/snippet}
+            </PaginatedTable>
         {:else if activeTab === "templates"}
             <PaginatedTable
                 items={templates}
@@ -441,8 +512,9 @@
 <Modal bind:open={showVerifyModal} title="Verify New Identity" maxWidth="max-w-md">
     <div class="space-y-4">
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Identity Type</label>
+            <label for="verifyIdentityType" class="block text-sm font-medium text-gray-300 mb-1">Identity Type</label>
             <select
+                id="verifyIdentityType"
                 bind:value={verifyIdentityType}
                 class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
             >
@@ -451,8 +523,9 @@
             </select>
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">{verifyIdentityType === 'Email' ? 'Email Address' : 'Domain Name'}</label>
+            <label for="verifyIdentityValue" class="block text-sm font-medium text-gray-300 mb-1">{verifyIdentityType === 'Email' ? 'Email Address' : 'Domain Name'}</label>
             <input
+                id="verifyIdentityValue"
                 type="text"
                 bind:value={verifyIdentityValue}
                 placeholder={verifyIdentityType === 'Email' ? 'user@example.com' : 'example.com'}
@@ -481,8 +554,9 @@
 <Modal bind:open={showSendEmailModal} title="Send Test Email" maxWidth="max-w-lg">
     <div class="space-y-4">
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">From</label>
+            <label for="sendEmailFrom" class="block text-sm font-medium text-gray-300 mb-1">From</label>
             <input
+                id="sendEmailFrom"
                 type="text"
                 bind:value={sendEmailFrom}
                 disabled
@@ -490,8 +564,9 @@
             />
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">To (comma-separated)</label>
+            <label for="sendEmailTo" class="block text-sm font-medium text-gray-300 mb-1">To (comma-separated)</label>
             <input
+                id="sendEmailTo"
                 type="text"
                 bind:value={sendEmailTo}
                 placeholder="recipient@example.com"
@@ -499,8 +574,9 @@
             />
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Subject</label>
+            <label for="sendEmailSubject" class="block text-sm font-medium text-gray-300 mb-1">Subject</label>
             <input
+                id="sendEmailSubject"
                 type="text"
                 bind:value={sendEmailSubject}
                 placeholder="Test Email from SES"
@@ -508,8 +584,9 @@
             />
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Body (Text)</label>
+            <label for="sendEmailBody" class="block text-sm font-medium text-gray-300 mb-1">Body (Text)</label>
             <textarea
+                id="sendEmailBody"
                 bind:value={sendEmailBody}
                 rows="5"
                 class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 font-mono"
@@ -589,6 +666,36 @@
                 class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium transition flex items-center gap-2"
             >
                 {#if creatingTemplate}<span class="animate-spin">⟳</span>{/if}
+                Create
+            </button>
+        </div>
+    </div>
+</Modal>
+<Modal bind:open={showCreateConfModal} title="Create Configuration Set" maxWidth="max-w-md">
+    <div class="space-y-4">
+        <div>
+            <label for="confName" class="block text-sm font-medium text-gray-300 mb-1">Configuration Set Name</label>
+            <input
+                id="confName"
+                type="text"
+                bind:value={confName}
+                placeholder="MyConfigurationSet"
+                class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
+            />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+            <button
+                onclick={() => showCreateConfModal = false}
+                class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition"
+            >
+                Cancel
+            </button>
+            <button
+                onclick={createConfigurationSet}
+                disabled={creatingConf || !confName}
+                class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium transition flex items-center gap-2"
+            >
+                {#if creatingConf}<span class="animate-spin">⟳</span>{/if}
                 Create
             </button>
         </div>
