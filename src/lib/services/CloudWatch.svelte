@@ -10,6 +10,8 @@
         GetMetricStatisticsCommand,
         DeleteAlarmsCommand,
         SetAlarmStateCommand,
+        EnableAlarmActionsCommand,
+        DisableAlarmActionsCommand,
         DeleteDashboardsCommand,
         PutDashboardCommand,
     } from "@aws-sdk/client-cloudwatch";
@@ -18,6 +20,7 @@
         DescribeLogGroupsCommand,
         StartQueryCommand,
         GetQueryResultsCommand,
+        StopQueryCommand,
         DescribeLogStreamsCommand,
         GetLogEventsCommand,
         FilterLogEventsCommand,
@@ -92,6 +95,8 @@
     let selectedMetric = $state<any>(null);
     let metricStats = $state<any[]>([]);
     let metricStatsLoading = $state(false);
+    let metricTimeRangeSec = $state(86400); // Default: Last 24 hours
+    let metricPeriodSec = $state(3600); // Default: 1 hour
 
     // --- Dashboards ---
     let dashboards = $state<any[]>([]);
@@ -136,6 +141,7 @@
     let logResults = $state<any[]>([]);
     let logColumns = $state<string[]>([]);
     let logQueryLoading = $state(false);
+    let logQueryId = $state("");
     let timeRange = $state(3600); // seconds
 
     onMount(async () => {
@@ -185,6 +191,28 @@
             selectedAlarm = null;
             alarmsTokenMap = [];
             await loadAlarms();
+        } catch (e) {
+            error = String(e);
+            alarmsLoading = false;
+        }
+    }
+
+    async function toggleAlarmActions(alarmName: string, enable: boolean) {
+        if (!cwClient) return;
+        try {
+            alarmsLoading = true;
+            error = "";
+            actionMsg = "";
+            const Command = enable ? EnableAlarmActionsCommand : DisableAlarmActionsCommand;
+            await cwClient.send(new Command({ AlarmNames: [alarmName] }));
+            actionMsg = `Alarm actions ${enable ? "enabled" : "disabled"} for "${alarmName}".`;
+
+            // Refresh
+            alarmsTokenMap = [];
+            await loadAlarms();
+            if (selectedAlarm && selectedAlarm.name === alarmName) {
+                selectedAlarm.actionsEnabled = enable;
+            }
         } catch (e) {
             error = String(e);
             alarmsLoading = false;
@@ -262,6 +290,10 @@
                 namespace: a.Namespace ?? "",
                 condition: `${a.ComparisonOperator} ${a.Threshold}`,
                 updated: a.StateUpdatedTimestamp?.toISOString(),
+                actionsEnabled: a.ActionsEnabled ?? false,
+                okActions: a.OKActions ?? [],
+                alarmActions: a.AlarmActions ?? [],
+                insufficientDataActions: a.InsufficientDataActions ?? [],
             }));
 
             // Sort by state (ALARM first, then others)
@@ -291,7 +323,7 @@
             actionMsg = "";
 
             const endTime = new Date();
-            const startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000); // Last 24 hours
+            const startTime = new Date(endTime.getTime() - metricTimeRangeSec * 1000);
 
             const resp = await cwClient.send(
                 new GetMetricStatisticsCommand({
@@ -300,7 +332,7 @@
                     Dimensions: metric.rawDimensions,
                     StartTime: startTime,
                     EndTime: endTime,
-                    Period: 3600, // 1 hour periods
+                    Period: metricPeriodSec,
                     Statistics: ["Average", "Sum", "Minimum", "Maximum", "SampleCount"],
                 })
             );
@@ -672,6 +704,20 @@
         }
     }
 
+    function exportLogEvents() {
+        if (!logEvents.length) return;
+        const text = logEvents.map(e => `[${e.timestamp}] ${e.message}`).join("\n");
+        const blob = new Blob([text], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${selectedStreamForEvents.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_logs.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     // --- Logs API ---
     async function loadLogGroups() {
         if (!logsClient) return;
@@ -700,6 +746,16 @@
         }
     }
 
+    async function stopInsightsQuery() {
+        if (!logsClient || !logQueryId) return;
+        try {
+            await logsClient.send(new StopQueryCommand({ queryId: logQueryId }));
+            actionMsg = "Query stopped.";
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
     async function runInsightsQuery() {
         if (!logsClient || !selectedLogGroup || !logQuery.trim()) return;
         try {
@@ -708,6 +764,7 @@
             logResults = [];
             logColumns = [];
             actionMsg = "";
+            logQueryId = "";
             const now = Math.floor(Date.now() / 1000);
             const startResp = await logsClient.send(
                 new StartQueryCommand({
@@ -719,11 +776,16 @@
             );
             const queryId = startResp.queryId;
             if (!queryId) throw new Error("No queryId returned");
+            logQueryId = queryId;
 
             let status = "Running";
             let results: any[] = [];
             while (status === "Running" || status === "Scheduled") {
                 await new Promise((r) => setTimeout(r, 1000));
+
+                // If logQueryId was cleared, it means the query was stopped or a new one started
+                if (logQueryId !== queryId) break;
+
                 const getResp = await logsClient.send(
                     new GetQueryResultsCommand({ queryId }),
                 );
@@ -736,7 +798,9 @@
                 }
             }
 
-            const cols = new Set<string>();
+            // Only update results if this is still the active query
+            if (logQueryId === queryId && status === "Complete") {
+                const cols = new Set<string>();
             const rows = results.map((row) => {
                 const obj: Record<string, string> = {};
                 for (const field of row) {
@@ -747,13 +811,15 @@
                 }
                 return obj;
             });
-            logColumns = [...cols];
-            logResults = rows;
-            if (rows.length === 0) actionMsg = "Query returned no results.";
+                logColumns = [...cols];
+                logResults = rows;
+                if (rows.length === 0) actionMsg = "Query returned no results.";
+            }
         } catch (e) {
             error = String(e);
         } finally {
             logQueryLoading = false;
+            logQueryId = "";
         }
     }
 
@@ -815,6 +881,10 @@
                             >INSUFFICIENT_DATA</button>
                         </div>
                         <div class="h-4 border-l border-gray-800 mx-1"></div>
+                        <button
+                            onclick={() => toggleAlarmActions(selectedAlarm.name, !selectedAlarm.actionsEnabled)}
+                            class="text-xs px-3 py-1.5 rounded transition border {selectedAlarm.actionsEnabled ? 'bg-yellow-600/10 text-yellow-400 hover:bg-yellow-600/20 border-yellow-600/20 hover:border-yellow-600/40' : 'bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 border-blue-600/20 hover:border-blue-600/40'}"
+                        >{selectedAlarm.actionsEnabled ? 'Disable Actions' : 'Enable Actions'}</button>
                         <button
                             onclick={() => deleteAlarm(selectedAlarm.name)}
                             class="text-xs bg-red-600/10 text-red-400 hover:bg-red-600/20 px-3 py-1.5 rounded transition border border-red-600/20 hover:border-red-600/40"
@@ -881,22 +951,62 @@
                         </div>
                     </div>
 
-                    {#if selectedAlarm.description}
-                        <div
-                            class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm shrink-0 mb-6"
-                        >
-                            <h3
-                                class="text-xs text-gray-400 uppercase tracking-widest font-bold mb-2"
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6 shrink-0">
+                        {#if selectedAlarm.description}
+                            <div
+                                class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
                             >
-                                Description
-                            </h3>
-                            <p
-                                class="text-sm text-gray-300 whitespace-pre-wrap"
-                            >
-                                {selectedAlarm.description}
-                            </p>
+                                <h3
+                                    class="text-xs text-gray-400 uppercase tracking-widest font-bold mb-2"
+                                >
+                                    Description
+                                </h3>
+                                <p
+                                    class="text-sm text-gray-300 whitespace-pre-wrap"
+                                >
+                                    {selectedAlarm.description}
+                                </p>
+                            </div>
+                        {/if}
+
+                        <div class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs text-gray-400 uppercase tracking-widest font-bold">
+                                    Configured Actions
+                                </h3>
+                                <span class="text-[10px] px-2 py-0.5 rounded font-bold {selectedAlarm.actionsEnabled ? 'bg-green-600/20 text-green-400' : 'bg-gray-600/20 text-gray-400'}">
+                                    {selectedAlarm.actionsEnabled ? 'ENABLED' : 'DISABLED'}
+                                </span>
+                            </div>
+
+                            <div class="space-y-3">
+                                <div>
+                                    <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">In ALARM</div>
+                                    {#if selectedAlarm.alarmActions.length > 0}
+                                        <div class="space-y-1">
+                                            {#each selectedAlarm.alarmActions as action}
+                                                <div class="text-xs text-gray-300 bg-gray-950 p-1.5 rounded border border-gray-800 font-mono truncate" title={action}>{action}</div>
+                                            {/each}
+                                        </div>
+                                    {:else}
+                                        <div class="text-xs text-gray-600 italic">No actions configured</div>
+                                    {/if}
+                                </div>
+                                <div>
+                                    <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">In OK</div>
+                                    {#if selectedAlarm.okActions.length > 0}
+                                        <div class="space-y-1">
+                                            {#each selectedAlarm.okActions as action}
+                                                <div class="text-xs text-gray-300 bg-gray-950 p-1.5 rounded border border-gray-800 font-mono truncate" title={action}>{action}</div>
+                                            {/each}
+                                        </div>
+                                    {:else}
+                                        <div class="text-xs text-gray-600 italic">No actions configured</div>
+                                    {/if}
+                                </div>
+                            </div>
                         </div>
-                    {/if}
+                    </div>
 
                     <div class="flex-1 min-h-0 bg-gray-900 rounded-lg border border-gray-800 shadow-sm overflow-hidden flex flex-col">
                         <div class="px-4 py-2 border-b border-gray-800 bg-gray-900/80 shrink-0">
@@ -1010,18 +1120,44 @@
 
                     <div class="flex-1 min-h-0 bg-gray-900 rounded-lg border border-gray-800 shadow-sm overflow-hidden flex flex-col">
                         <div class="px-4 py-2 border-b border-gray-800 bg-gray-900/80 flex justify-between items-center shrink-0">
-                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Metric Statistics (Last 24 Hours)</h3>
-                            <button
-                                onclick={() => loadMetricStats(selectedMetric)}
-                                disabled={metricStatsLoading}
-                                class="text-xs text-blue-400 hover:text-blue-300 transition"
-                            >↻ Refresh</button>
+                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Metric Statistics</h3>
+                            <div class="flex items-center gap-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs text-gray-500">Range:</span>
+                                    <select bind:value={metricTimeRangeSec} onchange={() => loadMetricStats(selectedMetric)} class="bg-gray-950 text-xs p-1 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500">
+                                        <option value={3600}>Last 1 Hour</option>
+                                        <option value={10800}>Last 3 Hours</option>
+                                        <option value={43200}>Last 12 Hours</option>
+                                        <option value={86400}>Last 24 Hours</option>
+                                        <option value={259200}>Last 3 Days</option>
+                                        <option value={604800}>Last 7 Days</option>
+                                        <option value={1209600}>Last 14 Days</option>
+                                        <option value={2592000}>Last 30 Days</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs text-gray-500">Period:</span>
+                                    <select bind:value={metricPeriodSec} onchange={() => loadMetricStats(selectedMetric)} class="bg-gray-950 text-xs p-1 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500">
+                                        <option value={60}>1 Minute</option>
+                                        <option value={300}>5 Minutes</option>
+                                        <option value={900}>15 Minutes</option>
+                                        <option value={3600}>1 Hour</option>
+                                        <option value={21600}>6 Hours</option>
+                                        <option value={86400}>1 Day</option>
+                                    </select>
+                                </div>
+                                <button
+                                    onclick={() => loadMetricStats(selectedMetric)}
+                                    disabled={metricStatsLoading}
+                                    class="text-xs text-blue-400 hover:text-blue-300 transition bg-blue-600/10 hover:bg-blue-600/20 px-2 py-1 rounded"
+                                >↻ Refresh</button>
+                            </div>
                         </div>
                         <div class="flex-1 overflow-auto bg-gray-950 p-2">
                             {#if metricStatsLoading && metricStats.length === 0}
                                 <div class="text-gray-500 italic p-4 text-center">Loading statistics...</div>
                             {:else if metricStats.length === 0}
-                                <div class="text-gray-500 italic p-4 text-center">No datapoints found in the last 24 hours.</div>
+                                <div class="text-gray-500 italic p-4 text-center">No datapoints found for the selected time range.</div>
                             {:else}
                                 <table class="w-full text-xs text-left">
                                     <thead class="sticky top-0 bg-gray-900 border-b border-gray-800/50 z-10">
@@ -1199,6 +1335,13 @@
                             disabled={!logEventsNextToken || logEventsLoading}
                             class="text-xs text-blue-400 hover:text-blue-300 transition px-2 py-1 rounded bg-blue-600/10 hover:bg-blue-600/20 disabled:opacity-50"
                         >Newer Logs</button>
+
+                        <div class="h-4 border-l border-gray-700 mx-1"></div>
+                        <button
+                            onclick={exportLogEvents}
+                            disabled={logEvents.length === 0}
+                            class="text-xs text-blue-400 hover:text-blue-300 transition px-2 py-1 rounded bg-blue-600/10 hover:bg-blue-600/20 disabled:opacity-50"
+                        >Export Logs</button>
                     </div>
 
                     <div class="flex-1 bg-gray-900 rounded-lg border border-gray-800 text-xs text-gray-300 overflow-auto font-mono relative p-2 shadow-inner">
@@ -1380,16 +1523,22 @@
                             <option value={86400}>Last 24 hours</option>
                             <option value={604800}>Last 7 days</option>
                         </select>
-                        <button
-                            onclick={runInsightsQuery}
-                            disabled={!selectedLogGroup || logQueryLoading}
-                            class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-5 py-2 rounded text-xs font-bold transition flex items-center gap-2"
-                        >
-                            {#if logQueryLoading}<span class="animate-spin"
-                                    >⟳</span
-                                >{/if}
-                            Run Query
-                        </button>
+                        {#if logQueryLoading}
+                            <button
+                                onclick={() => { stopInsightsQuery(); logQueryId = ""; }}
+                                class="bg-red-600 hover:bg-red-500 px-5 py-2 rounded text-xs font-bold transition flex items-center gap-2"
+                            >
+                                Stop Query
+                            </button>
+                        {:else}
+                            <button
+                                onclick={runInsightsQuery}
+                                disabled={!selectedLogGroup}
+                                class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-5 py-2 rounded text-xs font-bold transition flex items-center gap-2"
+                            >
+                                Run Query
+                            </button>
+                        {/if}
                     </div>
                     <textarea
                         bind:value={logQuery}
