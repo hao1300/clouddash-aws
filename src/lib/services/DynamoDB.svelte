@@ -13,6 +13,12 @@
         UpdateTableCommand,
         DescribeTimeToLiveCommand,
         UpdateTimeToLiveCommand,
+        DescribeContinuousBackupsCommand,
+        UpdateContinuousBackupsCommand,
+        ListBackupsCommand,
+        CreateBackupCommand,
+        DeleteBackupCommand,
+        RestoreTableFromBackupCommand,
     } from "@aws-sdk/client-dynamodb";
     import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
     import { getAwsCredentials } from "./aws-creds";
@@ -31,7 +37,8 @@
         { id: "tables", label: "Tables" },
         ...(tableName ? [
             { id: "details", label: "Details" },
-            { id: "explore", label: "Explore Items" }
+            { id: "explore", label: "Explore Items" },
+            { id: "backups", label: "Backups" }
         ] : [])
     ]);
     let activeTab = $state("tables");
@@ -63,6 +70,27 @@
 
     // --- Item Details Modal ---
     let viewingItem = $state<any>(null);
+
+    // --- Backups State ---
+    let backupsList = $state<any[]>([]);
+    let backupsLoading = $state(false);
+    let backupsTokenMap = $state<string[]>([]);
+    let backupsCurrentToken = $state<string | undefined>(undefined);
+
+    let pitrEnabled = $state(false);
+    let pitrLoading = $state(false);
+
+    let showCreateBackup = $state(false);
+    let newBackupName = $state("");
+    let createBackupLoading = $state(false);
+
+    let backupToDelete = $state<any>(null);
+    let deleteBackupLoading = $state(false);
+
+    let showRestoreBackup = $state(false);
+    let restoreSourceBackup = $state<any>(null);
+    let restoreNewTableName = $state("");
+    let restoreBackupLoading = $state(false);
 
     // --- Details Tab Modals ---
     let showEditCapacity = $state(false);
@@ -491,6 +519,151 @@
             deleteItemLoading = false;
         }
     }
+
+    async function loadBackups(token?: string) {
+        if (!client || !tableName) return;
+        try {
+            backupsLoading = true;
+            error = "";
+            const resp = await client.send(
+                new ListBackupsCommand({
+                    TableName: tableName,
+                    ExclusiveStartBackupArn: token,
+                    Limit: 50,
+                })
+            );
+            backupsList = resp.BackupSummaries ?? [];
+            pushToken(backupsTokenMap, resp.LastEvaluatedBackupArn);
+            backupsCurrentToken = resp.LastEvaluatedBackupArn;
+        } catch (e) {
+            error = String(e);
+            backupsList = [];
+        } finally {
+            backupsLoading = false;
+        }
+    }
+
+    async function createBackup() {
+        if (!client || !tableName || !newBackupName) return;
+        try {
+            createBackupLoading = true;
+            error = "";
+            actionMsg = "";
+            await client.send(
+                new CreateBackupCommand({
+                    TableName: tableName,
+                    BackupName: newBackupName
+                })
+            );
+            actionMsg = `Successfully requested creation of backup ${newBackupName}.`;
+            showCreateBackup = false;
+            newBackupName = "";
+            backupsTokenMap = [];
+            await loadBackups();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            createBackupLoading = false;
+        }
+    }
+
+    async function deleteBackup() {
+        if (!client || !backupToDelete) return;
+        try {
+            deleteBackupLoading = true;
+            error = "";
+            actionMsg = "";
+            await client.send(
+                new DeleteBackupCommand({
+                    BackupArn: backupToDelete.BackupArn
+                })
+            );
+            actionMsg = `Successfully deleted backup ${backupToDelete.BackupName}.`;
+            backupToDelete = null;
+            backupsTokenMap = [];
+            await loadBackups();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            deleteBackupLoading = false;
+        }
+    }
+
+    async function restoreBackup() {
+        if (!client || !restoreSourceBackup || !restoreNewTableName) return;
+        try {
+            restoreBackupLoading = true;
+            error = "";
+            actionMsg = "";
+            await client.send(
+                new RestoreTableFromBackupCommand({
+                    TargetTableName: restoreNewTableName,
+                    BackupArn: restoreSourceBackup.BackupArn
+                })
+            );
+            actionMsg = `Successfully requested restore of backup ${restoreSourceBackup.BackupName} to table ${restoreNewTableName}.`;
+            showRestoreBackup = false;
+            restoreSourceBackup = null;
+            restoreNewTableName = "";
+            activeTab = "tables";
+            tablesTokenMap = [];
+            await loadTables();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            restoreBackupLoading = false;
+        }
+    }
+
+    // --- Backups API ---
+    async function loadContinuousBackups() {
+        if (!client || !tableName) return;
+        try {
+            pitrLoading = true;
+            error = "";
+            const resp = await client.send(
+                new DescribeContinuousBackupsCommand({ TableName: tableName })
+            );
+            const pitrStatus = resp.ContinuousBackupsDescription?.PointInTimeRecoveryDescription?.PointInTimeRecoveryStatus;
+            pitrEnabled = pitrStatus === "ENABLED";
+        } catch (e) {
+            error = String(e);
+            pitrEnabled = false;
+        } finally {
+            pitrLoading = false;
+        }
+    }
+
+    async function togglePitr() {
+        if (!client || !tableName) return;
+        try {
+            pitrLoading = true;
+            error = "";
+            actionMsg = "";
+            const newState = !pitrEnabled;
+            await client.send(
+                new UpdateContinuousBackupsCommand({
+                    TableName: tableName,
+                    PointInTimeRecoverySpecification: {
+                        PointInTimeRecoveryEnabled: newState
+                    }
+                })
+            );
+            actionMsg = `Successfully ${newState ? 'enabled' : 'disabled'} Point-in-time recovery.`;
+            await loadContinuousBackups();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            pitrLoading = false;
+        }
+    }
+
+    $effect(() => {
+        if (activeTab === "backups" && tableName && client) {
+            loadContinuousBackups();
+            loadBackups();
+        }
+    });
 
     // --- TTL API ---
     async function loadTtl() {
@@ -1353,10 +1526,113 @@
 
                 </div>
             </div>
+        {:else if activeTab === "backups" && tableName}
+            <div class="h-full flex flex-col p-4 pr-1 bg-gray-950 overflow-auto">
+                <div class="space-y-4 max-w-5xl">
+                    <!-- Point-in-time recovery -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 shadow-sm flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-200 mb-1">Point-in-time recovery (PITR)</h3>
+                            <p class="text-xs text-gray-400">Continuous backups protect your tables from accidental write or delete operations. Restore to any second in the preceding 35 days.</p>
+                            <div class="mt-2 text-xs">
+                                Status:
+                                {#if pitrLoading}
+                                    <span class="text-gray-500 animate-pulse">Loading...</span>
+                                {:else if pitrEnabled}
+                                    <span class="text-green-400 font-bold">Enabled</span>
+                                {:else}
+                                    <span class="text-gray-500 font-bold">Disabled</span>
+                                {/if}
+                            </div>
+                        </div>
+                        <button
+                            onclick={togglePitr}
+                            disabled={pitrLoading}
+                            class="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 px-3 py-1.5 rounded text-xs font-medium text-gray-200 transition flex items-center gap-1"
+                        >
+                            {#if pitrLoading}<span class="animate-spin">⟳</span>{/if}
+                            {pitrEnabled ? 'Disable' : 'Enable'} PITR
+                        </button>
+                    </div>
+
+                    <!-- On-Demand Backups -->
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-sm flex-1 min-h-[400px] flex flex-col">
+                        <div class="p-4 border-b border-gray-800 flex items-center justify-between shrink-0">
+                            <div>
+                                <h3 class="text-sm font-bold text-gray-200">On-demand backups</h3>
+                                <p class="text-[11px] text-gray-400">Create full backups of your tables for long-term retention and archival for regulatory compliance.</p>
+                            </div>
+                            <button
+                                onclick={() => showCreateBackup = true}
+                                class="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1 shrink-0"
+                            >
+                                + Create Backup
+                            </button>
+                        </div>
+                        <div class="flex-1 min-h-0 overflow-hidden">
+                            <PaginatedTable
+                                items={backupsList}
+                                loading={backupsLoading}
+                                hasNext={!!backupsCurrentToken}
+                                hasPrev={backupsTokenMap.length > 0}
+                                onNext={() => loadBackups(backupsCurrentToken)}
+                                onPrev={() => loadBackups(popToken(backupsTokenMap))}
+                                onRefresh={() => {
+                                    backupsTokenMap = [];
+                                    loadBackups();
+                                }}
+                                columns={[
+                                    { key: "BackupName", label: "Backup Name" },
+                                    { key: "BackupStatus", label: "Status", format: (v) => v === "AVAILABLE" ? "🟢 AVAILABLE" : `⚪ ${v}` },
+                                    { key: "BackupCreationDateTime", label: "Creation Date", format: (v) => v ? new Date(v).toLocaleString() : "-" },
+                                    { key: "BackupSizeBytes", label: "Size", format: formatBytes }
+                                ]}
+                            >
+                                {#snippet actionsSnippet(item)}
+                                    <button
+                                        onclick={() => { restoreSourceBackup = item; showRestoreBackup = true; }}
+                                        class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition"
+                                    >
+                                        Restore
+                                    </button>
+                                    <button
+                                        onclick={() => backupToDelete = item}
+                                        class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition ml-1"
+                                    >
+                                        Delete
+                                    </button>
+                                {/snippet}
+                            </PaginatedTable>
+                        </div>
+                    </div>
+                </div>
+            </div>
         {/if}
     </div>
 
     <!-- Modals -->
+    {#if showCreateBackup}
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-sm flex flex-col">
+                <div class="flex items-center justify-between p-4 border-b border-gray-800 shrink-0">
+                    <h3 class="font-bold text-gray-200">Create Backup</h3>
+                    <button onclick={() => showCreateBackup = false} class="text-gray-400 hover:text-gray-200 transition-colors">✕</button>
+                </div>
+                <div class="p-4 space-y-4">
+                    <div>
+                        <label for="createBackupName" class="block text-xs font-bold text-gray-400 mb-1">Backup Name</label>
+                        <input id="createBackupName" bind:value={newBackupName} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" placeholder="MyBackup" />
+                    </div>
+                </div>
+                <div class="p-4 border-t border-gray-800 shrink-0 flex justify-end gap-2">
+                    <button onclick={() => showCreateBackup = false} class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
+                    <button onclick={createBackup} disabled={createBackupLoading || !newBackupName} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2">
+                        {#if createBackupLoading}<span class="animate-spin">⟳</span>{/if} Create
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
     {#if showCreateTable}
         <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-md flex flex-col">
@@ -1421,6 +1697,49 @@
                     <button onclick={() => showCreateTable = false} class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
                     <button onclick={handleCreateTable} disabled={createTableLoading || !newTableName || !newPkName} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2">
                         {#if createTableLoading}<span class="animate-spin">⟳</span>{/if} Create
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if backupToDelete}
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-sm flex flex-col">
+                <div class="p-4 border-b border-gray-800">
+                    <h3 class="font-bold text-red-400">Delete Backup</h3>
+                </div>
+                <div class="p-4">
+                    <p class="text-sm text-gray-300">Are you sure you want to delete backup <strong>{backupToDelete.BackupName}</strong>? This action cannot be undone.</p>
+                </div>
+                <div class="p-4 border-t border-gray-800 flex justify-end gap-2">
+                    <button onclick={() => backupToDelete = null} class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
+                    <button onclick={deleteBackup} disabled={deleteBackupLoading} class="bg-red-600 hover:bg-red-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2">
+                        {#if deleteBackupLoading}<span class="animate-spin">⟳</span>{/if} Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if showRestoreBackup && restoreSourceBackup}
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-sm flex flex-col">
+                <div class="flex items-center justify-between p-4 border-b border-gray-800 shrink-0">
+                    <h3 class="font-bold text-gray-200">Restore Backup</h3>
+                    <button onclick={() => showRestoreBackup = false} class="text-gray-400 hover:text-gray-200 transition-colors">✕</button>
+                </div>
+                <div class="p-4 space-y-4">
+                    <p class="text-sm text-gray-300">Restoring from backup <strong>{restoreSourceBackup.BackupName}</strong>.</p>
+                    <div>
+                        <label for="restoreNewTableName" class="block text-xs font-bold text-gray-400 mb-1">New Table Name</label>
+                        <input id="restoreNewTableName" bind:value={restoreNewTableName} class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500" placeholder="NewTableName" />
+                    </div>
+                </div>
+                <div class="p-4 border-t border-gray-800 shrink-0 flex justify-end gap-2">
+                    <button onclick={() => showRestoreBackup = false} class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
+                    <button onclick={restoreBackup} disabled={restoreBackupLoading || !restoreNewTableName} class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2">
+                        {#if restoreBackupLoading}<span class="animate-spin">⟳</span>{/if} Restore
                     </button>
                 </div>
             </div>
