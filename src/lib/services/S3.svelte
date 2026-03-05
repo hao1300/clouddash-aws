@@ -13,6 +13,7 @@
         DeleteObjectsCommand,
         CopyObjectCommand,
     } from "@aws-sdk/client-s3";
+    import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
     import { fetch } from "@tauri-apps/plugin-http";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -47,6 +48,7 @@
     let previewLoading = $state(false);
     let previewType = $state("");
     let previewSize = $state<number | null>(null);
+    let previewImageUrl = $state("");
 
     // --- Modals & Uploads ---
     let showCreateBucket = $state(false);
@@ -85,6 +87,25 @@
     } | null>(null);
     let emptyLoading = $state(false);
     let emptyProgressText = $state("");
+
+    let showPresignPrompt = $state(false);
+    let itemToPresign = $state<{
+        type: "file";
+        key: string;
+        name: string;
+    } | null>(null);
+    let presignExpiry = $state(3600);
+    let presignUrl = $state("");
+    let presignLoading = $state(false);
+
+    let showCopyPrompt = $state(false);
+    let itemToCopy = $state<{
+        type: "file";
+        key: string;
+        name: string;
+    } | null>(null);
+    let copyDestination = $state("");
+    let copyLoading = $state(false);
 
     function makeS3Client(region: string, creds: any): S3Client {
         return new S3Client({
@@ -374,6 +395,80 @@
         }
     }
 
+    async function generatePresignedUrl() {
+        if (!itemToPresign || !selectedBucket) return;
+        try {
+            presignLoading = true;
+            error = "";
+            const bc = await clientForBucket(selectedBucket);
+            const command = new GetObjectCommand({
+                Bucket: selectedBucket,
+                Key: itemToPresign.key,
+            });
+            presignUrl = await getSignedUrl(bc, command, {
+                expiresIn: presignExpiry,
+            });
+        } catch (e) {
+            error = String(e);
+        } finally {
+            presignLoading = false;
+        }
+    }
+
+    async function copyObject() {
+        if (!copyDestination || !selectedBucket || !itemToCopy) return;
+
+        try {
+            copyLoading = true;
+            error = "";
+
+            let destBucket = selectedBucket;
+            let destKey = copyDestination;
+
+            // Handle s3:// format
+            if (copyDestination.startsWith("s3://")) {
+                const url = copyDestination.slice(5);
+                const firstSlash = url.indexOf("/");
+                if (firstSlash === -1) {
+                    destBucket = url;
+                    // If no key is specified, just copy it to the root of the destination bucket with the same name
+                    destKey = itemToCopy.name;
+                } else {
+                    destBucket = url.slice(0, firstSlash);
+                    destKey = url.slice(firstSlash + 1);
+                    // if it ends with a slash, treat it as a directory
+                    if (destKey === "" || destKey.endsWith("/")) {
+                        destKey += itemToCopy.name;
+                    }
+                }
+            } else if (copyDestination.endsWith("/")) {
+                destKey += itemToCopy.name;
+            }
+
+            const bc = await clientForBucket(destBucket);
+            const sourceKey = itemToCopy.key;
+
+            await bc.send(
+                new CopyObjectCommand({
+                    Bucket: destBucket,
+                    CopySource: encodeURI(`${selectedBucket}/${sourceKey}`),
+                    Key: destKey,
+                })
+            );
+
+            showCopyPrompt = false;
+            itemToCopy = null;
+            copyDestination = "";
+            if (destBucket === selectedBucket) {
+                await loadObjects();
+            }
+        } catch (e) {
+            error = String(e);
+        } finally {
+            copyLoading = false;
+        }
+    }
+
     async function renameObject() {
         if (!newObjectName || !selectedBucket || !itemToRename) return;
         if (newObjectName === itemToRename.name) {
@@ -471,23 +566,27 @@
         const input = e.target as HTMLInputElement;
         if (!input.files || input.files.length === 0) return;
 
-        const file = input.files[0];
         try {
             uploadLoading = true;
             error = "";
 
-            const buffer = await file.arrayBuffer();
-            const body = new Uint8Array(buffer);
-
             const bc = await clientForBucket(selectedBucket);
-            await bc.send(
-                new PutObjectCommand({
-                    Bucket: selectedBucket,
-                    Key: prefix + file.name,
-                    Body: body,
-                    ContentType: file.type || "application/octet-stream",
-                }),
-            );
+
+            // Upload files sequentially
+            for (let i = 0; i < input.files.length; i++) {
+                const file = input.files[i];
+                const buffer = await file.arrayBuffer();
+                const body = new Uint8Array(buffer);
+
+                await bc.send(
+                    new PutObjectCommand({
+                        Bucket: selectedBucket,
+                        Key: prefix + file.name,
+                        Body: body,
+                        ContentType: file.type || "application/octet-stream",
+                    }),
+                );
+            }
 
             input.value = ""; // Reset
             await loadObjects();
@@ -525,6 +624,7 @@
                         name: (cp.Prefix || "").slice(prefix.length),
                         size: null,
                         lastModified: null,
+                        storageClass: null,
                     });
                 }
             }
@@ -540,6 +640,7 @@
                     lastModified: o.LastModified
                         ? o.LastModified.toISOString()
                         : null,
+                    storageClass: o.StorageClass || "STANDARD",
                 });
             }
             objects = newItems;
@@ -553,6 +654,11 @@
     }
 
     async function previewFile(key: string) {
+        if (previewImageUrl) {
+            URL.revokeObjectURL(previewImageUrl);
+            previewImageUrl = "";
+        }
+
         previewKey = key;
         previewContent = "";
         previewSize = null;
@@ -588,6 +694,10 @@
             if (isText) {
                 previewType = "text";
                 previewContent = new TextDecoder().decode(bytes);
+            } else if (contentType.startsWith("image/")) {
+                previewType = "image";
+                const blob = new Blob([bytes], { type: contentType });
+                previewImageUrl = URL.createObjectURL(blob);
             } else {
                 previewType = "binary";
                 previewContent = "";
@@ -666,6 +776,11 @@
                     : previewFile(item.key),
         },
         { key: "size", label: "Size", format: (v: number) => formatSize(v) },
+        {
+            key: "storageClass",
+            label: "Storage Class",
+            format: (v: string) => v || "-",
+        },
         {
             key: "lastModified",
             label: "Last Modified",
@@ -751,6 +866,122 @@
                         class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-bold transition shadow"
                     >
                         {newBucketLoading ? "Creating..." : "Create"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if showPresignPrompt && itemToPresign}
+        <div
+            class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        >
+            <div
+                class="bg-gray-900 border border-gray-700 rounded-lg p-6 w-96 shadow-2xl"
+            >
+                <h3 class="text-lg font-semibold text-white mb-4">
+                    Generate Presigned URL
+                </h3>
+                <label for="presignExpiry" class="text-xs text-gray-400 mb-2 block">
+                    Generating for <span class="font-mono text-blue-300">{itemToPresign.name}</span>
+                </label>
+                <div class="mb-4">
+                    <label for="presignExpiry" class="block text-xs text-gray-400 mb-1">Expiration (seconds)</label>
+                    <input
+                        id="presignExpiry"
+                        type="number"
+                        min="1"
+                        max="604800"
+                        bind:value={presignExpiry}
+                        class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors"
+                    />
+                </div>
+
+                {#if presignUrl}
+                    <div class="mb-4">
+                        <label for="presignUrlResult" class="block text-xs text-gray-400 mb-1">Presigned URL</label>
+                        <textarea
+                            id="presignUrlResult"
+                            readonly
+                            rows="4"
+                            class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-xs outline-none text-gray-200 transition-colors font-mono break-all resize-none"
+                            value={presignUrl}
+                        ></textarea>
+                        <button
+                            onclick={() => navigator.clipboard.writeText(presignUrl)}
+                            class="mt-2 w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 px-3 py-1.5 rounded text-xs font-semibold transition shadow"
+                        >📋 Copy to Clipboard</button>
+                    </div>
+                {/if}
+
+                <div class="flex justify-end gap-2">
+                    <button
+                        onclick={() => {
+                            showPresignPrompt = false;
+                            itemToPresign = null;
+                            presignUrl = "";
+                        }}
+                        class="px-4 py-2 rounded text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition"
+                        >{presignUrl ? "Close" : "Cancel"}</button
+                    >
+                    {#if !presignUrl}
+                    <button
+                        onclick={generatePresignedUrl}
+                        disabled={presignLoading}
+                        class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-bold transition shadow"
+                    >
+                        {presignLoading ? "Generating..." : "Generate"}
+                    </button>
+                    {/if}
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if showCopyPrompt && itemToCopy}
+        <div
+            class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        >
+            <div
+                class="bg-gray-900 border border-gray-700 rounded-lg p-6 w-[500px] max-w-[90vw] shadow-2xl"
+            >
+                <h3 class="text-lg font-semibold text-white mb-4">
+                    Copy Object
+                </h3>
+                <div class="text-xs text-gray-400 mb-4 block">
+                    Copying <span class="font-mono text-blue-300 break-all">{selectedBucket}/{itemToCopy.key}</span>
+                </div>
+
+                <div class="mb-4">
+                    <label for="copyDestination" class="block text-xs text-gray-400 mb-1">Destination</label>
+                    <p class="text-xs text-gray-500 mb-2">
+                        Provide a new path in the current bucket (e.g., <code>folder/new-name.txt</code>) or an S3 URI to copy to another bucket (e.g., <code>s3://other-bucket/path/</code>).
+                    </p>
+                    <input
+                        id="copyDestination"
+                        type="text"
+                        bind:value={copyDestination}
+                        placeholder="new-folder/ or s3://dest-bucket/key"
+                        class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors"
+                    />
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button
+                        onclick={() => {
+                            showCopyPrompt = false;
+                            copyDestination = "";
+                            itemToCopy = null;
+                        }}
+                        class="px-4 py-2 rounded text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition"
+                        >Cancel</button
+                    >
+                    <button
+                        onclick={copyObject}
+                        disabled={!copyDestination || copyLoading}
+                        class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-bold transition shadow"
+                    >
+                        {copyLoading ? "Copying..." : "Copy"}
                     </button>
                 </div>
             </div>
@@ -956,6 +1187,7 @@
         <!-- Hidden file input for uploads -->
         <input
             type="file"
+            multiple
             class="hidden"
             bind:this={uploadFileInput}
             onchange={onFileUpload}
@@ -998,6 +1230,10 @@
                         {:else if previewType === "text"}
                             <pre
                                 class="text-gray-300 whitespace-pre-wrap break-all font-mono text-xs">{previewContent}</pre>
+                        {:else if previewType === "image"}
+                            <div class="h-full flex items-center justify-center p-4">
+                                <img src={previewImageUrl} alt="Preview" class="max-w-full max-h-full object-contain" />
+                            </div>
                         {:else}
                             <div
                                 class="h-full flex flex-col items-center justify-center text-gray-500 space-y-4"
@@ -1160,6 +1396,35 @@
                                         class="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded text-xs transition"
                                         title="Copy URL"
                                         >📋 URL</button
+                                    >
+                                    <button
+                                        onclick={() => {
+                                            itemToPresign = {
+                                                type: "file",
+                                                key: item.key,
+                                                name: item.name,
+                                            };
+                                            presignUrl = "";
+                                            presignExpiry = 3600;
+                                            showPresignPrompt = true;
+                                        }}
+                                        class="text-purple-400 hover:text-white bg-purple-900/30 hover:bg-purple-800 px-3 py-1 rounded text-xs transition"
+                                        title="Presign URL"
+                                        >🔗</button
+                                    >
+                                    <button
+                                        onclick={() => {
+                                            itemToCopy = {
+                                                type: "file",
+                                                key: item.key,
+                                                name: item.name,
+                                            };
+                                            copyDestination = "";
+                                            showCopyPrompt = true;
+                                        }}
+                                        class="text-green-400 hover:text-white bg-green-900/30 hover:bg-green-800 px-3 py-1 rounded text-xs transition"
+                                        title="Copy Object"
+                                        >📄</button
                                     >
                                     <button
                                         onclick={() => {
