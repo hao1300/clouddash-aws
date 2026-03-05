@@ -6,6 +6,7 @@
         InvokeCommand,
         GetFunctionConfigurationCommand,
         UpdateFunctionConfigurationCommand,
+        DeleteFunctionCommand,
         type FunctionConfiguration,
     } from "@aws-sdk/client-lambda";
     import { getAwsCredentials } from "./aws-creds";
@@ -40,6 +41,7 @@
     // --- Detail View ---
     let selectedFn = $state<FunctionConfiguration | null>(null);
     let detailTab = $state<"invoke" | "configuration">("invoke");
+    let isDeleting = $state(false);
 
     // Invoke state
     let invokeInput = $state("{}");
@@ -57,6 +59,12 @@
     let editHandler = $state("");
     let configLoading = $state(false);
     let configError = $state("");
+
+    // Environment Variables Edit State
+    let isEditingEnv = $state(false);
+    let editEnvVars = $state<{ key: string; value: string }[]>([]);
+    let envLoading = $state(false);
+    let envError = $state("");
 
     onMount(async () => {
         try {
@@ -123,6 +131,55 @@
             configError = e.message || String(e);
         } finally {
             configLoading = false;
+        }
+    }
+
+    async function deleteFunction() {
+        if (!client || !selectedFn?.FunctionName) return;
+        if (!confirm(`Are you sure you want to delete function ${selectedFn.FunctionName}?`)) return;
+        isDeleting = true;
+        error = "";
+        actionMsg = "";
+        try {
+            await client.send(
+                new DeleteFunctionCommand({
+                    FunctionName: selectedFn.FunctionName,
+                })
+            );
+            actionMsg = `Deleted function: ${selectedFn.FunctionName}`;
+            selectedFn = null;
+            await loadFunctions();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            isDeleting = false;
+        }
+    }
+
+    async function updateEnvVars() {
+        if (!client || !selectedFn?.FunctionName) return;
+        envLoading = true;
+        envError = "";
+        try {
+            const variables: Record<string, string> = {};
+            for (const { key, value } of editEnvVars) {
+                if (key.trim()) {
+                    variables[key.trim()] = value;
+                }
+            }
+
+            const res = await client.send(
+                new UpdateFunctionConfigurationCommand({
+                    FunctionName: selectedFn.FunctionName,
+                    Environment: { Variables: variables }
+                })
+            );
+            selectedFn = res;
+            isEditingEnv = false;
+        } catch (e: any) {
+            envError = e.message || String(e);
+        } finally {
+            envLoading = false;
         }
     }
 
@@ -271,7 +328,7 @@
             <div class="h-full flex flex-col -m-4 sm:-m-6">
                 <!-- Header -->
                 <div
-                    class="px-4 sm:px-6 py-4 bg-gray-900 border-b border-gray-800 shrink-0"
+                    class="px-4 sm:px-6 py-4 bg-gray-900 border-b border-gray-800 shrink-0 flex justify-between items-center"
                 >
                     <div class="flex items-center gap-3">
                         <button
@@ -289,6 +346,14 @@
                             {selectedFn.FunctionName}
                         </h2>
                     </div>
+                    <button
+                        onclick={deleteFunction}
+                        disabled={isDeleting}
+                        class="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 px-3 py-1.5 rounded text-sm font-semibold transition flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {#if isDeleting}<span class="animate-spin">⟳</span>{/if}
+                        Delete Function
+                    </button>
                 </div>
 
                 <!-- Inner Tabs -->
@@ -523,31 +588,103 @@
                                 {/if}
                             </div>
 
-                            <!-- Environment Variables (Readonly mapping) -->
+                            <!-- Environment Variables -->
                             <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-sm overflow-hidden mt-6">
-                                <div class="px-4 py-3 border-b border-gray-800 bg-gray-900/80">
+                                <div class="px-4 py-3 border-b border-gray-800 bg-gray-900/80 flex items-center justify-between">
                                     <h4 class="text-sm font-bold text-gray-300">Environment Variables</h4>
+                                    {#if !isEditingEnv}
+                                        <button
+                                            onclick={() => {
+                                                editEnvVars = Object.entries(selectedFn?.Environment?.Variables || {}).map(([key, value]) => ({ key, value }));
+                                                isEditingEnv = true;
+                                            }}
+                                            class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1 rounded text-xs font-semibold transition border border-gray-700 shadow-sm"
+                                        >
+                                            Edit
+                                        </button>
+                                    {/if}
                                 </div>
+
+                                {#if envError}
+                                    <div class="m-4 bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded text-sm">
+                                        {envError}
+                                    </div>
+                                {/if}
+
                                 <div class="p-4 bg-gray-950 overflow-x-auto">
-                                    {#if selectedFn.Environment?.Variables && Object.keys(selectedFn.Environment.Variables).length > 0}
-                                        <table class="w-full text-left text-sm">
-                                            <thead>
-                                                <tr>
-                                                    <th class="px-3 py-2 text-gray-400 font-semibold border-b border-gray-800 w-1/3">Key</th>
-                                                    <th class="px-3 py-2 text-gray-400 font-semibold border-b border-gray-800 w-2/3">Value</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {#each Object.entries(selectedFn.Environment.Variables) as [key, value]}
-                                                    <tr class="border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors">
-                                                        <td class="px-3 py-2 text-gray-300 font-mono font-medium">{key}</td>
-                                                        <td class="px-3 py-2 text-green-400 font-mono break-all">{value}</td>
-                                                    </tr>
-                                                {/each}
-                                            </tbody>
-                                        </table>
+                                    {#if isEditingEnv}
+                                        <div class="space-y-3">
+                                            {#each editEnvVars as envVar, index}
+                                                <div class="flex gap-3 items-start">
+                                                    <div class="flex-1">
+                                                        <input type="text" bind:value={envVar.key} placeholder="Key" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white font-mono focus:border-blue-500 outline-none" disabled={envLoading} />
+                                                    </div>
+                                                    <div class="flex-[2]">
+                                                        <input type="text" bind:value={envVar.value} placeholder="Value" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white font-mono focus:border-blue-500 outline-none" disabled={envLoading} />
+                                                    </div>
+                                                    <button
+                                                        onclick={() => editEnvVars.splice(index, 1)}
+                                                        disabled={envLoading}
+                                                        class="mt-1 text-gray-500 hover:text-red-400 transition"
+                                                        title="Remove Variable"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            {/each}
+
+                                            <div class="pt-2">
+                                                <button
+                                                    onclick={() => editEnvVars.push({ key: "", value: "" })}
+                                                    disabled={envLoading}
+                                                    class="text-sm text-blue-400 hover:text-blue-300 font-medium"
+                                                >
+                                                    + Add environment variable
+                                                </button>
+                                            </div>
+
+                                            <div class="flex justify-end gap-3 pt-4 border-t border-gray-800 mt-4">
+                                                <button
+                                                    onclick={() => {
+                                                        isEditingEnv = false;
+                                                        envError = "";
+                                                    }}
+                                                    disabled={envLoading}
+                                                    class="text-gray-400 hover:text-white px-4 py-2 text-sm transition"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onclick={updateEnvVars}
+                                                    disabled={envLoading}
+                                                    class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-6 py-2 rounded text-sm font-semibold transition shadow flex items-center gap-2"
+                                                >
+                                                    {#if envLoading}<span class="animate-spin">⟳</span>{/if}
+                                                    Save Changes
+                                                </button>
+                                            </div>
+                                        </div>
                                     {:else}
-                                        <div class="text-sm text-gray-500 italic p-2 text-center">No environment variables configured.</div>
+                                        {#if selectedFn.Environment?.Variables && Object.keys(selectedFn.Environment.Variables).length > 0}
+                                            <table class="w-full text-left text-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th class="px-3 py-2 text-gray-400 font-semibold border-b border-gray-800 w-1/3">Key</th>
+                                                        <th class="px-3 py-2 text-gray-400 font-semibold border-b border-gray-800 w-2/3">Value</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {#each Object.entries(selectedFn.Environment.Variables) as [key, value]}
+                                                        <tr class="border-b border-gray-800/50 hover:bg-gray-900/50 transition-colors">
+                                                            <td class="px-3 py-2 text-gray-300 font-mono font-medium">{key}</td>
+                                                            <td class="px-3 py-2 text-green-400 font-mono break-all">{value}</td>
+                                                        </tr>
+                                                    {/each}
+                                                </tbody>
+                                            </table>
+                                        {:else}
+                                            <div class="text-sm text-gray-500 italic p-2 text-center">No environment variables configured.</div>
+                                        {/if}
                                     {/if}
                                 </div>
                             </div>
