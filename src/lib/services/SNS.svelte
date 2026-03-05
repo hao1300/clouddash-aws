@@ -507,8 +507,9 @@
 <Modal bind:open={showCreateTopicModal} title="Create Topic" maxWidth="max-w-md">
     <div class="space-y-4">
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Topic Name</label>
+            <label for="newTopicName" class="block text-sm font-medium text-gray-300 mb-1">Topic Name</label>
             <input
+                id="newTopicName"
                 type="text"
                 bind:value={newTopicName}
                 placeholder="MyTopic"
@@ -544,9 +545,10 @@
 <Modal bind:open={showCreateSubscriptionModal} title="Create Subscription" maxWidth="max-w-md">
     <div class="space-y-4">
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Topic ARN</label>
+            <label for="subTopicArn" class="block text-sm font-medium text-gray-300 mb-1">Topic ARN</label>
             {#if topics.length > 0}
                 <select
+                    id="subTopicArn"
                     bind:value={subTopicArn}
                     class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
                 >
@@ -557,6 +559,7 @@
                 </select>
             {:else}
                 <input
+                    id="subTopicArn"
                     type="text"
                     bind:value={subTopicArn}
                     placeholder="arn:aws:sns:..."
@@ -565,8 +568,9 @@
             {/if}
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Protocol</label>
+            <label for="subProtocol" class="block text-sm font-medium text-gray-300 mb-1">Protocol</label>
             <select
+                id="subProtocol"
                 bind:value={subProtocol}
                 class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500"
             >
@@ -582,8 +586,9 @@
             </select>
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Endpoint</label>
+            <label for="subEndpoint" class="block text-sm font-medium text-gray-300 mb-1">Endpoint</label>
             <input
+                id="subEndpoint"
                 type="text"
                 bind:value={subEndpoint}
                 placeholder="e.g. user@example.com or arn:aws:sqs:..."
@@ -612,8 +617,9 @@
 <Modal bind:open={showPublishModal} title="Publish Message" maxWidth="max-w-lg">
     <div class="space-y-4">
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Topic ARN</label>
+            <label for="publishTopicArn" class="block text-sm font-medium text-gray-300 mb-1">Topic ARN</label>
             <input
+                id="publishTopicArn"
                 type="text"
                 bind:value={publishTopicArn}
                 disabled
@@ -621,8 +627,9 @@
             />
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Subject (Optional)</label>
+            <label for="publishSubject" class="block text-sm font-medium text-gray-300 mb-1">Subject (Optional)</label>
             <input
+                id="publishSubject"
                 type="text"
                 bind:value={publishSubject}
                 placeholder="Message Subject"
@@ -630,8 +637,9 @@
             />
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Message Body</label>
+            <label for="publishMessageBody" class="block text-sm font-medium text-gray-300 mb-1">Message Body</label>
             <textarea
+                id="publishMessageBody"
                 bind:value={publishMessageBody}
                 rows="6"
                 placeholder="Enter message text or JSON..."
