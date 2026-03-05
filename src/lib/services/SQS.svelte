@@ -11,6 +11,9 @@
         CreateQueueCommand,
         DeleteQueueCommand,
         SetQueueAttributesCommand,
+        ListQueueTagsCommand,
+        TagQueueCommand,
+        UntagQueueCommand,
     } from "@aws-sdk/client-sqs";
     import { getAwsCredentials } from "./aws-creds";
     import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -61,11 +64,14 @@
 
     // --- Queue Detail View ---
     let selectedQueue = $state<any>(null);
-    let queueDetailTab = $state<"messages" | "configuration">("messages");
+    let queueDetailTab = $state<"messages" | "configuration" | "tags">("messages");
     let queueAttributes = $state<Record<string, string>>({});
+    let queueTags = $state<Record<string, string>>({});
+    let tagsLoading = $state(false);
     let configForm = $state({
         VisibilityTimeout: "30",
         MessageRetentionPeriod: "345600",
+        Policy: "",
         DelaySeconds: "0",
         MaximumMessageSize: "262144",
         ReceiveMessageWaitTimeSeconds: "0",
@@ -178,7 +184,84 @@
         actionMsg = "";
         showCreate = false;
         queueDetailTab = "messages";
-        await loadQueueAttributes();
+        await Promise.all([
+            loadQueueAttributes(),
+            loadTags(),
+        ]);
+    }
+
+    async function loadTags() {
+        if (!client || !selectedQueue) return;
+        try {
+            tagsLoading = true;
+            error = "";
+            const tagsResponse = await client.send(
+                new ListQueueTagsCommand({
+                    QueueUrl: selectedQueue.url,
+                })
+            );
+            queueTags = tagsResponse.Tags ?? {};
+        } catch (e) {
+            error = String(e);
+        } finally {
+            tagsLoading = false;
+        }
+    }
+
+    let newTagKey = $state("");
+    let newTagValue = $state("");
+
+    async function addTag() {
+        if (!client || !selectedQueue || !newTagKey.trim()) return;
+        try {
+            tagsLoading = true;
+            error = "";
+            actionMsg = "";
+
+            const tagsToUpdate: Record<string, string> = {
+                [newTagKey]: newTagValue,
+            };
+
+            await client.send(
+                new TagQueueCommand({
+                    QueueUrl: selectedQueue.url,
+                    Tags: tagsToUpdate,
+                })
+            );
+
+            actionMsg = `Tag '${newTagKey}' added.`;
+            newTagKey = "";
+            newTagValue = "";
+            await loadTags();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            tagsLoading = false;
+        }
+    }
+
+    async function deleteTag(key: string) {
+        if (!client || !selectedQueue) return;
+        if (!confirm(`Are you sure you want to delete tag '${key}'?`)) return;
+        try {
+            tagsLoading = true;
+            error = "";
+            actionMsg = "";
+
+            await client.send(
+                new UntagQueueCommand({
+                    QueueUrl: selectedQueue.url,
+                    TagKeys: [key],
+                })
+            );
+
+            actionMsg = `Tag '${key}' deleted.`;
+            await loadTags();
+        } catch (e) {
+            error = String(e);
+        } finally {
+            tagsLoading = false;
+        }
     }
 
     async function loadQueueAttributes() {
@@ -197,6 +280,7 @@
             configForm = {
                 VisibilityTimeout: queueAttributes.VisibilityTimeout ?? "30",
                 MessageRetentionPeriod: queueAttributes.MessageRetentionPeriod ?? "345600",
+                Policy: queueAttributes.Policy ?? "",
                 DelaySeconds: queueAttributes.DelaySeconds ?? "0",
                 MaximumMessageSize: queueAttributes.MaximumMessageSize ?? "262144",
                 ReceiveMessageWaitTimeSeconds: queueAttributes.ReceiveMessageWaitTimeSeconds ?? "0",
@@ -241,6 +325,7 @@
                 MessageRetentionPeriod: String(configForm.MessageRetentionPeriod),
                 MaximumMessageSize: String(configForm.MaximumMessageSize),
                 SqsManagedSseEnabled: String(configForm.SqsManagedSseEnabled),
+                Policy: configForm.Policy,
             };
 
             if (selectedQueue.name.endsWith('.fifo')) {
@@ -688,6 +773,14 @@
                                 : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'}"
                             >Configuration</button
                         >
+                        <button
+                            onclick={() => (queueDetailTab = "tags")}
+                            class="px-3 py-1 text-xs rounded transition-colors {queueDetailTab ===
+                            'tags'
+                                ? 'bg-gray-800 text-white font-semibold'
+                                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'}"
+                            >Tags</button
+                        >
                     </div>
 
                     {#if queueDetailTab === "messages"}
@@ -771,8 +864,8 @@
                                 {/if}
                                 <div class="md:col-span-3 border-t border-gray-800 pt-3 mt-1">
                                     <div class="flex justify-between items-center mb-2">
-                                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Message Attributes</label>
-                                        <button onclick={() => sendAttributes = [...sendAttributes, {name: '', type: 'String', value: ''}]} class="text-[10px] bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2 py-0.5 rounded transition font-bold">+ Add Attribute</button>
+                                        <label for="msg-attr-lbl" class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Message Attributes</label>
+                                        <button id="msg-attr-lbl" onclick={() => sendAttributes = [...sendAttributes, {name: '', type: 'String', value: ''}]} class="text-[10px] bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 px-2 py-0.5 rounded transition font-bold">+ Add Attribute</button>
                                     </div>
                                     {#if sendAttributes.length === 0}
                                         <div class="text-[10px] text-gray-600 italic">No attributes added.</div>
@@ -999,66 +1092,96 @@
                                         {/if}
                                     </div>
                                 </div>
+
+                                <!-- Access Policy -->
+                                <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                                    <h3 class="text-sm font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">Access Policy (JSON)</h3>
+                                    <div class="max-w-3xl">
+                                        <label for="conf-policy" class="block text-xs font-medium text-gray-400 mb-1 sr-only">Policy</label>
+                                        <textarea id="conf-policy" bind:value={configForm.Policy} rows="8" class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 font-mono resize-y" placeholder="&#123;&quot;Version&quot;: &quot;2012-10-17&quot;, &quot;Statement&quot;: []&#125;"></textarea>
+                                    </div>
+                                </div>
                             </div>
 
-                            <h3
-                                class="text-sm font-bold text-gray-200 mt-10 mb-4 border-b border-gray-800 pb-2"
-                            >
+                            <h3 class="text-sm font-bold text-gray-200 mt-10 mb-4 border-b border-gray-800 pb-2">
                                 Queue Details (Read Only)
                             </h3>
-                            <div
-                                class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-300"
-                            >
-                                <div
-                                    class="bg-black/50 p-3 rounded border border-gray-800"
-                                >
-                                    <span class="text-gray-500 block mb-1"
-                                        >Queue ARN</span
-                                    >
-                                    <span class="font-mono break-all"
-                                        >{queueAttributes.QueueArn ?? "-"}</span
-                                    >
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-300">
+                                <div class="bg-black/50 p-3 rounded border border-gray-800">
+                                    <span class="text-gray-500 block mb-1">Queue ARN</span>
+                                    <span class="font-mono break-all">{queueAttributes.QueueArn ?? "-"}</span>
                                 </div>
-                                <div
-                                    class="bg-black/50 p-3 rounded border border-gray-800"
-                                >
-                                    <span class="text-gray-500 block mb-1"
-                                        >Created Timestamp</span
-                                    >
-                                    <span class="font-mono"
-                                        >{queueAttributes.CreatedTimestamp
-                                            ? new Date(
-                                                  Number(
-                                                      queueAttributes.CreatedTimestamp,
-                                                  ) * 1000,
-                                              ).toLocaleString()
-                                            : "-"}</span
-                                    >
+                                <div class="bg-black/50 p-3 rounded border border-gray-800">
+                                    <span class="text-gray-500 block mb-1">Created Timestamp</span>
+                                    <span class="font-mono">
+                                        {queueAttributes.CreatedTimestamp ? new Date(Number(queueAttributes.CreatedTimestamp) * 1000).toLocaleString() : "-"}
+                                    </span>
                                 </div>
-                                <div
-                                    class="bg-black/50 p-3 rounded border border-gray-800"
-                                >
-                                    <span class="text-gray-500 block mb-1"
-                                        >Messages Available</span
-                                    >
-                                    <span class="font-mono"
-                                        >{queueAttributes.ApproximateNumberOfMessages ??
-                                            "-"}</span
-                                    >
+                                <div class="bg-black/50 p-3 rounded border border-gray-800">
+                                    <span class="text-gray-500 block mb-1">Messages Available</span>
+                                    <span class="font-mono">{queueAttributes.ApproximateNumberOfMessages ?? "-"}</span>
                                 </div>
-                                <div
-                                    class="bg-black/50 p-3 rounded border border-gray-800"
-                                >
-                                    <span class="text-gray-500 block mb-1"
-                                        >Messages In Flight</span
-                                    >
-                                    <span class="font-mono"
-                                        >{queueAttributes.ApproximateNumberOfMessagesNotVisible ??
-                                            "-"}</span
-                                    >
+                                <div class="bg-black/50 p-3 rounded border border-gray-800">
+                                    <span class="text-gray-500 block mb-1">Messages In Flight</span>
+                                    <span class="font-mono">{queueAttributes.ApproximateNumberOfMessagesNotVisible ?? "-"}</span>
                                 </div>
                             </div>
                         {/if}
+                    </div>
+                {:else if queueDetailTab === "tags"}
+                    <div class="flex-1 overflow-auto bg-gray-900 rounded-lg border border-gray-800 p-6 shadow-sm">
+                        <div class="max-w-3xl">
+                            <h3 class="text-sm font-bold text-gray-200 mb-4 border-b border-gray-800 pb-2">Queue Tags</h3>
+
+                            <div class="bg-black border border-gray-800 rounded-lg p-4 mb-6">
+                                <h4 class="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">Add New Tag</h4>
+                                <div class="flex gap-3 items-end">
+                                    <div class="flex-1">
+                                        <label for="tag-key" class="block text-xs font-medium text-gray-400 mb-1">Key</label>
+                                        <input id="tag-key" type="text" bind:value={newTagKey} class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" placeholder="e.g. Environment" />
+                                    </div>
+                                    <div class="flex-1">
+                                        <label for="tag-value" class="block text-xs font-medium text-gray-400 mb-1">Value</label>
+                                        <input id="tag-value" type="text" bind:value={newTagValue} class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" placeholder="e.g. Production" />
+                                    </div>
+                                    <button
+                                        onclick={addTag}
+                                        disabled={!newTagKey.trim() || tagsLoading}
+                                        class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-bold transition h-[38px] flex items-center justify-center min-w-[100px]"
+                                    >
+                                        {#if tagsLoading}<span class="animate-spin mr-2">⟳</span>{/if}
+                                        Add Tag
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+                                <div class="px-4 py-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
+                                    <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Existing Tags</span>
+                                    <span class="text-xs text-gray-500">{Object.keys(queueTags).length} tags</span>
+                                </div>
+                                <div class="p-4">
+                                    {#if tagsLoading && Object.keys(queueTags).length === 0}
+                                        <div class="flex justify-center text-gray-500 py-4"><span class="animate-spin mr-2">⟳</span> Loading tags...</div>
+                                    {:else if Object.keys(queueTags).length === 0}
+                                        <div class="text-center text-gray-500 italic py-4">No tags found for this queue.</div>
+                                    {:else}
+                                        <div class="grid grid-cols-1 gap-2">
+                                            {#each Object.entries(queueTags) as [key, val]}
+                                                <div class="flex items-center justify-between bg-black border border-gray-800 rounded p-2 px-3">
+                                                    <div class="flex items-center gap-4 flex-1 overflow-hidden">
+                                                        <span class="text-blue-400 text-sm font-mono truncate min-w-[150px]">{key}</span>
+                                                        <span class="text-gray-500 text-xs shrink-0">=</span>
+                                                        <span class="text-gray-300 text-sm truncate">{val || '-'}</span>
+                                                    </div>
+                                                    <button onclick={() => deleteTag(key)} class="text-red-400 hover:text-red-300 hover:bg-red-900/30 px-2 py-1 rounded text-xs ml-4 transition shrink-0">Remove</button>
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 {/if}
             </div>
