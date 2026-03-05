@@ -8,6 +8,9 @@
         DescribeExecutionCommand,
         GetExecutionHistoryCommand,
         DescribeStateMachineCommand,
+        DeleteStateMachineCommand,
+        StopExecutionCommand,
+        RedriveExecutionCommand,
         type StateMachineListItem,
         type ExecutionListItem,
         type HistoryEvent,
@@ -45,6 +48,7 @@
     let selectedSM = $state<StateMachineListItem | null>(null);
     let detailTab = $state<"executions" | "start" | "definition">("executions");
     let smDetails = $state<any>(null);
+    let isDeletingSM = $state(false);
 
     // Executions
     let executions = $state<ExecutionListItem[]>([]);
@@ -57,6 +61,8 @@
     let executionHistory = $state<HistoryEvent[]>([]);
     let historyTokenMap = $state<string[]>([]);
     let historyCurrentToken = $state<string | undefined>(undefined);
+    let isStopping = $state(false);
+    let isRedriving = $state(false);
 
     // Start Execution
     let startInput = $state("{}");
@@ -113,6 +119,28 @@
     function handlePrev() {
         const prevToken = popToken(tokenMap);
         loadStateMachines(prevToken);
+    }
+
+    async function deleteStateMachine() {
+        if (!client || !selectedSM?.stateMachineArn) return;
+        if (!confirm(`Are you sure you want to delete state machine ${selectedSM.name}?`)) return;
+        isDeletingSM = true;
+        error = "";
+        actionMsg = "";
+        try {
+            await client.send(
+                new DeleteStateMachineCommand({
+                    stateMachineArn: selectedSM.stateMachineArn,
+                })
+            );
+            actionMsg = `Deleted state machine: ${selectedSM.name}`;
+            selectedSM = null;
+            await loadStateMachines();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            isDeletingSM = false;
+        }
     }
 
     // --- Executions Methods ---
@@ -208,6 +236,46 @@
         historyCurrentToken = undefined;
         loadExecutionDetails();
         loadExecutionHistory();
+    }
+
+    async function redriveExecution() {
+        if (!client || !selectedExecution?.executionArn) return;
+        if (!confirm("Are you sure you want to redrive this execution?")) return;
+        isRedriving = true;
+        error = "";
+        try {
+            await client.send(
+                new RedriveExecutionCommand({
+                    executionArn: selectedExecution.executionArn,
+                })
+            );
+            await loadExecutionDetails();
+            await loadExecutions();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            isRedriving = false;
+        }
+    }
+
+    async function stopExecution() {
+        if (!client || !selectedExecution?.executionArn) return;
+        if (!confirm("Are you sure you want to stop this execution?")) return;
+        isStopping = true;
+        error = "";
+        try {
+            await client.send(
+                new StopExecutionCommand({
+                    executionArn: selectedExecution.executionArn,
+                })
+            );
+            await loadExecutionDetails();
+            await loadExecutions();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            isStopping = false;
+        }
     }
 
     async function loadExecutionDetails() {
@@ -321,7 +389,7 @@
             <div class="h-full flex flex-col -m-4 sm:-m-6">
                 <!-- Header -->
                 <div
-                    class="px-4 sm:px-6 py-4 bg-gray-900 border-b border-gray-800 shrink-0"
+                    class="px-4 sm:px-6 py-4 bg-gray-900 border-b border-gray-800 shrink-0 flex justify-between items-center"
                 >
                     <div class="flex items-center gap-3">
                         <button
@@ -339,6 +407,14 @@
                             {selectedSM.name}
                         </h2>
                     </div>
+                    <button
+                        onclick={deleteStateMachine}
+                        disabled={isDeletingSM}
+                        class="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 px-3 py-1.5 rounded text-sm font-semibold transition flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {#if isDeletingSM}<span class="animate-spin">⟳</span>{/if}
+                        Delete
+                    </button>
                 </div>
 
                 <!-- Inner Tabs -->
@@ -465,7 +541,7 @@
                         {:else}
                             <div class="h-full flex flex-col -m-4 sm:-m-6">
                                 <div
-                                    class="px-4 sm:px-6 py-4 bg-gray-900 border-b border-gray-800 shrink-0"
+                                    class="px-4 sm:px-6 py-4 bg-gray-900 border-b border-gray-800 shrink-0 flex justify-between items-center"
                                 >
                                     <div class="flex items-center gap-3">
                                         <button
@@ -481,6 +557,28 @@
                                         >
                                             {selectedExecution.name}
                                         </h2>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        {#if executionDetails?.status === 'FAILED' || executionDetails?.status === 'TIMED_OUT' || executionDetails?.status === 'ABORTED'}
+                                            <button
+                                                onclick={redriveExecution}
+                                                disabled={isRedriving}
+                                                class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-1.5 rounded text-sm font-semibold transition shadow flex items-center gap-2"
+                                            >
+                                                {#if isRedriving}<span class="animate-spin">⟳</span>{/if}
+                                                Redrive Execution
+                                            </button>
+                                        {/if}
+                                        {#if executionDetails?.status === 'RUNNING'}
+                                            <button
+                                                onclick={stopExecution}
+                                                disabled={isStopping}
+                                                class="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white px-3 py-1.5 rounded text-sm font-semibold transition shadow flex items-center gap-2"
+                                            >
+                                                {#if isStopping}<span class="animate-spin">⟳</span>{/if}
+                                                Stop Execution
+                                            </button>
+                                        {/if}
                                     </div>
                                 </div>
                                 <div class="flex-1 overflow-auto p-4 sm:p-6 flex flex-col gap-6">
