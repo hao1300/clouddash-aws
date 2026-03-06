@@ -1,0 +1,121 @@
+<script lang="ts">
+    import { DescribeSecurityGroupsCommand, CreateSecurityGroupCommand, DeleteSecurityGroupCommand } from "@aws-sdk/client-ec2";
+    import PaginatedTable from "$lib/components/PaginatedTable.svelte";
+    import Modal from "$lib/components/Modal.svelte";
+    import { aws } from "$lib/services/aws.svelte";
+
+    let sgs = $state<any[]>([]);
+    let loading = $state(false);
+    let error = $state("");
+    let actionMsg = $state("");
+
+    let showCreateModal = $state(false);
+    let sgName = $state("");
+    let description = $state("");
+    let vpcId = $state("");
+    let creating = $state(false);
+
+    $effect(() => {
+        if (aws.ec2 && sgs.length === 0) {
+            loadSgs();
+        }
+    });
+
+    async function loadSgs() {
+        if (!aws.ec2) return;
+        try {
+            loading = true;
+            error = "";
+            const res = await aws.ec2.send(new DescribeSecurityGroupsCommand({}));
+            sgs = (res.SecurityGroups ?? []).map(sg => ({
+                id: sg.GroupId,
+                name: sg.GroupName,
+                description: sg.Description,
+                vpc: sg.VpcId || "-",
+                owner: sg.OwnerId
+            }));
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            loading = false;
+        }
+    }
+
+    async function handleCreate() {
+        if (!aws.ec2 || !sgName || !description) return;
+        try {
+            creating = true;
+            await aws.ec2.send(new CreateSecurityGroupCommand({ GroupName: sgName, Description: description, VpcId: vpcId || undefined }));
+            actionMsg = `Security group ${sgName} created.`;
+            showCreateModal = false;
+            loadSgs();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            creating = false;
+        }
+    }
+
+    async function handleDelete(id: string) {
+        if (!aws.ec2 || !confirm(`Delete security group ${id}?`)) return;
+        try {
+            loading = true;
+            await aws.ec2.send(new DeleteSecurityGroupCommand({ GroupId: id }));
+            actionMsg = `Security group ${id} deleted.`;
+            loadSgs();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            loading = false;
+        }
+    }
+</script>
+
+<div class="h-full relative overflow-hidden flex flex-col">
+    {#if error}<div class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30">{error}</div>{/if}
+    {#if actionMsg}<div class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30">{actionMsg}</div>{/if}
+
+    <PaginatedTable
+        items={sgs}
+        {loading}
+        onRefresh={loadSgs}
+        columns={[
+            { label: "Name", key: "name" },
+            { label: "Security Group ID", key: "id" },
+            { label: "Description", key: "description" },
+            { label: "VPC ID", key: "vpc" },
+            { label: "Owner", key: "owner" },
+        ]}
+    >
+        {#snippet headerActionsSnippet()}
+            <button onclick={() => showCreateModal = true} class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow">Create Security Group</button>
+        {#/snippet}
+        {#snippet actionsSnippet(item)}
+            <div class="flex gap-2 justify-end">
+                <button onclick={() => handleDelete(item.id)} class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition shadow">Delete</button>
+            </div>
+        {#/snippet}
+    </PaginatedTable>
+</div>
+
+<Modal bind:open={showCreateModal} title="Create Security Group">
+    <div class="space-y-4 p-4 text-gray-300">
+        <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Group Name</label>
+            <input type="text" bind:value={sgName} class="w-full bg-black border border-gray-700 rounded p-2 text-xs text-white" />
+        </div>
+        <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Description</label>
+            <input type="text" bind:value={description} class="w-full bg-black border border-gray-700 rounded p-2 text-xs text-white" />
+        </div>
+        <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">VPC ID (Optional)</label>
+            <input type="text" bind:value={vpcId} class="w-full bg-black border border-gray-700 rounded p-2 text-xs text-white" />
+        </div>
+        <div class="flex justify-end pt-2">
+            <button onclick={handleCreate} disabled={creating} class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-bold transition flex items-center gap-2">
+                {#if creating}<span class="animate-spin">⟳</span>{/if} Create
+            </button>
+        </div>
+    </div>
+</Modal>

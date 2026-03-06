@@ -1,7 +1,14 @@
 <script lang="ts">
     import Modal from "./Modal.svelte";
     import ReorderableList from "./ReorderableList.svelte";
-    import type { ServiceDef } from "$lib/services/registry";
+    import { invoke } from "@tauri-apps/api/core";
+    import QRCode from "qrcode";
+
+    export interface ServiceDef {
+        id: string;
+        label: string;
+        defaultEnabled?: boolean;
+    }
 
     let {
         open = $bindable(false),
@@ -25,7 +32,41 @@
         onChange: () => void;
     } = $props();
 
-    let settingsTab = $state<"profiles" | "regions" | "services">("profiles");
+    let settingsTab = $state<"profiles" | "regions" | "services" | "qrcode">(
+        "profiles",
+    );
+
+    let qrCodeDataUrl = $state("");
+    let qrError = $state("");
+    let loadingQr = $state(false);
+
+    $effect(() => {
+        if (settingsTab === "qrcode" && !qrCodeDataUrl && !loadingQr) {
+            loadingQr = true;
+            qrError = "";
+            invoke("get_credentials")
+                .then((creds) => {
+                    const jsonStr = JSON.stringify(creds);
+                    return QRCode.toDataURL(jsonStr, {
+                        width: 300,
+                        margin: 2,
+                        scale: 4,
+                    });
+                })
+                .then((url) => {
+                    qrCodeDataUrl = typeof url === "string" ? url : "";
+                })
+                .catch((err) => {
+                    qrError =
+                        typeof err === "string"
+                            ? err
+                            : err.message || "Failed to generate QR code";
+                })
+                .finally(() => {
+                    loadingQr = false;
+                });
+        }
+    });
 
     function toggleInSet(s: Set<string>, id: string, minSize = 1): Set<string> {
         const next = new Set(s);
@@ -72,7 +113,7 @@
         <div
             class="w-32 bg-gray-950 border-r border-gray-800 flex flex-col py-2 shrink-0"
         >
-            {#each [["profiles", "Profiles"], ["regions", "Regions"], ["services", "Services"]] as const as [key, label]}
+            {#each [["profiles", "Profiles"], ["regions", "Regions"], ["services", "Services"], ["qrcode", "Export Keys"]] as const as [key, label]}
                 <button
                     onclick={() => (settingsTab = key)}
                     class="px-4 py-2.5 text-left text-xs font-semibold transition whitespace-nowrap {settingsTab ===
@@ -183,6 +224,41 @@
                         {/if}
                     {/snippet}
                 </ReorderableList>
+            {:else if settingsTab === "qrcode"}
+                <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
+                    Export Credentials
+                </h3>
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div
+                        class="text-sm text-gray-400 text-center mb-6 leading-relaxed max-w-sm"
+                    >
+                        Scan this QR code from your mobile client's login page
+                        to securely transfer your current active AWS
+                        credentials.
+                    </div>
+
+                    {#if loadingQr}
+                        <div class="text-blue-400 font-mono text-sm">
+                            Generating secure QR code...
+                        </div>
+                    {:else if qrError}
+                        <div
+                            class="bg-red-500/20 text-red-300 p-3 rounded text-sm text-center max-w-sm border border-red-500/30"
+                        >
+                            {qrError}
+                        </div>
+                    {:else if qrCodeDataUrl}
+                        <div
+                            class="bg-white p-4 rounded-xl shadow-lg border border-gray-700"
+                        >
+                            <img
+                                src={qrCodeDataUrl}
+                                alt="Credentials QR Code"
+                                class="w-[250px] h-[250px] select-none pointer-events-none"
+                            />
+                        </div>
+                    {/if}
+                </div>
             {/if}
         </div>
     </div>

@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { Html5QrcodeScanner } from "html5-qrcode";
+
     let {
         authType = $bindable("profile"),
         selectedProfile = $bindable(""),
@@ -7,11 +9,6 @@
         sessionToken = $bindable(""),
         saveProfileChecked = $bindable(false),
         saveProfileName = $bindable(""),
-        ssoProfileName = $bindable(""),
-        ssoStartUrl = $bindable(""),
-        ssoRegion = $bindable(""),
-        ssoAccountId = $bindable(""),
-        ssoRoleName = $bindable(""),
         region = $bindable("us-east-1"),
         visibleProfiles = [],
         visibleRegions = [],
@@ -20,26 +17,70 @@
         onLogin,
         onSwitchAuthType,
     }: {
-        authType: "profile" | "manual" | "sso";
+        authType: "profile" | "manual" | "qr";
         selectedProfile: string;
         accessKeyId: string;
         secretAccessKey: string;
         sessionToken: string;
         saveProfileChecked: boolean;
         saveProfileName: string;
-        ssoProfileName: string;
-        ssoStartUrl: string;
-        ssoRegion: string;
-        ssoAccountId: string;
-        ssoRoleName: string;
         region: string;
         visibleProfiles: string[];
         visibleRegions: string[];
         loading: boolean;
         error: string;
         onLogin: () => void;
-        onSwitchAuthType: (type: "profile" | "manual" | "sso") => void;
+        onSwitchAuthType: (type: "profile" | "manual" | "qr") => void;
     } = $props();
+
+    let scanner: Html5QrcodeScanner | null = null;
+    let scannerNode: HTMLElement | null = $state(null);
+
+    $effect(() => {
+        if (authType === "qr" && scannerNode && !scanner) {
+            scanner = new Html5QrcodeScanner(
+                "qr-reader",
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                /* verbose= */ false,
+            );
+            scanner.render(onScanSuccess, onScanFailure);
+        } else if (authType !== "qr" && scanner) {
+            scanner.clear().catch(console.error);
+            scanner = null;
+        }
+
+        return () => {
+            if (scanner) {
+                scanner.clear().catch(console.error);
+                scanner = null;
+            }
+        };
+    });
+
+    function onScanSuccess(decodedText: string, decodedResult: any) {
+        try {
+            const data = JSON.parse(decodedText);
+            if (data.access_key_id && data.secret_access_key) {
+                accessKeyId = data.access_key_id;
+                secretAccessKey = data.secret_access_key;
+                if (data.session_token) sessionToken = data.session_token;
+                if (data.region) region = data.region;
+
+                onSwitchAuthType("manual");
+                if (scanner) {
+                    scanner.clear().catch(console.error);
+                    scanner = null;
+                }
+                onLogin();
+            }
+        } catch (e) {
+            console.error("Failed to parse QR code", e);
+        }
+    }
+
+    function onScanFailure(error: any) {
+        // ignore scan failures
+    }
 </script>
 
 <div class="flex items-center justify-center flex-1 p-4">
@@ -77,12 +118,12 @@
                         >API Keys</button
                     >
                     <button
-                        onclick={() => onSwitchAuthType("sso")}
+                        onclick={() => onSwitchAuthType("qr")}
                         class="flex-1 py-1.5 rounded text-xs font-semibold transition {authType ===
-                        'sso'
+                        'qr'
                             ? 'bg-blue-600 text-white'
                             : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
-                        >AWS SSO</button
+                        >QR Code</button
                     >
                 </div>
             </div>
@@ -171,87 +212,18 @@
                         class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono resize-none"
                     ></textarea>
                 </div>
-            {:else if authType === "sso"}
+            {:else if authType === "qr"}
                 <div
                     class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
                 >
-                    <strong>SSO Web Login:</strong> This will create an AWS SSO
-                    profile in your <code>~/.aws/config</code> and execute
-                    <code>aws sso login</code>, which securely opens your web
-                    browser to authenticate.
+                    <strong>QR Scan:</strong> Scan the credentials QR code from your
+                    other device to securely transfer them here.
                 </div>
-                <div>
-                    <label
-                        for="ssoProfileInput"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Profile Name</label
-                    >
-                    <input
-                        id="ssoProfileInput"
-                        type="text"
-                        bind:value={ssoProfileName}
-                        placeholder="my-sso-admin"
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                    />
-                </div>
-                <div>
-                    <label
-                        for="ssoUrlInput"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Start URL</label
-                    >
-                    <input
-                        id="ssoUrlInput"
-                        type="text"
-                        bind:value={ssoStartUrl}
-                        placeholder="https://d-12345.awsapps.com/start"
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                    />
-                </div>
-                <div class="flex flex-col sm:flex-row gap-2">
-                    <div class="flex-1">
-                        <label
-                            for="ssoRegInput"
-                            class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                            >SSO Region</label
-                        >
-                        <input
-                            id="ssoRegInput"
-                            type="text"
-                            bind:value={ssoRegion}
-                            placeholder="us-east-1"
-                            class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                        />
-                    </div>
-                    <div class="flex-1">
-                        <label
-                            for="ssoAccInput"
-                            class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                            >Account ID</label
-                        >
-                        <input
-                            id="ssoAccInput"
-                            type="text"
-                            bind:value={ssoAccountId}
-                            placeholder="123456789012"
-                            class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                        />
-                    </div>
-                </div>
-                <div>
-                    <label
-                        for="ssoRoleInput"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Role Name</label
-                    >
-                    <input
-                        id="ssoRoleInput"
-                        type="text"
-                        bind:value={ssoRoleName}
-                        placeholder="AdministratorAccess"
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                    />
-                </div>
+                <div
+                    id="qr-reader"
+                    bind:this={scannerNode}
+                    class="w-full bg-white text-black min-h-[300px] rounded overflow-hidden"
+                ></div>
             {/if}
             <div>
                 <label
