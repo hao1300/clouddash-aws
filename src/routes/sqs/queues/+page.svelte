@@ -34,7 +34,16 @@
     });
 
     let queueToDelete = $state<any>(null);
+    let showDeleteModal = $state(false);
     let deleteLoading = $state(false);
+
+    $effect(() => {
+        if (queueToDelete) showDeleteModal = true;
+    });
+
+    $effect(() => {
+        if (!showDeleteModal) queueToDelete = null;
+    });
 
     $effect(() => {
         if (aws.sqs && queues.length === 0) {
@@ -308,7 +317,7 @@
     </div>
 </Modal>
 
-<Modal bind:open={!!queueToDelete} title="Delete Queue">
+<Modal bind:open={showDeleteModal} title="Delete Queue">
     <div class="space-y-4">
         <p class="text-sm text-gray-300">
             Are you sure you want to delete queue <strong

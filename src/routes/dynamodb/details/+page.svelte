@@ -36,7 +36,16 @@
     let createIndexLoading = $state(false);
 
     let indexToDelete = $state<string | null>(null);
+    let showDeleteModal = $state(false);
     let deleteIndexLoading = $state(false);
+
+    $effect(() => {
+        if (indexToDelete) showDeleteModal = true;
+    });
+
+    $effect(() => {
+        if (!showDeleteModal) indexToDelete = null;
+    });
 
     $effect(() => {
         if (aws.dynamodb && tableName) {
@@ -727,7 +736,7 @@
     </div>
 </Modal>
 
-<Modal bind:open={!!indexToDelete} title="Delete Index">
+<Modal bind:open={showDeleteModal} title="Delete Index">
     <div class="space-y-4">
         <p class="text-sm text-gray-300">
             Are you sure you want to delete the index <strong

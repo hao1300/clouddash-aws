@@ -39,7 +39,9 @@ const customRequestHandler = {
 
         const headers: Record<string, string> = {};
         if (request.headers) {
+            const forbidden = ["host", "content-length", "connection", "expect", "te", "trailer", "transfer-encoding", "upgrade", "via", "keep-alive"];
             for (const [key, value] of Object.entries(request.headers)) {
+                if (forbidden.includes(key.toLowerCase())) continue;
                 headers[key] = String(value);
             }
         }

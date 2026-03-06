@@ -53,8 +53,26 @@
     let itemEditorJson = $state("");
     let itemEditorLoading = $state(false);
     let itemToDelete = $state<any>(null);
+    let showDeleteModal = $state(false);
     let deleteItemLoading = $state(false);
     let viewingItem = $state<any>(null);
+    let showViewModal = $state(false);
+
+    $effect(() => {
+        if (itemToDelete) showDeleteModal = true;
+    });
+
+    $effect(() => {
+        if (!showDeleteModal) itemToDelete = null;
+    });
+
+    $effect(() => {
+        if (viewingItem) showViewModal = true;
+    });
+
+    $effect(() => {
+        if (!showViewModal) viewingItem = null;
+    });
 
     $effect(() => {
         if (aws.dynamodb && tableName) {
@@ -149,7 +167,8 @@
             let exprVals: Record<string, any> | undefined;
             if (scanValues.trim()) {
                 const parsed = JSON.parse(scanValues);
-                if (Object.keys(parsed).length) exprVals = marshalValues(parsed);
+                if (Object.keys(parsed).length)
+                    exprVals = marshalValues(parsed);
             }
 
             const resp = await aws.dynamodb.send(
@@ -194,7 +213,8 @@
             let exprVals: Record<string, any> | undefined;
             if (queryValues.trim()) {
                 const parsed = JSON.parse(queryValues);
-                if (Object.keys(parsed).length) exprVals = marshalValues(parsed);
+                if (Object.keys(parsed).length)
+                    exprVals = marshalValues(parsed);
             }
 
             let consistentRead = queryConsistentRead;
@@ -290,8 +310,10 @@
                 (k: any) => k.KeyType === "RANGE",
             )?.AttributeName;
             const key: any = {};
-            if (pk && itemToDelete[pk] !== undefined) key[pk] = itemToDelete[pk];
-            if (sk && itemToDelete[sk] !== undefined) key[sk] = itemToDelete[sk];
+            if (pk && itemToDelete[pk] !== undefined)
+                key[pk] = itemToDelete[pk];
+            if (sk && itemToDelete[sk] !== undefined)
+                key[sk] = itemToDelete[sk];
             await aws.dynamodb.send(
                 new DeleteItemCommand({
                     TableName: tableName,
@@ -313,7 +335,9 @@
             key: k,
             label: k,
             format: (val: any) =>
-                typeof val === "object" ? JSON.stringify(val) : String(val ?? ""),
+                typeof val === "object"
+                    ? JSON.stringify(val)
+                    : String(val ?? ""),
         })),
     );
 </script>
@@ -366,7 +390,8 @@
                     class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-400 font-mono flex items-center"
                 >
                     <span
-                        >Table: <strong class="text-blue-300">{tableName}</strong
+                        >Table: <strong class="text-blue-300"
+                            >{tableName}</strong
                         ></span
                     >
                 </div>
@@ -375,8 +400,7 @@
                     disabled={loading}
                     class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-6 py-2 rounded text-xs font-bold transition flex items-center gap-2"
                 >
-                    {#if loading}<span class="animate-spin">⟳</span>{/if} Run
-                    Scan
+                    {#if loading}<span class="animate-spin">⟳</span>{/if} Run Scan
                 </button>
             </div>
             <div class="grid grid-cols-2 gap-2">
@@ -387,7 +411,7 @@
                 />
                 <input
                     bind:value={scanValues}
-                    placeholder='Expression JSON (e.g. {":status": "active"})'
+                    placeholder={'Expression JSON (e.g. {":status": "active"})'}
                     class="bg-black font-mono text-xs p-2 rounded border border-gray-700 text-green-400 outline-none focus:border-blue-500"
                 />
             </div>
@@ -397,7 +421,8 @@
                     class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-400 font-mono flex items-center"
                 >
                     <span
-                        >Table: <strong class="text-blue-300">{tableName}</strong
+                        >Table: <strong class="text-blue-300"
+                            >{tableName}</strong
                         ></span
                     >
                 </div>
@@ -415,14 +440,15 @@
                     disabled={loading || !queryKeyCond}
                     class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-6 py-2 rounded text-xs font-bold transition flex items-center gap-2"
                 >
-                    {#if loading}<span class="animate-spin">⟳</span>{/if} Run
-                    Query
+                    {#if loading}<span class="animate-spin">⟳</span>{/if} Run Query
                 </button>
             </div>
             <div
                 class="flex gap-4 items-center bg-gray-950 p-3 rounded border border-gray-800"
             >
-                <div class="text-xs font-bold text-gray-400 w-24">Key Values:</div>
+                <div class="text-xs font-bold text-gray-400 w-24">
+                    Key Values:
+                </div>
                 <div class="flex-1 flex gap-2">
                     <div class="flex-1">
                         <input
@@ -475,7 +501,9 @@
             onPrev={() => {
                 resultTokenMap.pop();
                 const prevToken = resultTokenMap[resultTokenMap.length - 1];
-                exploreMode === "scan" ? runScan(prevToken) : runQuery(prevToken);
+                exploreMode === "scan"
+                    ? runScan(prevToken)
+                    : runQuery(prevToken);
             }}
             onRefresh={() => {
                 resultTokenMap = [];
@@ -548,7 +576,7 @@
     </div>
 </Modal>
 
-<Modal bind:open={!!itemToDelete} title="Delete Item">
+<Modal bind:open={showDeleteModal} title="Delete Item">
     <div class="space-y-4">
         <p class="text-sm text-gray-300">
             Delete this item? This cannot be undone.
@@ -571,9 +599,10 @@
     </div>
 </Modal>
 
-<Modal bind:open={!!viewingItem} title="Item Details" size="lg">
+<Modal bind:open={showViewModal} title="Item Details" size="lg">
     <div class="bg-black/50 p-4 rounded min-h-[40vh] overflow-auto">
-        <pre class="text-xs text-green-400 font-mono whitespace-pre-wrap">{JSON.stringify(
+        <pre
+            class="text-xs text-green-400 font-mono whitespace-pre-wrap">{JSON.stringify(
                 viewingItem,
                 null,
                 2,

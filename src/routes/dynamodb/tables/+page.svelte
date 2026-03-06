@@ -33,7 +33,16 @@
     let createTableLoading = $state(false);
 
     let tableToDelete = $state<string | null>(null);
+    let showDeleteModal = $state(false);
     let deleteTableLoading = $state(false);
+
+    $effect(() => {
+        if (tableToDelete) showDeleteModal = true;
+    });
+
+    $effect(() => {
+        if (!showDeleteModal) tableToDelete = null;
+    });
 
     $effect(() => {
         if (aws.dynamodb && tables.length === 0) {
@@ -386,7 +395,7 @@
     </div>
 </Modal>
 
-<Modal bind:open={!!tableToDelete} title="Delete Table">
+<Modal bind:open={showDeleteModal} title="Delete Table">
     <div class="space-y-4">
         <p class="text-sm text-gray-300">
             Are you sure you want to delete table <strong
