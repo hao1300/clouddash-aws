@@ -54,7 +54,7 @@
     }
 
     function handleBack() {
-        goto("/secretsmanager/secrets");
+        goto("/secretsmanager");
     }
 </script>
 

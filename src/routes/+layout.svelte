@@ -112,7 +112,9 @@
   );
   let serviceTabs = $derived($page.data.tabs || []);
   let serviceActiveTab = $derived(
-    $page.data.activeTab || $page.url.pathname.split("/").pop() || "",
+    $page.data.activeTab ||
+      $page.url.pathname.split("/").slice(2).join("/") ||
+      "",
   );
 
   function handleServiceTabChange(tabId: string) {

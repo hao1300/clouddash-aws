@@ -54,7 +54,7 @@
     }
 
     function handleBack() {
-        goto("/ec2/instances");
+        goto("/ec2");
     }
 </script>
 

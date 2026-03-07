@@ -2,7 +2,7 @@ export function load({ url }) {
     const instanceId = url.searchParams.get("id") || "";
     return {
         tabs: [
-            { id: "instances", label: "Instances" },
+            { id: "", label: "Instances" },
             ...(instanceId ? [{ id: "details", label: "Details" }] : []),
             { id: "amis", label: "AMIs" },
             { id: "volumes", label: "Volumes" },

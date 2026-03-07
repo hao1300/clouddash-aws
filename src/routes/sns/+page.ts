@@ -1,5 +1,2 @@
-import { redirect } from '@sveltejs/kit';
-
-export function load() {
-    throw redirect(307, '/sns/topics');
-}
+// Neutralized redirect
+export function load() { }

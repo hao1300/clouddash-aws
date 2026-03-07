@@ -43,7 +43,7 @@
     }
 
     function handleBack() {
-        goto("/cloudformation/stacks");
+        goto("/cloudformation");
     }
 </script>
 

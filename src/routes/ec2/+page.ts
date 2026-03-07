@@ -1,5 +1,2 @@
-import { redirect } from '@sveltejs/kit';
-
-export function load() {
-    throw redirect(307, '/ec2/instances');
-}
+// Neutralized redirect
+export function load() { }

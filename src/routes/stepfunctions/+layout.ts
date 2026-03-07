@@ -3,7 +3,7 @@ export function load({ url }) {
     const execArn = url.searchParams.get("exec") || "";
     return {
         tabs: [
-            { id: "list", label: "State Machines" },
+            { id: "", label: "State Machines" },
             ...(smArn ? [{ id: "details", label: "Details" }] : []),
             ...(execArn ? [{ id: "execution", label: "Execution" }] : []),
         ]

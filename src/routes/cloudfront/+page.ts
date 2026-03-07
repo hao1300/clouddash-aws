@@ -1,5 +1,2 @@
-import { redirect } from '@sveltejs/kit';
-
-export function load() {
-    throw redirect(307, '/cloudfront/distributions');
-}
+// Neutralized redirect
+export function load() { }

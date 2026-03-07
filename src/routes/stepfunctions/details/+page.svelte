@@ -100,7 +100,7 @@
             await aws.sfn.send(
                 new DeleteStateMachineCommand({ stateMachineArn: smArn }),
             );
-            goto("/stepfunctions/list");
+            goto("/stepfunctions");
         } catch (e: any) {
             error = e.message || String(e);
         } finally {
@@ -109,7 +109,7 @@
     }
 
     function handleBack() {
-        goto("/stepfunctions/list");
+        goto("/stepfunctions");
     }
 
     function handleSelectExecution(exec: ExecutionListItem) {
@@ -226,10 +226,13 @@
             >
                 <div class="mb-4">
                     <label
+                        for="start-name"
                         class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
-                        >Execution Name (Optional)</label
                     >
+                        Execution Name (Optional)
+                    </label>
                     <input
+                        id="start-name"
                         type="text"
                         bind:value={startName}
                         class="w-full bg-black border border-gray-700 rounded p-2 text-xs text-white"
@@ -237,12 +240,15 @@
                 </div>
                 <div class="mb-4">
                     <label
+                        for="start-input"
                         class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
-                        >Input JSON</label
                     >
+                        Input JSON
+                    </label>
                     <textarea
+                        id="start-input"
                         bind:value={startInput}
-                        class="w-full h-48 bg-black border border-gray-700 rounded p-3 text-xs font-mono text-gray-300"
+                        class="w-full h-48 bg-black border border-gray-700 rounded p-3 text-xs font-mono text-gray-300 outline-none focus:border-blue-500"
                     ></textarea>
                 </div>
                 <button

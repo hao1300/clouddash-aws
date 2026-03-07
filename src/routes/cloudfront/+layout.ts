@@ -1,7 +1,7 @@
 export function load() {
     return {
         tabs: [
-            { id: "distributions", label: "Distributions" },
+            { id: "", label: "Distributions" },
         ]
     };
 }

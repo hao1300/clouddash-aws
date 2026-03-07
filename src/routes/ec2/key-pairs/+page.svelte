@@ -1,5 +1,9 @@
 <script lang="ts">
-    import { DescribeKeyPairsCommand, CreateKeyPairCommand, DeleteKeyPairCommand } from "@aws-sdk/client-ec2";
+    import {
+        DescribeKeyPairsCommand,
+        CreateKeyPairCommand,
+        DeleteKeyPairCommand,
+    } from "@aws-sdk/client-ec2";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
@@ -26,12 +30,12 @@
             loading = true;
             error = "";
             const res = await aws.ec2.send(new DescribeKeyPairsCommand({}));
-            keyPairs = (res.KeyPairs ?? []).map(kp => ({
+            keyPairs = (res.KeyPairs ?? []).map((kp) => ({
                 id: kp.KeyPairId,
                 name: kp.KeyName,
                 fingerprint: kp.KeyFingerprint,
                 type: kp.KeyType,
-                creation: kp.CreateTime?.toLocaleString() ?? "-"
+                creation: kp.CreateTime?.toLocaleString() ?? "-",
             }));
         } catch (e: any) {
             error = e.message || String(e);
@@ -44,7 +48,9 @@
         if (!aws.ec2 || !keyName) return;
         try {
             creating = true;
-            const res = await aws.ec2.send(new CreateKeyPairCommand({ KeyName: keyName }));
+            const res = await aws.ec2.send(
+                new CreateKeyPairCommand({ KeyName: keyName }),
+            );
             createdKey = res.KeyMaterial || "No key material returned.";
             actionMsg = `Key pair ${keyName} created. COPY THE PRIVATE KEY NOW!`;
             loadKeyPairs();
@@ -71,8 +77,16 @@
 </script>
 
 <div class="h-full relative overflow-hidden flex flex-col">
-    {#if error}<div class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30">{error}</div>{/if}
-    {#if actionMsg}<div class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30">{actionMsg}</div>{/if}
+    {#if error}<div
+            class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
+        >
+            {error}
+        </div>{/if}
+    {#if actionMsg}<div
+            class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30"
+        >
+            {actionMsg}
+        </div>{/if}
 
     <PaginatedTable
         items={keyPairs}
@@ -87,13 +101,24 @@
         ]}
     >
         {#snippet headerActionsSnippet()}
-            <button onclick={() => { showCreateModal = true; createdKey = ""; }} class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow">Create Key Pair</button>
-        {#/snippet}
+            <button
+                onclick={() => {
+                    showCreateModal = true;
+                    createdKey = "";
+                }}
+                class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow"
+                >Create Key Pair</button
+            >
+        {/snippet}
         {#snippet actionsSnippet(item)}
             <div class="flex gap-2 justify-end">
-                <button onclick={() => handleDelete(item.id, item.name)} class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition shadow">Delete</button>
+                <button
+                    onclick={() => handleDelete(item.id, item.name)}
+                    class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition shadow"
+                    >Delete</button
+                >
             </div>
-        {#/snippet}
+        {/snippet}
     </PaginatedTable>
 </div>
 
@@ -101,21 +126,43 @@
     <div class="space-y-4 p-4 text-gray-300">
         {#if !createdKey}
             <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Key Name</label>
-                <input type="text" bind:value={keyName} class="w-full bg-black border border-gray-700 rounded p-2 text-xs text-white" />
+                <label
+                    class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
+                    >Key Name</label
+                >
+                <input
+                    type="text"
+                    bind:value={keyName}
+                    class="w-full bg-black border border-gray-700 rounded p-2 text-xs text-white"
+                />
             </div>
             <div class="flex justify-end pt-2">
-                <button onclick={handleCreate} disabled={creating} class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-bold transition flex items-center gap-2">
+                <button
+                    onclick={handleCreate}
+                    disabled={creating}
+                    class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-bold transition flex items-center gap-2"
+                >
                     {#if creating}<span class="animate-spin">⟳</span>{/if} Create
                 </button>
             </div>
         {:else}
             <div>
-                <label class="block text-[10px] font-bold text-red-500 uppercase mb-1 tracking-widest">Private Key Material (Save now!)</label>
-                <textarea readonly class="w-full h-64 bg-black border border-red-900/40 rounded p-2 text-[10px] font-mono text-gray-300 whitespace-pre overflow-auto">{createdKey}</textarea>
+                <label
+                    class="block text-[10px] font-bold text-red-500 uppercase mb-1 tracking-widest"
+                    >Private Key Material (Save now!)</label
+                >
+                <textarea
+                    readonly
+                    class="w-full h-64 bg-black border border-red-900/40 rounded p-2 text-[10px] font-mono text-gray-300 whitespace-pre overflow-auto"
+                    >{createdKey}</textarea
+                >
             </div>
             <div class="flex justify-end pt-2">
-                <button onclick={() => showCreateModal = false} class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded text-xs font-bold transition">Close</button>
+                <button
+                    onclick={() => (showCreateModal = false)}
+                    class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded text-xs font-bold transition"
+                    >Close</button
+                >
             </div>
         {/if}
     </div>

@@ -138,7 +138,7 @@
             await aws.lambda.send(
                 new DeleteFunctionCommand({ FunctionName: fnName }),
             );
-            goto("/lambda/functions");
+            goto("/lambda");
         } catch (e: any) {
             error = e.message || String(e);
         } finally {
@@ -147,7 +147,7 @@
     }
 
     function handleBack() {
-        goto("/lambda/functions");
+        goto("/lambda");
     }
 </script>
 

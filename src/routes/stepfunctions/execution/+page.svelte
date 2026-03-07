@@ -98,7 +98,7 @@
         if (details?.stateMachineArn) {
             goto(`/stepfunctions/details?id=${details.stateMachineArn}`);
         } else {
-            goto("/stepfunctions/list");
+            goto("/stepfunctions");
         }
     }
 </script>

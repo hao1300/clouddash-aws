@@ -1,5 +1,9 @@
 <script lang="ts">
-    import { DescribeAddressesCommand, ReleaseAddressCommand, AllocateAddressCommand } from "@aws-sdk/client-ec2";
+    import {
+        DescribeAddressesCommand,
+        ReleaseAddressCommand,
+        AllocateAddressCommand,
+    } from "@aws-sdk/client-ec2";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
 
@@ -20,15 +24,15 @@
             loading = true;
             error = "";
             const res = await aws.ec2.send(new DescribeAddressesCommand({}));
-            eips = (res.Addresses ?? []).map(eip => {
-                const nameTag = eip.Tags?.find(t => t.Key === "Name");
+            eips = (res.Addresses ?? []).map((eip) => {
+                const nameTag = eip.Tags?.find((t) => t.Key === "Name");
                 return {
                     id: eip.AllocationId,
                     name: nameTag?.Value ?? "-",
                     publicIp: eip.PublicIp,
                     privateIp: eip.PrivateIpAddress ?? "-",
                     instance: eip.InstanceId ?? "-",
-                    networkInterface: eip.NetworkInterfaceId ?? "-"
+                    networkInterface: eip.NetworkInterfaceId ?? "-",
                 };
             });
         } catch (e: any) {
@@ -68,8 +72,16 @@
 </script>
 
 <div class="h-full relative overflow-hidden flex flex-col">
-    {#if error}<div class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30">{error}</div>{/if}
-    {#if actionMsg}<div class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30">{actionMsg}</div>{/if}
+    {#if error}<div
+            class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
+        >
+            {error}
+        </div>{/if}
+    {#if actionMsg}<div
+            class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30"
+        >
+            {actionMsg}
+        </div>{/if}
 
     <PaginatedTable
         items={eips}
@@ -84,12 +96,20 @@
         ]}
     >
         {#snippet headerActionsSnippet()}
-            <button onclick={handleAllocate} class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow">Allocate Elastic IP</button>
+            <button
+                onclick={handleAllocate}
+                class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow"
+                >Allocate Elastic IP</button
+            >
         {/snippet}
         {#snippet actionsSnippet(item)}
             <div class="flex gap-2 justify-end">
-                <button onclick={() => handleRelease(item.id, item.publicIp)} class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition shadow">Release</button>
+                <button
+                    onclick={() => handleRelease(item.id, item.publicIp)}
+                    class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition shadow"
+                    >Release</button
+                >
             </div>
-        {#/snippet}
+        {/snippet}
     </PaginatedTable>
 </div>
