@@ -44,8 +44,10 @@
         if (!showDeleteModal) tableToDelete = null;
     });
 
+    let __loadTables_loaded = false;
     $effect(() => {
-        if (aws.dynamodb && tables.length === 0) {
+        if (aws.dynamodb && !__loadTables_loaded) {
+            __loadTables_loaded = true;
             loadTables();
         }
     });
@@ -217,7 +219,7 @@
             {actionMsg}
         </div>{/if}
 
-    <div class="flex-1 {error || actionMsg ? 'pt-8' : ''}">
+    <div class="flex-1 min-h-0 {error || actionMsg ? 'pt-8' : ''}">
         <PaginatedTable
             items={tables}
             {loading}

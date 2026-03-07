@@ -15,8 +15,10 @@
     let error = $state("");
     let actionMsg = $state("");
 
+    let __loadInstances_loaded = false;
     $effect(() => {
-        if (aws.ec2 && instances.length === 0) {
+        if (aws.ec2 && !__loadInstances_loaded) {
+            __loadInstances_loaded = true;
             loadInstances();
         }
     });
@@ -101,50 +103,56 @@
             {actionMsg}
         </div>{/if}
 
-    <PaginatedTable
-        items={instances}
-        {loading}
-        onRefresh={loadInstances}
-        columns={[
-            {
-                label: "Name",
-                key: "name",
-                onClick: (item) => handleSelectInstance(item.id),
-            },
-            { label: "Instance ID", key: "id" },
-            { label: "Type", key: "type" },
-            { label: "State", key: "state", format: (v) => v.toUpperCase() },
-            { label: "Public IP", key: "publicIp" },
-            { label: "Private IP", key: "privateIp" },
-            { label: "AZ", key: "az" },
-        ]}
-    >
-        {#snippet actionsSnippet(item)}
-            <div class="flex gap-2 justify-end">
-                {#if item.state === "stopped"}
+    <div class="flex-1 min-h-0 {error || actionMsg ? 'pt-8' : ''}">
+        <PaginatedTable
+            items={instances}
+            {loading}
+            onRefresh={loadInstances}
+            columns={[
+                {
+                    label: "Name",
+                    key: "name",
+                    onClick: (item) => handleSelectInstance(item.id),
+                },
+                { label: "Instance ID", key: "id" },
+                { label: "Type", key: "type" },
+                {
+                    label: "State",
+                    key: "state",
+                    format: (v) => v.toUpperCase(),
+                },
+                { label: "Public IP", key: "publicIp" },
+                { label: "Private IP", key: "privateIp" },
+                { label: "AZ", key: "az" },
+            ]}
+        >
+            {#snippet actionsSnippet(item)}
+                <div class="flex gap-2 justify-end">
+                    {#if item.state === "stopped"}
+                        <button
+                            onclick={() => handleAction("start", item.id)}
+                            class="text-[10px] bg-green-600/20 hover:bg-green-600/40 text-green-400 px-2 py-1 rounded border border-green-500/30 transition shadow"
+                            >Start</button
+                        >
+                    {:else if item.state === "running"}
+                        <button
+                            onclick={() => handleAction("stop", item.id)}
+                            class="text-[10px] bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 px-2 py-1 rounded border border-yellow-500/30 transition shadow"
+                            >Stop</button
+                        >
+                        <button
+                            onclick={() => handleAction("reboot", item.id)}
+                            class="text-[10px] bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 px-2 py-1 rounded border border-blue-500/30 transition shadow"
+                            >Reboot</button
+                        >
+                    {/if}
                     <button
-                        onclick={() => handleAction("start", item.id)}
-                        class="text-[10px] bg-green-600/20 hover:bg-green-600/40 text-green-400 px-2 py-1 rounded border border-green-500/30 transition shadow"
-                        >Start</button
+                        onclick={() => handleAction("terminate", item.id)}
+                        class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition shadow"
+                        >Terminate</button
                     >
-                {:else if item.state === "running"}
-                    <button
-                        onclick={() => handleAction("stop", item.id)}
-                        class="text-[10px] bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 px-2 py-1 rounded border border-yellow-500/30 transition shadow"
-                        >Stop</button
-                    >
-                    <button
-                        onclick={() => handleAction("reboot", item.id)}
-                        class="text-[10px] bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 px-2 py-1 rounded border border-blue-500/30 transition shadow"
-                        >Reboot</button
-                    >
-                {/if}
-                <button
-                    onclick={() => handleAction("terminate", item.id)}
-                    class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition shadow"
-                    >Terminate</button
-                >
-            </div>
-        {/snippet}
-    </PaginatedTable>
+                </div>
+            {/snippet}
+        </PaginatedTable>
+    </div>
 </div>

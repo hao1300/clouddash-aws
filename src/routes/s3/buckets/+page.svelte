@@ -22,8 +22,10 @@
     let region = $state("us-east-1");
     let creating = $state(false);
 
+    let __loadBuckets_loaded = false;
     $effect(() => {
-        if (aws.s3 && buckets.length === 0) {
+        if (aws.s3 && !__loadBuckets_loaded) {
+            __loadBuckets_loaded = true;
             loadBuckets();
         }
     });
@@ -157,43 +159,45 @@
             {actionMsg}
         </div>{/if}
 
-    <PaginatedTable
-        items={buckets}
-        {loading}
-        onRefresh={loadBuckets}
-        columns={[
-            {
-                label: "Bucket Name",
-                key: "name",
-                onClick: (item) => handleSelectBucket(item.name),
-                format: (v) => "🪣 " + v,
-            },
-            { label: "Region", key: "region" },
-            { label: "Creation Date", key: "creation" },
-        ]}
-    >
-        {#snippet headerActionsSnippet()}
-            <button
-                onclick={() => (showCreateModal = true)}
-                class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow"
-                >Create Bucket</button
-            >
-        {/snippet}
-        {#snippet actionsSnippet(item)}
-            <div class="flex gap-2 justify-end">
+    <div class="flex-1 min-h-0 {error || actionMsg ? 'pt-8' : ''}">
+        <PaginatedTable
+            items={buckets}
+            {loading}
+            onRefresh={loadBuckets}
+            columns={[
+                {
+                    label: "Bucket Name",
+                    key: "name",
+                    onClick: (item) => handleSelectBucket(item.name),
+                    format: (v) => "🪣 " + v,
+                },
+                { label: "Region", key: "region" },
+                { label: "Creation Date", key: "creation" },
+            ]}
+        >
+            {#snippet headerActionsSnippet()}
                 <button
-                    onclick={() => handleEmpty(item.name)}
-                    class="text-[10px] bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 px-2 py-1 rounded border border-yellow-500/30 transition shadow"
-                    >Empty</button
+                    onclick={() => (showCreateModal = true)}
+                    class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow"
+                    >Create Bucket</button
                 >
-                <button
-                    onclick={() => handleDelete(item.name)}
-                    class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition shadow"
-                    >Delete</button
-                >
-            </div>
-        {/snippet}
-    </PaginatedTable>
+            {/snippet}
+            {#snippet actionsSnippet(item)}
+                <div class="flex gap-2 justify-end">
+                    <button
+                        onclick={() => handleEmpty(item.name)}
+                        class="text-[10px] bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 px-2 py-1 rounded border border-yellow-500/30 transition shadow"
+                        >Empty</button
+                    >
+                    <button
+                        onclick={() => handleDelete(item.name)}
+                        class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition shadow"
+                        >Delete</button
+                    >
+                </div>
+            {/snippet}
+        </PaginatedTable>
+    </div>
 </div>
 
 <Modal bind:open={showCreateModal} title="Create Bucket">

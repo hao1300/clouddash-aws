@@ -45,8 +45,10 @@
         if (!showDeleteModal) queueToDelete = null;
     });
 
+    let _loadedQueues = false;
     $effect(() => {
-        if (aws.sqs && queues.length === 0) {
+        if (aws.sqs && !_loadedQueues) {
+            _loadedQueues = true;
             loadQueues();
         }
     });
@@ -204,7 +206,7 @@
             {actionMsg}
         </div>{/if}
 
-    <div class="flex-1 {error || actionMsg ? 'pt-8' : ''}">
+    <div class="flex-1 min-h-0 {error || actionMsg ? 'pt-8' : ''}">
         <PaginatedTable
             items={queues}
             {loading}
