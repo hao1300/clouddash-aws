@@ -23,19 +23,22 @@
     let timeRange = $state(3600); // 1 hour default
 
     $effect(() => {
-        if (aws.cwLogs && logGroups.length === 0) {
+        if (aws.cwLogs && logGroups.length === 0 && !lgLoading) {
             loadLogGroups();
         }
     });
 
     async function loadLogGroups() {
-        if (!aws.cwLogs) return;
+        if (!aws.cwLogs || lgLoading) return;
         try {
             lgLoading = true;
             error = "";
             actionMsg = "";
-            logGroups = [];
+            const allGroups: any[] = [];
             let nextToken: string | undefined = undefined;
+            let pageCount = 0;
+            const maxPages = 10; // Load up to 500 groups (50 per page) for performance
+
             do {
                 const resp: any = await aws.cwLogs.send(
                     new DescribeLogGroupsCommand({ limit: 50, nextToken }),
@@ -45,9 +48,12 @@
                     storedBytes: g.storedBytes ?? 0,
                     retentionDays: g.retentionInDays ?? "Never expire",
                 }));
-                logGroups = [...logGroups, ...page];
+                allGroups.push(...page);
                 nextToken = resp.nextToken;
-            } while (nextToken);
+                pageCount++;
+            } while (nextToken && pageCount < maxPages);
+
+            logGroups = allGroups;
         } catch (e) {
             error = String(e);
         } finally {
@@ -55,10 +61,20 @@
         }
     }
 
+    let stopQueryFlag = $state(false);
+    let queryStatus = $state("");
+
+    async function stopQuery() {
+        stopQueryFlag = true;
+        actionMsg = "Stopping query...";
+    }
+
     async function runInsightsQuery() {
         if (!aws.cwLogs || !selectedLogGroup || !logQuery.trim()) return;
         try {
             logQueryLoading = true;
+            stopQueryFlag = false;
+            queryStatus = "Starting...";
             error = "";
             logResults = [];
             logColumns = [];
@@ -77,37 +93,68 @@
 
             let status = "Running";
             let results: any[] = [];
+            let pollCount = 0;
+            const maxPolls = 120; // 2 minutes max polling (1s intervals)
+
             while (status === "Running" || status === "Scheduled") {
+                if (stopQueryFlag) {
+                    status = "Cancelled";
+                    actionMsg = "Query execution stopped by user.";
+                    break;
+                }
+
+                pollCount++;
+                if (pollCount > maxPolls) {
+                    status = "TimedOut";
+                    error =
+                        "Query timed out after 2 minutes. Try a smaller time range or more specific query.";
+                    break;
+                }
+
                 await new Promise((r) => setTimeout(r, 1000));
                 const getResp = await aws.cwLogs.send(
                     new GetQueryResultsCommand({ queryId }),
                 );
                 status = getResp.status ?? "Complete";
+                queryStatus = status;
+
                 if (status === "Complete") {
                     results = getResp.results ?? [];
                     break;
-                } else if (status === "Failed" || status === "Cancelled") {
+                } else if (
+                    status === "Failed" ||
+                    status === "Cancelled" ||
+                    status === "Timeout" ||
+                    status === "Unknown"
+                ) {
                     throw new Error(`Query ${status}`);
                 }
             }
 
             if (results.length > 0) {
-                const firstRow = results[0];
+                // Limit to 1000 results for UI performance
+                const displayResults = results.slice(0, 1000);
+                if (results.length > 1000) {
+                    actionMsg = `Query returned ${results.length} results. Displaying first 1,000.`;
+                }
+
+                const firstRow = displayResults[0];
                 logColumns = firstRow.map((f: any) => f.field || "");
-                logResults = results.map((row) => {
+                logResults = displayResults.map((row) => {
                     const obj: any = {};
                     row.forEach((f: any) => {
                         obj[f.field || "unknown"] = f.value;
                     });
                     return obj;
                 });
-            } else {
+            } else if (status === "Complete") {
                 actionMsg = "Query completed. No results found.";
             }
         } catch (e) {
             error = String(e);
         } finally {
             logQueryLoading = false;
+            queryStatus = "";
         }
     }
 </script>
@@ -205,43 +252,55 @@
             </div>
 
             <div>
-                <label
-                    for="query-textarea"
-                    class="block text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider flex justify-between items-center"
-                >
-                    <span>CloudWatch Logs Insights Query</span>
-                    <button
-                        onclick={runInsightsQuery}
-                        disabled={logQueryLoading || !selectedLogGroup}
-                        class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded transition font-bold tracking-normal uppercase disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                <div class="flex justify-between items-center mb-1">
+                    <label
+                        for="query-textarea"
+                        class="block text-xs text-gray-400 font-bold uppercase tracking-wider"
                     >
+                        CloudWatch Logs Insights Query
+                    </label>
+                    <div class="flex items-center gap-2">
                         {#if logQueryLoading}
-                            <svg
-                                class="animate-spin h-4 w-4 text-white"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
+                            <button
+                                onclick={stopQuery}
+                                class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded transition font-bold uppercase text-xs flex items-center shadow-sm"
                             >
-                                <circle
-                                    class="opacity-25"
-                                    cx="12"
-                                    cy="12"
-                                    r="10"
-                                    stroke="currentColor"
-                                    stroke-width="4"
-                                ></circle>
-                                <path
-                                    class="opacity-75"
-                                    fill="currentColor"
-                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                ></path>
-                            </svg>
-                            Running...
-                        {:else}
-                            Run Query
+                                Stop
+                            </button>
                         {/if}
-                    </button>
-                </label>
+                        <button
+                            onclick={runInsightsQuery}
+                            disabled={logQueryLoading || !selectedLogGroup}
+                            class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded transition font-bold tracking-normal uppercase disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                        >
+                            {#if logQueryLoading}
+                                <svg
+                                    class="animate-spin h-4 w-4 text-white"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <circle
+                                        class="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        stroke-width="4"
+                                    ></circle>
+                                    <path
+                                        class="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
+                                </svg>
+                                {queryStatus || "Running..."}
+                            {:else}
+                                Run Query
+                            {/if}
+                        </button>
+                    </div>
+                </div>
                 <textarea
                     id="query-textarea"
                     bind:value={logQuery}
