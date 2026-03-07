@@ -1,4 +1,3 @@
-mod s3;
 mod state;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -12,7 +11,6 @@ pub fn run() {
             state::authenticate,
             state::get_credentials,
             state::save_profile,
-            s3::s3,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

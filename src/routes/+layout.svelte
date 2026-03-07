@@ -89,6 +89,24 @@
   type SettingsTab = "profiles" | "regions" | "services";
   let settingsTab = $state<SettingsTab>("profiles");
 
+  // Service Dropdown
+  let dropdownOpen = $state(false);
+  let searchQuery = $state("");
+  let filteredServices = $derived(
+    services.filter((s) =>
+      s.label.toLowerCase().includes(searchQuery.toLowerCase()),
+    ),
+  );
+
+  function toggleStar(id: string, e: MouseEvent) {
+    e.stopPropagation();
+    const next = new Set(serviceVisible);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    serviceVisible = next;
+    saveState();
+  }
+
   // Derived
   let visibleProfiles = $derived(
     profileOrder.filter((p) => profileVisible.has(p)),
@@ -204,10 +222,7 @@
       ];
     }
     if (saved?.serviceVisible) serviceVisible = new Set(saved.serviceVisible);
-    else
-      serviceVisible = new Set(
-        services.filter((s) => s.defaultEnabled).map((s) => s.id),
-      );
+    else serviceVisible = new Set(["cloudwatch", "s3", "dynamodb"]);
 
     // Restore profile/region and auto-login
     if (saved?.authType) authType = saved.authType;
@@ -368,10 +383,80 @@
 
       <!-- Services List (SvelteKit routes) -->
       <div
-        class="flex items-center min-w-0 flex-1 order-2 sm:order-1 px-2 sm:px-3 py-1.5"
+        class="flex items-center min-w-0 flex-1 order-2 sm:order-1 px-2 sm:px-3 py-1.5 gap-2"
       >
+        <!-- Service Dropdown Button -->
+        <div class="relative shrink-0">
+          <button
+            onclick={() => (dropdownOpen = !dropdownOpen)}
+            class="px-3 py-1.5 rounded flex items-center gap-2 text-xs font-bold transition whitespace-nowrap {dropdownOpen
+              ? 'bg-blue-600 text-white shadow'
+              : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-700'}"
+          >
+            <span class="text-blue-400">☰</span> Services
+          </button>
+
+          {#if dropdownOpen}
+            <!-- Click outside overlay -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="fixed inset-0 z-[90] bg-transparent"
+              onclick={() => (dropdownOpen = false)}
+            ></div>
+
+            <div
+              class="absolute top-full left-0 mt-2 w-64 bg-gray-900 border border-gray-800 rounded-lg shadow-2xl z-[100] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150"
+            >
+              <div class="p-2 border-b border-gray-800 bg-gray-900/50">
+                <input
+                  type="text"
+                  bind:value={searchQuery}
+                  placeholder="Search services..."
+                  class="w-full bg-black border border-gray-800 rounded p-1.5 text-xs text-white outline-none focus:border-blue-500 transition"
+                  onclick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div class="max-h-80 overflow-y-auto p-1 py-2 space-y-0.5">
+                {#each filteredServices as svc}
+                  <div
+                    class="group flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-800 cursor-pointer transition"
+                    onclick={() => {
+                      switchTab(svc.id);
+                      dropdownOpen = false;
+                    }}
+                  >
+                    <span
+                      class="text-xs font-medium text-gray-300 group-hover:text-white"
+                      >{svc.label}</span
+                    >
+                    <button
+                      onclick={(e) => toggleStar(svc.id, e)}
+                      class="text-xs p-1 rounded hover:bg-gray-700 transition {serviceVisible.has(
+                        svc.id,
+                      )
+                        ? 'text-yellow-400'
+                        : 'text-gray-600 hover:text-gray-400'}"
+                      title={serviceVisible.has(svc.id) ? "Unstar" : "Star"}
+                    >
+                      {serviceVisible.has(svc.id) ? "★" : "☆"}
+                    </button>
+                  </div>
+                {/each}
+                {#if filteredServices.length === 0}
+                  <div
+                    class="px-3 py-4 text-center text-xs text-gray-500 italic"
+                  >
+                    No services found
+                  </div>
+                {/if}
+              </div>
+            </div>
+          {/if}
+        </div>
+
         <nav
-          class="flex gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-hide snap-x"
+          class="flex gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-hide snap-x pt-0.5"
         >
           {#each enabledServices as svc}
             <button
