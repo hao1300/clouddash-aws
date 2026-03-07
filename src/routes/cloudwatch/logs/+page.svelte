@@ -144,6 +144,7 @@
             );
             actionMsg = `Log Group "${name}" deleted.`;
             logGroupsTokenMap = [];
+            selectedGroupForStreams = "";
             await loadLogGroupsTable();
         } catch (e) {
             error = String(e);
@@ -494,6 +495,11 @@
                             >{selectedGroupForStreams}</span
                         >
                     </div>
+                    <button
+                        onclick={() => deleteLogGroup(selectedGroupForStreams)}
+                        class="text-xs text-red-400 hover:text-red-300 transition px-3 py-1.5 rounded bg-red-600/10 hover:bg-red-600/20 border border-red-900/30"
+                        >Delete Log Group</button
+                    >
                 </div>
 
                 <PaginatedTable
@@ -537,30 +543,13 @@
                 >
                     {#snippet headerActionsSnippet()}
                         <div class="flex items-center gap-3 pr-2">
-                            <div class="flex items-center gap-2">
-                                <input
-                                    type="text"
-                                    bind:value={logStreamSearchPrefix}
-                                    onkeydown={(e) => {
-                                        if (e.key === "Enter") {
-                                            logStreamsTokenMap = [];
-                                            loadLogStreams(
-                                                selectedGroupForStreams,
-                                            );
-                                        }
-                                    }}
-                                    placeholder="Prefix..."
-                                    class="bg-gray-950 border border-gray-700 rounded px-3 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-200 w-40"
-                                />
-                                <button
-                                    onclick={() => {
-                                        logStreamsTokenMap = [];
-                                        loadLogStreams(selectedGroupForStreams);
-                                    }}
-                                    class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded transition font-bold"
-                                    >Search</button
-                                >
-                            </div>
+                            <!-- Prefix search hidden as requested -->
+                            <button
+                                onclick={() =>
+                                    setRetention(selectedGroupForStreams)}
+                                class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded transition font-bold"
+                                >Retention</button
+                            >
                             <div class="w-px h-6 bg-gray-700 mx-1"></div>
                             <button
                                 onclick={() =>
@@ -618,14 +607,6 @@
                 {/snippet}
                 {#snippet actionsSnippet(item)}
                     <div class="flex gap-1 justify-end">
-                        <button
-                            onclick={(e) => {
-                                e.stopPropagation();
-                                setRetention(item.name);
-                            }}
-                            class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition"
-                            >Retention</button
-                        >
                         <button
                             onclick={(e) => {
                                 e.stopPropagation();
