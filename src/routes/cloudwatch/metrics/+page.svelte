@@ -1,5 +1,6 @@
 <script lang="ts">
     import { page } from "$app/stores";
+    import { goto } from "$app/navigation";
     import {
         ListMetricsCommand,
         GetMetricStatisticsCommand,
@@ -16,9 +17,6 @@
     let metricsLoading = $state(false);
     let metricsTokenMap = $state<string[]>([]);
     let metricsCurrentToken = $state<string | undefined>(undefined);
-    let selectedMetric = $state<any>(null);
-    let metricStats = $state<any[]>([]);
-    let metricStatsLoading = $state(false);
     let expandedNamespace = $state<string | null>(null);
 
     // Sync filter from URL if it changes (e.g. navigating from Alarms)
@@ -145,57 +143,10 @@
         }
     }
 
-    async function loadMetricStats(metric: any) {
-        if (!aws.cw) return;
-        try {
-            selectedMetric = metric;
-            metricStatsLoading = true;
-            error = "";
-            actionMsg = "";
-
-            const endTime = new Date();
-            const startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000); // Last 24 hours
-
-            const resp = await aws.cw.send(
-                new GetMetricStatisticsCommand({
-                    Namespace: metric.namespace,
-                    MetricName: metric.metricName,
-                    Dimensions: metric.rawDimensions,
-                    StartTime: startTime,
-                    EndTime: endTime,
-                    Period: 3600, // 1 hour periods
-                    Statistics: [
-                        "Average",
-                        "Sum",
-                        "Minimum",
-                        "Maximum",
-                        "SampleCount",
-                    ],
-                }),
-            );
-
-            metricStats = (resp.Datapoints ?? [])
-                .map((dp) => ({
-                    timestamp: dp.Timestamp?.toLocaleString() ?? "",
-                    average: dp.Average?.toFixed(2) ?? "-",
-                    sum: dp.Sum?.toFixed(2) ?? "-",
-                    min: dp.Minimum?.toFixed(2) ?? "-",
-                    max: dp.Maximum?.toFixed(2) ?? "-",
-                    count: dp.SampleCount ?? "-",
-                    unit: dp.Unit ?? "",
-                    rawTimestamp: dp.Timestamp,
-                    rawAverage: dp.Average ?? dp.Sum ?? dp.Maximum ?? 0,
-                }))
-                .sort(
-                    (a, b) =>
-                        new Date(b.timestamp).getTime() -
-                        new Date(a.timestamp).getTime(),
-                );
-        } catch (e) {
-            error = String(e);
-        } finally {
-            metricStatsLoading = false;
-        }
+    async function handleSelectMetric(m: any) {
+        const dimensions = JSON.stringify(m.rawDimensions);
+        const url = `/cloudwatch/metrics/detail?namespace=${encodeURIComponent(m.namespace)}&name=${encodeURIComponent(m.metricName)}&dimensions=${encodeURIComponent(dimensions)}`;
+        goto(url);
     }
 </script>
 
@@ -207,274 +158,118 @@
         </div>{/if}
 
     <div class="flex-1 {error ? 'pt-8' : ''} flex flex-col overflow-hidden">
-        {#if selectedMetric}
-            <div class="h-full flex flex-col p-4 bg-gray-950">
-                <div
-                    class="flex items-center gap-3 mb-6 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm shrink-0"
-                >
-                    <button
-                        onclick={() => {
-                            selectedMetric = null;
-                            metricStats = [];
-                        }}
-                        class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
-                        >← Back</button
-                    >
-                    <span
-                        class="text-sm font-bold text-gray-200 truncate flex-1"
-                        >{selectedMetric.metricName}
-                        <span class="text-xs font-normal text-gray-500 ml-2"
-                            >({selectedMetric.namespace})</span
-                        ></span
-                    >
-                </div>
-
-                <div class="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
-                    <div
-                        class="p-6 bg-gray-900 rounded-lg border border-gray-800 shadow-sm overflow-hidden flex flex-col"
-                    >
-                        <h3
-                            class="text-xs font-bold text-gray-400 tracking-wide uppercase mb-4"
-                        >
-                            Last 24 Hours Metrics
-                        </h3>
-
-                        {#if metricStatsLoading}
-                            <div
-                                class="h-40 flex items-center justify-center text-gray-400 text-sm animate-pulse"
-                            >
-                                <span class="animate-spin mr-2">⟳</span> Loading
-                                statistics...
-                            </div>
-                        {:else if metricStats.length === 0}
-                            <div
-                                class="h-40 flex items-center justify-center text-gray-500 text-sm italic"
-                            >
-                                No data points available for the last 24 hours.
-                            </div>
-                        {:else}
-                            {#if metricChartData}
-                                <div
-                                    class="relative w-full bg-gray-950 rounded-lg border border-gray-800/80 p-4 shadow-inner mb-6"
-                                >
-                                    <svg
-                                        viewBox="0 0 {metricChartData.width} {metricChartData.height}"
-                                        class="w-full h-auto max-h-[180px]"
-                                    >
-                                        <path
-                                            d={metricChartData.path}
-                                            fill="none"
-                                            stroke="#3B82F6"
-                                            stroke-width="2"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                        />
-                                        {#each metricChartData.path.split(" L ") as pt, i}
-                                            <circle
-                                                cx={i === 0
-                                                    ? pt
-                                                          .substring(2)
-                                                          .split(",")[0]
-                                                    : pt.split(",")[0]}
-                                                cy={i === 0
-                                                    ? pt
-                                                          .substring(2)
-                                                          .split(",")[1]
-                                                    : pt.split(",")[1]}
-                                                r="2.5"
-                                                fill="#60A5FA"
-                                            />
-                                        {/each}
-                                    </svg>
-                                    <div
-                                        class="flex justify-between mt-2 px-10 text-[10px] text-gray-500 font-mono"
-                                    >
-                                        <span
-                                            >{new Date(
-                                                metricChartData.minT,
-                                            ).toLocaleTimeString()}</span
-                                        >
-                                        <span
-                                            >{new Date(
-                                                metricChartData.maxT,
-                                            ).toLocaleTimeString()}</span
-                                        >
-                                    </div>
-                                </div>
-                            {/if}
-
-                            <div
-                                class="flex-1 overflow-auto bg-gray-950/20 rounded shadow-inner"
-                            >
-                                <table
-                                    class="w-full text-left text-sm whitespace-nowrap"
-                                >
-                                    <thead
-                                        class="sticky top-0 bg-gray-900 border-b border-gray-800 uppercase text-[10px] tracking-wider text-gray-400 font-semibold"
-                                    >
-                                        <tr>
-                                            <th class="px-3 py-2">Timestamp</th>
-                                            <th class="px-3 py-2 text-right"
-                                                >Average</th
-                                            >
-                                            <th class="px-3 py-2 text-right"
-                                                >Maximum</th
-                                            >
-                                            <th class="px-3 py-2 text-right"
-                                                >Minimum</th
-                                            >
-                                            <th class="px-3 py-2 text-right"
-                                                >SampleCount</th
-                                            >
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-800/30">
-                                        {#each metricStats as stat}
-                                            <tr
-                                                class="hover:bg-gray-800/40 transition-colors"
-                                            >
-                                                <td
-                                                    class="px-3 py-1.5 text-gray-400 font-mono text-xs"
-                                                    >{stat.timestamp}</td
-                                                >
-                                                <td
-                                                    class="px-3 py-1.5 text-blue-300 font-mono text-xs text-right"
-                                                    >{stat.average}</td
-                                                >
-                                                <td
-                                                    class="px-3 py-1.5 text-gray-400 font-mono text-xs text-right"
-                                                    >{stat.max}</td
-                                                >
-                                                <td
-                                                    class="px-3 py-1.5 text-gray-400 font-mono text-xs text-right"
-                                                    >{stat.min}</td
-                                                >
-                                                <td
-                                                    class="px-3 py-1.5 text-gray-500 font-mono text-xs text-right"
-                                                >
-                                                    {stat.count}
-                                                    <span
-                                                        class="text-[9px] text-gray-600 ml-0.5"
-                                                        >{stat.unit}</span
-                                                    >
-                                                </td>
-                                            </tr>
-                                        {/each}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {/if}
-                    </div>
-                </div>
-            </div>
-        {:else}
-            <div class="h-full flex flex-col p-4 bg-gray-950 overflow-hidden">
-                <div
-                    class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm flex items-center justify-between mb-4 shrink-0"
-                >
-                    <div class="flex items-center gap-2">
-                        <input
-                            type="text"
-                            bind:value={metricSearchFilter}
-                            placeholder="Search currently loaded metrics..."
-                            class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 text-gray-200 w-80 shadow-inner"
-                        />
-                    </div>
-                    <div class="flex items-center gap-4">
+        <div class="h-full flex flex-col p-4 bg-gray-950 overflow-hidden">
+            <div
+                class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm flex items-center justify-between mb-4 shrink-0"
+            >
+                <div class="flex items-center gap-2 relative">
+                    <input
+                        type="text"
+                        bind:value={metricSearchFilter}
+                        placeholder="Search currently loaded metrics..."
+                        class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 text-gray-200 w-80 shadow-inner pr-8"
+                    />
+                    {#if metricSearchFilter}
                         <button
-                            onclick={() =>
-                                loadMetrics(popToken(metricsTokenMap))}
-                            disabled={metricsTokenMap.length === 0 ||
-                                metricsLoading}
-                            class="text-xs font-bold text-gray-400 hover:text-gray-200 transition disabled:opacity-30"
-                            >← Previous Page</button
+                            onclick={() => (metricSearchFilter = "")}
+                            class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors bg-gray-900/50 rounded-full w-5 h-5 flex items-center justify-center text-[10px]"
+                            title="Clear search"
                         >
-                        <button
-                            onclick={() => loadMetrics(metricsCurrentToken)}
-                            disabled={!metricsCurrentToken || metricsLoading}
-                            class="text-xs font-bold text-blue-400 hover:text-blue-300 transition disabled:opacity-30"
-                            >Next Page →</button
-                        >
-                    </div>
-                </div>
-
-                <div class="flex-1 overflow-y-auto space-y-4 pr-1">
-                    {#if metricsLoading}
-                        <div
-                            class="h-40 flex items-center justify-center text-gray-400 text-sm animate-pulse"
-                        >
-                            <span class="animate-spin mr-2">⟳</span> Loading metrics...
-                        </div>
-                    {:else if metrics.length === 0}
-                        <div
-                            class="h-40 flex items-center justify-center text-gray-500 text-sm italic"
-                        >
-                            No metrics found.
-                        </div>
-                    {:else}
-                        {#each Object.entries(metricsByNamespace) as [ns, mets]}
-                            <div
-                                class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-sm"
-                            >
-                                <button
-                                    class="w-full px-4 py-3 bg-gray-800/40 hover:bg-gray-800/60 flex justify-between items-center transition-colors border-b border-gray-800/0"
-                                    class:border-b-gray-800={expandedNamespace ===
-                                        ns}
-                                    onclick={() =>
-                                        (expandedNamespace =
-                                            expandedNamespace === ns
-                                                ? null
-                                                : ns)}
-                                >
-                                    <div class="flex items-center gap-3">
-                                        <span
-                                            class="font-bold text-gray-200 text-sm"
-                                            >{ns}</span
-                                        >
-                                        <span
-                                            class="text-[10px] text-gray-500 bg-gray-950 px-2 py-0.5 rounded-full border border-gray-800"
-                                            >{mets.length} metrics</span
-                                        >
-                                    </div>
-                                    <span
-                                        class="text-gray-400 text-xs transition-transform {expandedNamespace ===
-                                        ns
-                                            ? 'rotate-180'
-                                            : ''}">▼</span
-                                    >
-                                </button>
-
-                                {#if expandedNamespace === ns}
-                                    <div
-                                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1 p-2 bg-gray-950/20"
-                                    >
-                                        {#each mets as m}
-                                            <button
-                                                onclick={() =>
-                                                    loadMetricStats(m)}
-                                                class="px-4 py-3 bg-gray-900/40 hover:bg-gray-800/60 rounded border border-gray-800/50 hover:border-blue-900/30 text-left group transition shadow-sm"
-                                            >
-                                                <div
-                                                    class="text-xs font-bold text-gray-300 group-hover:text-blue-400 transition-colors truncate"
-                                                >
-                                                    {m.metricName}
-                                                </div>
-                                                <div
-                                                    class="text-[10px] text-gray-500 truncate mt-1 font-mono"
-                                                    title={m.dimensions}
-                                                >
-                                                    {m.dimensions ||
-                                                        "No dimensions"}
-                                                </div>
-                                            </button>
-                                        {/each}
-                                    </div>
-                                {/if}
-                            </div>
-                        {/each}
+                            ✕
+                        </button>
                     {/if}
                 </div>
+                <div class="flex items-center gap-4">
+                    <button
+                        onclick={() => loadMetrics(popToken(metricsTokenMap))}
+                        disabled={metricsTokenMap.length === 0 ||
+                            metricsLoading}
+                        class="text-xs font-bold text-gray-400 hover:text-gray-200 transition disabled:opacity-30"
+                        >← Previous Page</button
+                    >
+                    <button
+                        onclick={() => loadMetrics(metricsCurrentToken)}
+                        disabled={!metricsCurrentToken || metricsLoading}
+                        class="text-xs font-bold text-blue-400 hover:text-blue-300 transition disabled:opacity-30"
+                        >Next Page →</button
+                    >
+                </div>
             </div>
-        {/if}
+
+            <div class="flex-1 overflow-y-auto space-y-4 pr-1">
+                {#if metricsLoading}
+                    <div
+                        class="h-40 flex items-center justify-center text-gray-400 text-sm animate-pulse"
+                    >
+                        <span class="animate-spin mr-2">⟳</span> Loading metrics...
+                    </div>
+                {:else if metrics.length === 0}
+                    <div
+                        class="h-40 flex items-center justify-center text-gray-500 text-sm italic"
+                    >
+                        No metrics found.
+                    </div>
+                {:else}
+                    {#each Object.entries(metricsByNamespace) as [ns, mets]}
+                        <div
+                            class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-sm"
+                        >
+                            <button
+                                class="w-full px-4 py-3 bg-gray-800/40 hover:bg-gray-800/60 flex justify-between items-center transition-colors border-b border-gray-800/0"
+                                class:border-b-gray-800={expandedNamespace ===
+                                    ns}
+                                onclick={() =>
+                                    (expandedNamespace =
+                                        expandedNamespace === ns ? null : ns)}
+                            >
+                                <div class="flex items-center gap-3">
+                                    <span
+                                        class="font-bold text-gray-200 text-sm"
+                                        >{ns}</span
+                                    >
+                                    <span
+                                        class="text-[10px] text-gray-500 bg-gray-950 px-2 py-0.5 rounded-full border border-gray-800"
+                                        >{mets.length} metrics</span
+                                    >
+                                </div>
+                                <span
+                                    class="text-gray-400 text-xs transition-transform {expandedNamespace ===
+                                    ns
+                                        ? 'rotate-180'
+                                        : ''}">▼</span
+                                >
+                            </button>
+
+                            {#if expandedNamespace === ns}
+                                <div
+                                    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1 p-2 bg-gray-950/20"
+                                >
+                                    {#each mets as m}
+                                        <button
+                                            onclick={() =>
+                                                handleSelectMetric(m)}
+                                            class="px-4 py-3 bg-gray-900/40 hover:bg-gray-800/60 rounded border border-gray-800/50 hover:border-blue-900/30 text-left group transition shadow-sm"
+                                        >
+                                            <div
+                                                class="text-xs font-bold text-gray-300 group-hover:text-blue-400 transition-colors truncate"
+                                            >
+                                                {m.metricName}
+                                            </div>
+                                            <div
+                                                class="text-[10px] text-gray-500 truncate mt-1 font-mono"
+                                                title={m.dimensions}
+                                            >
+                                                {m.dimensions ||
+                                                    "No dimensions"}
+                                            </div>
+                                        </button>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </div>
+                    {/each}
+                {/if}
+            </div>
+        </div>
     </div>
 </div>

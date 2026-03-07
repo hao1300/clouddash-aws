@@ -126,8 +126,17 @@
     }
 
     function navigateToMetric(item: any) {
-        const filter = `${item.metric} ${item.dimensions || ""}`.trim();
-        goto(`/cloudwatch/metrics?filter=${encodeURIComponent(filter)}`);
+        const dimensions = JSON.stringify(
+            (item.dimensions || "")
+                .split(" ")
+                .map((d: string) => {
+                    const [Name, Value] = d.split("=");
+                    return { Name, Value };
+                })
+                .filter((d: any) => d.Name && d.Value),
+        );
+        const url = `/cloudwatch/metrics/detail?namespace=${encodeURIComponent(item.namespace)}&name=${encodeURIComponent(item.metric)}&dimensions=${encodeURIComponent(dimensions)}`;
+        goto(url);
     }
 </script>
 
