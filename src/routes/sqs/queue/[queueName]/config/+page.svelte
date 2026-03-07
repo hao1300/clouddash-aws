@@ -6,7 +6,8 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
 
-    let queueUrl = $derived($page.url.searchParams.get("url") || "");
+    let { data } = $props();
+    let queueUrl = $derived(data.queueUrl || "");
 
     let error = $state("");
     let actionMsg = $state("");

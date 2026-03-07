@@ -7,6 +7,7 @@
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
   import Login from "$lib/components/Login.svelte";
   import { aws } from "$lib/services/aws.svelte";
+  import ServiceLayout from "$lib/components/ServiceLayout.svelte";
 
   let { children }: { children: Snippet } = $props();
 
@@ -106,6 +107,20 @@
 
   // To highlight active tab on top
   let activeId = $derived($page.url.pathname.split("/")[1] || "");
+  let serviceTitle = $derived(
+    services.find((s) => s.id === activeId)?.label || "",
+  );
+  let serviceTabs = $derived($page.data.tabs || []);
+  let serviceActiveTab = $derived(
+    $page.data.activeTab || $page.url.pathname.split("/").pop() || "",
+  );
+
+  function handleServiceTabChange(tabId: string) {
+    const url = new URL($page.url);
+    // If it's a relative-like tab change within the service
+    url.pathname = `/${activeId}/${tabId}`;
+    goto(url.toString());
+  }
 
   function loadState() {
     try {
@@ -390,11 +405,18 @@
 
     <!-- Dynamic SvelteKit Content Slot -->
     <div class="flex-1 overflow-hidden relative">
-      <div class="absolute inset-0">
-        {#key refreshKey}
-          {@render children()}
-        {/key}
-      </div>
+      <ServiceLayout
+        title={serviceTitle}
+        tabs={serviceTabs}
+        activeTab={serviceActiveTab}
+        onTabChange={handleServiceTabChange}
+      >
+        <div class="absolute inset-0">
+          {#key refreshKey}
+            {@render children()}
+          {/key}
+        </div>
+      </ServiceLayout>
     </div>
   {/if}
 </main>

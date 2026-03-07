@@ -189,8 +189,8 @@
         }
     }
 
-    function handleSelectQueue(url: string) {
-        goto(`/sqs/messages?url=${encodeURIComponent(url)}`);
+    function handleSelectQueue(item: any) {
+        goto(`/sqs/queue/${item.name}?url=${encodeURIComponent(item.url)}`);
     }
 </script>
 
@@ -215,7 +215,7 @@
                 {
                     key: "name",
                     label: "Queue Name",
-                    onClick: (item) => handleSelectQueue(item.url),
+                    onClick: (item) => handleSelectQueue(item),
                 },
                 { key: "messages_available", label: "Messages Available" },
                 { key: "messages_in_flight", label: "Messages In Flight" },
@@ -230,11 +230,6 @@
             {/snippet}
             {#snippet actionsSnippet(item)}
                 <div class="flex gap-1 justify-end">
-                    <button
-                        onclick={() => handleSelectQueue(item.url)}
-                        class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition"
-                        >Details</button
-                    >
                     <button
                         onclick={() => (queueToDelete = item)}
                         class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"

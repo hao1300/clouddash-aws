@@ -12,7 +12,7 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
 
-    let tableName = $derived($page.url.searchParams.get("name") || "");
+    let tableName = $derived($page.params.tableId || "");
 
     let error = $state("");
     let actionMsg = $state("");
@@ -548,7 +548,7 @@
 <Modal
     bind:open={showItemEditor}
     title={itemEditorMode === "create" ? "Create Item" : "Edit Item"}
-    size="lg"
+    maxWidth="max-w-4xl"
 >
     <div class="flex flex-col h-[60vh]">
         <p class="text-xs text-gray-400 mb-2">
@@ -599,7 +599,7 @@
     </div>
 </Modal>
 
-<Modal bind:open={showViewModal} title="Item Details" size="lg">
+<Modal bind:open={showViewModal} title="Item Details" maxWidth="max-w-4xl">
     <div class="bg-black/50 p-4 rounded min-h-[40vh] overflow-auto">
         <pre
             class="text-xs text-green-400 font-mono whitespace-pre-wrap">{JSON.stringify(

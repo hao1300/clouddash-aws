@@ -9,8 +9,9 @@
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
+    import { goto } from "$app/navigation";
 
-    let bucket = $derived($page.url.searchParams.get("bucket") || "");
+    let bucket = $derived($page.params.bucketName || "");
     let prefix = $derived($page.url.searchParams.get("prefix") || "");
 
     let objects = $state<any[]>([]);
@@ -199,55 +200,52 @@
     }
 
     function navigateToFolder(key: string) {
-        const url = new URL(window.location.href);
+        const url = new URL($page.url);
         url.searchParams.set("prefix", key);
-        window.history.pushState({}, "", url.toString());
-        // Triggers derived re-evaluation if we use $page, but since we are using relative navigation via goto in layout,
-        // it's better to just use goto here for consistency.
-        import("$app/navigation").then((m) => m.goto(url.toString()));
+        goto(url.toString());
     }
 </script>
 
-{#if bucket}
-    <div class="h-full relative overflow-hidden flex flex-col">
-        {#if error}<div
-                class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
-            >
-                {error}
-            </div>{/if}
-
-        <div
-            class="p-2 bg-gray-900 border-b border-gray-800 flex items-center gap-4"
+<div class="h-full relative overflow-hidden flex flex-col pt-2 bg-gray-950">
+    {#if error}<div
+            class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
-            <div
-                class="flex-1 flex items-center gap-1 text-xs text-gray-400 overflow-hidden"
-            >
-                <span class="text-blue-400 font-bold shrink-0">{bucket}</span>
-                <span class="text-gray-600 shrink-0">/</span>
-                <span class="truncate">{prefix}</span>
-            </div>
-            <div class="flex gap-2">
-                <input
-                    type="file"
-                    bind:this={uploadInput}
-                    onchange={handleUpload}
-                    class="hidden"
-                />
-                <button
-                    onclick={() => uploadInput?.click()}
-                    disabled={uploading}
-                    class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-[10px] font-bold transition flex items-center gap-1"
-                >
-                    {#if uploading}<span class="animate-spin">⟳</span>{/if} Upload
-                </button>
-                <button
-                    onclick={() => (showCreateFolder = true)}
-                    class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded text-[10px] font-bold transition"
-                    >New Folder</button
-                >
-            </div>
-        </div>
+            {error}
+        </div>{/if}
 
+    <div
+        class="p-2 bg-gray-900 border-b border-gray-800 flex items-center justify-between gap-4"
+    >
+        <div
+            class="hidden md:flex items-center gap-1 text-xs text-gray-400 overflow-hidden"
+        >
+            <span class="text-blue-400 font-bold shrink-0">{bucket}</span>
+            <span class="text-gray-600 shrink-0">/</span>
+            <span class="truncate">{prefix}</span>
+        </div>
+        <div class="flex gap-2">
+            <input
+                type="file"
+                bind:this={uploadInput}
+                onchange={handleUpload}
+                class="hidden"
+            />
+            <button
+                onclick={() => uploadInput?.click()}
+                disabled={uploading}
+                class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-[10px] font-bold transition flex items-center gap-1"
+            >
+                {#if uploading}<span class="animate-spin">⟳</span>{/if} Upload
+            </button>
+            <button
+                onclick={() => (showCreateFolder = true)}
+                class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded text-[10px] font-bold transition"
+                >New Folder</button
+            >
+        </div>
+    </div>
+
+    <div class="flex-1 min-h-0 bg-gray-950">
         <PaginatedTable
             items={objects}
             {loading}
@@ -268,6 +266,10 @@
                     key: "name",
                     format: (v, item) =>
                         (item.type === "folder" ? "📁 " : "📄 ") + v,
+                    onClick: (item) =>
+                        item.type === "folder"
+                            ? navigateToFolder(item.key)
+                            : handlePreview(item.key),
                 },
                 { label: "Size", key: "size" },
                 { label: "Last Modified", key: "lastModified" },
@@ -278,41 +280,32 @@
                     {#if item.type === "file"}
                         <button
                             onclick={() => handlePreview(item.key)}
-                            class="text-[10px] bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 px-2 py-1 rounded border border-blue-500/30 transition"
+                            class="text-[10px] bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 px-2 py-1 rounded border border-blue-500/30 transition"
                             >View</button
                         >
                         <button
                             onclick={() => handleDownload(item.key)}
-                            class="text-[10px] bg-green-600/20 hover:bg-green-600/40 text-green-400 px-2 py-1 rounded border border-green-500/30 transition"
+                            class="text-[10px] bg-green-600/10 hover:bg-green-600/20 text-green-400 px-2 py-1 rounded border border-green-500/30 transition"
                             >↓</button
                         >
                     {/if}
                     <button
                         onclick={() => handleDelete(item.key)}
-                        class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition"
+                        class="text-[10px] bg-red-600/10 hover:bg-red-600/20 text-red-400 px-2 py-1 rounded border border-red-500/30 transition"
                         >Delete</button
                     >
                 </div>
             {/snippet}
-            {#snippet rowClickSnippet(item)}
-                {#if item.type === "folder"}
-                    <button
-                        class="absolute inset-0 z-0 opacity-0"
-                        aria-label="Open folder"
-                        onclick={() => navigateToFolder(item.key)}
-                    ></button>
-                {/if}
-            {/snippet}
         </PaginatedTable>
     </div>
-{:else}
-    <div class="p-8 text-gray-500 italic">No bucket selected.</div>
-{/if}
+</div>
 
-<Modal bind:open={showPreview} title="File Preview: {previewKey}">
-    <div
-        class="h-[70vh] flex flex-col p-4 bg-gray-950 rounded-lg overflow-hidden"
-    >
+<Modal
+    bind:open={showPreview}
+    title="File Preview: {previewKey}"
+    maxWidth="max-w-4xl"
+>
+    <div class="h-[70vh] flex flex-col bg-gray-950 rounded-lg overflow-hidden">
         {#if previewLoading}
             <div
                 class="flex-1 flex items-center justify-center text-blue-400 animate-pulse font-bold tracking-widest uppercase text-xs"
@@ -327,13 +320,15 @@
 </Modal>
 
 <Modal bind:open={showCreateFolder} title="New Folder">
-    <div class="space-y-4 p-4 text-gray-300">
+    <div class="space-y-4 text-gray-300">
         <div>
             <label
+                for="folderName"
                 class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
                 >Folder Name</label
             >
             <input
+                id="folderName"
                 type="text"
                 bind:value={folderName}
                 class="w-full bg-black border border-gray-700 rounded p-2 text-xs text-white"

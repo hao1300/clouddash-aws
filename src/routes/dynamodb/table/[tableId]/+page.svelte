@@ -8,7 +8,7 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
 
-    let tableName = $derived($page.url.searchParams.get("name") || "");
+    let tableName = $derived($page.params.tableId || "");
 
     let error = $state("");
     let actionMsg = $state("");

@@ -203,7 +203,7 @@
     }
 
     function handleSelectTable(name: string) {
-        goto(`/dynamodb/details?name=${encodeURIComponent(name)}`);
+        goto(`/dynamodb/table/${encodeURIComponent(name)}`);
     }
 </script>
 
@@ -260,11 +260,6 @@
             {/snippet}
             {#snippet actionsSnippet(item)}
                 <div class="flex gap-1 justify-end">
-                    <button
-                        onclick={() => handleSelectTable(item.name)}
-                        class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition"
-                        >Details</button
-                    >
                     <button
                         onclick={() => (tableToDelete = item.name)}
                         class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"

@@ -143,7 +143,7 @@
     }
 
     function handleSelectBucket(name: string) {
-        goto(`/s3/objects?bucket=${name}`);
+        goto(`/s3/bucket/${encodeURIComponent(name)}`);
     }
 </script>
 
