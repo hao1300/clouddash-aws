@@ -19,7 +19,7 @@
     let lgLoading = $state(false);
     let selectedLogGroup = $state("");
     let logQuery = $state(
-        "fields @timestamp, @message\n| sort @timestamp desc\n| limit 20",
+        "fields @timestamp, @message, @logStream\n| sort @timestamp desc\n| limit 20",
     );
     let logResults = $state<any[]>([]);
     let logColumns = $state<string[]>([]);
@@ -155,8 +155,10 @@
         const timestamp = row["@timestamp"];
         if (group && stream && timestamp) {
             const timeDate = new Date(timestamp).getTime();
+            const start = timeDate - 1000;
+            const end = timeDate + 1000;
             goto(
-                `/cloudwatch/logs?group=${encodeURIComponent(group)}&stream=${encodeURIComponent(stream)}&time=${timeDate}`,
+                `/cloudwatch/logs?group=${encodeURIComponent(group)}&stream=${encodeURIComponent(stream)}&start=${start}&end=${end}&type=absolute`,
             );
         }
     }
