@@ -3,10 +3,14 @@
         DescribeLogGroupsCommand,
         StartQueryCommand,
         GetQueryResultsCommand,
+        DescribeQueryDefinitionsCommand,
+        PutQueryDefinitionCommand,
+        GetLogGroupFieldsCommand,
     } from "@aws-sdk/client-cloudwatch-logs";
     import { formatBytes } from "$lib/utils/pagination";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { goto } from "$app/navigation";
 
     let error = $state("");
     let actionMsg = $state("");
@@ -22,9 +26,26 @@
     let logQueryLoading = $state(false);
     let timeRange = $state(3600); // 1 hour default
 
+    let savedQueries = $state<any[]>([]);
+    let selectedSavedQueryId = $state("");
+
+    let knownFields = $state<any[]>([]);
+    let fieldsLoading = $state(false);
+    let showFieldsSidebar = $state(false);
+
+    let sortColumn = $state("");
+    let sortDirection = $state<"asc" | "desc">("desc");
+
     $effect(() => {
         if (aws.cwLogs && logGroups.length === 0 && !lgLoading) {
             loadLogGroups();
+            fetchSavedQueries();
+        }
+    });
+
+    $effect(() => {
+        if (selectedLogGroup) {
+            fetchFields();
         }
     });
 
@@ -58,6 +79,85 @@
             error = String(e);
         } finally {
             lgLoading = false;
+        }
+    }
+
+    async function fetchSavedQueries() {
+        if (!aws.cwLogs) return;
+        try {
+            const resp = await aws.cwLogs.send(
+                new DescribeQueryDefinitionsCommand({}),
+            );
+            savedQueries = resp.queryDefinitions ?? [];
+        } catch (e) {
+            console.error("Failed to fetch saved queries", e);
+        }
+    }
+
+    async function saveQuery() {
+        if (!aws.cwLogs || !logQuery.trim()) return;
+        const name = prompt("Enter a name for this query:");
+        if (!name) return;
+        try {
+            await aws.cwLogs.send(
+                new PutQueryDefinitionCommand({
+                    name,
+                    queryString: logQuery,
+                    logGroupNames: selectedLogGroup ? [selectedLogGroup] : [],
+                }),
+            );
+            actionMsg = `Query "${name}" saved successfully.`;
+            await fetchSavedQueries();
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    async function fetchFields() {
+        if (!aws.cwLogs || !selectedLogGroup) return;
+        try {
+            fieldsLoading = true;
+            const now = Math.floor(Date.now() / 1000);
+            const resp = await aws.cwLogs.send(
+                new GetLogGroupFieldsCommand({
+                    logGroupName: selectedLogGroup,
+                    time: now - 3600, // Look at last hour
+                }),
+            );
+            knownFields = resp.logGroupFields ?? [];
+        } catch (e) {
+            console.error("Failed to fetch fields", e);
+        } finally {
+            fieldsLoading = false;
+        }
+    }
+
+    function sortResults(column: string) {
+        if (sortColumn === column) {
+            sortDirection = sortDirection === "asc" ? "desc" : "asc";
+        } else {
+            sortColumn = column;
+            sortDirection = "desc";
+        }
+
+        logResults = [...logResults].sort((a, b) => {
+            const valA = a[column] ?? "";
+            const valB = b[column] ?? "";
+            if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+            if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+            return 0;
+        });
+    }
+
+    function navigateToLog(row: any) {
+        const group = selectedLogGroup;
+        const stream = row["@logStream"];
+        const timestamp = row["@timestamp"];
+        if (group && stream && timestamp) {
+            const timeDate = new Date(timestamp).getTime();
+            goto(
+                `/cloudwatch/logs?group=${encodeURIComponent(group)}&stream=${encodeURIComponent(stream)}&time=${timeDate}`,
+            );
         }
     }
 
@@ -216,6 +316,65 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="w-64">
+                    <label
+                        for="saved-query-select"
+                        class="block text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider"
+                        >Saved Queries</label
+                    >
+                    <div class="relative">
+                        <select
+                            id="saved-query-select"
+                            bind:value={selectedSavedQueryId}
+                            onchange={(e) => {
+                                const q = savedQueries.find(
+                                    (sq) =>
+                                        sq.queryDefinitionId ===
+                                        selectedSavedQueryId,
+                                );
+                                if (q) {
+                                    logQuery = q.queryString || "";
+                                    if (
+                                        q.logGroupNames &&
+                                        q.logGroupNames.length > 0
+                                    ) {
+                                        selectedLogGroup = q.logGroupNames[0];
+                                    }
+                                }
+                            }}
+                            class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 appearance-none"
+                        >
+                            <option value="">Select a saved query</option>
+                            {#each savedQueries as sq}
+                                <option value={sq.queryDefinitionId}
+                                    >{sq.name}</option
+                                >
+                            {/each}
+                        </select>
+                        <div
+                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"
+                        >
+                            <svg
+                                class="fill-current h-4 w-4"
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 20 20"
+                                ><path
+                                    d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
+                                /></svg
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-end pb-0.5">
+                    <button
+                        onclick={() => (showFieldsSidebar = !showFieldsSidebar)}
+                        class="bg-gray-800 hover:bg-gray-700 text-blue-400 px-4 py-2 rounded transition font-bold uppercase text-xs h-[38px] flex items-center shadow-sm border border-gray-700"
+                    >
+                        {showFieldsSidebar ? "Hide Fields" : "Show Fields"}
+                    </button>
+                </div>
                 <div class="w-48">
                     <label
                         for="time-range-select"
@@ -260,6 +419,13 @@
                         CloudWatch Logs Insights Query
                     </label>
                     <div class="flex items-center gap-2">
+                        <button
+                            onclick={saveQuery}
+                            disabled={!logQuery.trim()}
+                            class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded transition font-bold uppercase text-xs flex items-center shadow-sm border border-gray-700"
+                        >
+                            Save
+                        </button>
                         {#if logQueryLoading}
                             <button
                                 onclick={stopQuery}
@@ -311,102 +477,167 @@
             </div>
         </div>
 
-        <div
-            class="flex-1 bg-gray-900 border border-gray-800 rounded-lg shadow-sm overflow-hidden flex flex-col"
-        >
-            <div
-                class="px-4 py-3 border-b border-gray-800 bg-gray-900/80 shrink-0 flex justify-between items-center"
-            >
-                <h3
-                    class="text-xs font-bold text-gray-400 uppercase tracking-wider"
+        <div class="flex-1 flex gap-4 min-h-0">
+            {#if showFieldsSidebar}
+                <div
+                    class="w-64 bg-gray-900 border border-gray-800 rounded-lg shadow-sm flex flex-col"
                 >
-                    Query Results
-                    {#if logResults.length > 0}
-                        <span class="text-blue-400 font-bold ml-2"
-                            >({logResults.length} records)</span
-                        >
-                    {/if}
-                </h3>
-            </div>
-            <div class="flex-1 overflow-auto bg-gray-950/20">
-                {#if logQueryLoading}
                     <div
-                        class="h-64 flex flex-col items-center justify-center text-gray-400 text-sm"
+                        class="px-4 py-3 border-b border-gray-800 bg-gray-900/80"
                     >
-                        <div class="animate-spin text-2xl mb-4">⟳</div>
-                        Executing Query... This may take a moment.
-                    </div>
-                {:else if logResults.length > 0}
-                    <div class="overflow-x-auto">
-                        <table
-                            class="w-full text-left text-sm whitespace-nowrap"
+                        <h3
+                            class="text-xs font-bold text-gray-400 uppercase tracking-wider"
                         >
-                            <thead
-                                class="sticky top-0 bg-gray-900 border-b border-gray-800 shadow-sm z-10"
-                            >
-                                <tr>
-                                    {#each logColumns as col}
-                                        <th
-                                            class="px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider"
+                            Log Fields
+                        </h3>
+                    </div>
+                    <div class="flex-1 overflow-auto p-4">
+                        {#if fieldsLoading}
+                            <div class="text-xs text-gray-500 animate-pulse">
+                                Loading fields...
+                            </div>
+                        {:else if knownFields.length === 0}
+                            <div class="text-xs text-gray-500 italic">
+                                No fields found for this group.
+                            </div>
+                        {:else}
+                            <ul class="space-y-2">
+                                {#each knownFields as field}
+                                    <li class="group">
+                                        <button
+                                            onclick={() => {
+                                                logQuery += `\n| filter ${field.name} = ""`;
+                                            }}
+                                            class="text-xs text-blue-400 hover:text-blue-300 truncate w-full text-left font-mono"
+                                            title={field.name}
                                         >
-                                            {col}
-                                        </th>
-                                    {/each}
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-800/50">
-                                {#each logResults as row}
-                                    <tr
-                                        class="hover:bg-gray-800/40 transition-colors group"
-                                    >
+                                            {field.name}
+                                        </button>
+                                        <div class="text-[10px] text-gray-600">
+                                            {field.percent}% of events
+                                        </div>
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                    </div>
+                </div>
+            {/if}
+
+            <div
+                class="flex-1 bg-gray-900 border border-gray-800 rounded-lg shadow-sm overflow-hidden flex flex-col"
+            >
+                <div
+                    class="px-4 py-3 border-b border-gray-800 bg-gray-900/80 shrink-0 flex justify-between items-center"
+                >
+                    <h3
+                        class="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                    >
+                        Query Results
+                        {#if logResults.length > 0}
+                            <span class="text-blue-400 font-bold ml-2"
+                                >({logResults.length} records)</span
+                            >
+                        {/if}
+                    </h3>
+                </div>
+                <div class="flex-1 overflow-auto bg-gray-950/20">
+                    {#if logQueryLoading}
+                        <div
+                            class="h-64 flex flex-col items-center justify-center text-gray-400 text-sm"
+                        >
+                            <div class="animate-spin text-2xl mb-4">⟳</div>
+                            Executing Query... This may take a moment.
+                        </div>
+                    {:else if logResults.length > 0}
+                        <div class="overflow-x-auto">
+                            <table
+                                class="w-full text-left text-sm whitespace-nowrap"
+                            >
+                                <thead
+                                    class="sticky top-0 bg-gray-900 border-b border-gray-800 shadow-sm z-10"
+                                >
+                                    <tr>
                                         {#each logColumns as col}
-                                            <td
-                                                class="px-4 py-2.5 text-gray-300 group-hover:text-gray-200 font-mono text-xs {col ===
-                                                '@message'
-                                                    ? 'whitespace-pre-wrap min-w-[400px]'
-                                                    : ''}"
+                                            <th
+                                                class="px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider cursor-pointer hover:text-gray-200 transition-colors"
+                                                onclick={() => sortResults(col)}
                                             >
-                                                {row[col] ?? "-"}
-                                            </td>
+                                                <div
+                                                    class="flex items-center gap-1"
+                                                >
+                                                    {col}
+                                                    {#if sortColumn === col}
+                                                        <span
+                                                            class="text-blue-400"
+                                                            >{sortDirection ===
+                                                            "asc"
+                                                                ? "↑"
+                                                                : "↓"}</span
+                                                        >
+                                                    {/if}
+                                                </div>
+                                            </th>
                                         {/each}
                                     </tr>
-                                {/each}
-                            </tbody>
-                        </table>
-                    </div>
-                {:else if !logQueryLoading && selectedLogGroup && actionMsg.includes("completed")}
-                    <div
-                        class="h-64 flex items-center justify-center text-gray-500 text-sm"
-                    >
-                        No results found for this query in the selected time
-                        range.
-                    </div>
-                {:else}
-                    <div
-                        class="h-full flex flex-col items-center justify-center p-12 text-center text-gray-600"
-                    >
-                        <div
-                            class="w-16 h-16 mb-4 bg-gray-900 rounded-full flex items-center justify-center border border-gray-800"
-                        >
-                            <svg
-                                class="w-8 h-8 opacity-50"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                xmlns="http://www.w3.org/2000/svg"
-                                ><path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="1.5"
-                                    d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                ></path></svg
-                            >
+                                </thead>
+                                <tbody class="divide-y divide-gray-800/50">
+                                    {#each logResults as row}
+                                        <tr
+                                            class="hover:bg-gray-800/40 transition-colors group cursor-pointer"
+                                            onclick={() => navigateToLog(row)}
+                                            title="Click to view in log stream"
+                                        >
+                                            {#each logColumns as col}
+                                                <td
+                                                    class="px-4 py-2.5 text-gray-300 group-hover:text-blue-300 font-mono text-xs {col ===
+                                                    '@message'
+                                                        ? 'whitespace-pre-wrap min-w-[400px]'
+                                                        : ''}"
+                                                >
+                                                    {row[col] ?? "-"}
+                                                </td>
+                                            {/each}
+                                        </tr>
+                                    {/each}
+                                </tbody>
+                            </table>
                         </div>
-                        <p class="max-w-xs text-sm">
-                            Select a log group and run a query to view results.
-                        </p>
-                    </div>
-                {/if}
+                    {:else if !logQueryLoading && selectedLogGroup && actionMsg.includes("completed")}
+                        <div
+                            class="h-64 flex items-center justify-center text-gray-500 text-sm"
+                        >
+                            No results found for this query in the selected time
+                            range.
+                        </div>
+                    {:else}
+                        <div
+                            class="h-full flex flex-col items-center justify-center p-12 text-center text-gray-600"
+                        >
+                            <div
+                                class="w-16 h-16 mb-4 bg-gray-900 rounded-full flex items-center justify-center border border-gray-800"
+                            >
+                                <svg
+                                    class="w-8 h-8 opacity-50"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    ><path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="1.5"
+                                        d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                    ></path></svg
+                                >
+                            </div>
+                            <p class="max-w-xs text-sm">
+                                Select a log group and run a query to view
+                                results.
+                            </p>
+                        </div>
+                    {/if}
+                </div>
             </div>
         </div>
     </div>

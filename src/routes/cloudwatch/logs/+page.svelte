@@ -14,6 +14,7 @@
     import { pushToken, popToken, formatBytes } from "$lib/utils/pagination";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { page } from "$app/stores";
 
     let error = $state("");
     let actionMsg = $state("");
@@ -42,7 +43,25 @@
 
     $effect(() => {
         if (aws.cwLogs && logGroupsTable.length === 0) {
-            loadLogGroupsTable();
+            const group = $page.url.searchParams.get("group");
+            const stream = $page.url.searchParams.get("stream");
+            const time = $page.url.searchParams.get("time");
+
+            if (group && stream) {
+                selectedGroupForStreams = group;
+                selectedStreamForEvents = stream;
+                const timeMs = time ? parseInt(time) : undefined;
+                if (timeMs) {
+                    loadLogEvents(group, stream, {
+                        startTime: timeMs - 300000,
+                        endTime: timeMs + 300000,
+                    });
+                } else {
+                    loadLogEvents(group, stream);
+                }
+            } else {
+                loadLogGroupsTable();
+            }
         }
     });
 
@@ -249,10 +268,15 @@
     async function loadLogEvents(
         logGroupName: string,
         logStreamName: string,
-        token?: string,
-        direction: "next" | "prev" = "next",
+        options: {
+            token?: string;
+            direction?: "next" | "prev";
+            startTime?: number;
+            endTime?: number;
+        } = {},
     ) {
         if (!aws.cwLogs) return;
+        const { token, direction = "next", startTime, endTime } = options;
         try {
             selectedStreamForEvents = logStreamName;
             logEventsLoading = true;
@@ -269,6 +293,9 @@
                 if (token) {
                     params.nextToken = token;
                 }
+                if (startTime) params.startTime = startTime;
+                if (endTime) params.endTime = endTime;
+
                 const resp = await aws.cwLogs.send(
                     new FilterLogEventsCommand(params),
                 );
@@ -295,6 +322,9 @@
                 } else if (direction === "next" && !token) {
                     params.startFromHead = true;
                 }
+
+                if (startTime) params.startTime = startTime;
+                if (endTime) params.endTime = endTime;
 
                 const resp = await aws.cwLogs.send(
                     new GetLogEventsCommand(params),
@@ -413,8 +443,10 @@
                                     loadLogEvents(
                                         selectedGroupForStreams,
                                         selectedStreamForEvents,
-                                        logEventsPrevToken,
-                                        "prev",
+                                        {
+                                            token: logEventsPrevToken,
+                                            direction: "prev",
+                                        },
                                     )}
                                 disabled={logEventsLoading ||
                                     logEventsFilter.trim() !== ""}
@@ -428,8 +460,10 @@
                                     loadLogEvents(
                                         selectedGroupForStreams,
                                         selectedStreamForEvents,
-                                        logEventsNextToken,
-                                        "next",
+                                        {
+                                            token: logEventsNextToken,
+                                            direction: "next",
+                                        },
                                     )}
                                 disabled={!logEventsNextToken ||
                                     logEventsLoading}

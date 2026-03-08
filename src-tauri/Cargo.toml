@@ -1,8 +1,8 @@
 [package]
-name = "aws-console"
+name = "clouddash-aws"
 version = "0.1.0"
 description = "High-performance local AWS management dashboard"
-authors = ["you"]
+authors = ["support@chrome-stats.com"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,7 +11,7 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "tpl_lib"
+name = "clouddash_aws_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -29,12 +29,11 @@ dirs = "5.0"
 # Credential resolution + S3 proxy (S3 doesn't support browser CORS)
 aws-config = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio", "behavior-version-latest", "sso"] }
 aws-credential-types = { version = "1.2", default-features = false, features = ["hardcoded-credentials"] }
-aws-sdk-s3 = { version = "1.15", default-features = false, features = ["rustls", "rt-tokio"] }
 base64 = "0.22.1"
 
 [profile.release]
 opt-level = "s"       # Optimize for binary size
 lto = true            # Link-time optimization
-codegen-units = 1     # Reduce parallel code generation units
+codegen-units = 4     # Reduce parallel code generation units
 strip = true          # Strip symbols
 panic = "abort"       # Remove panic unwinding
