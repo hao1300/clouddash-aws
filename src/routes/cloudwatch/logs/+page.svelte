@@ -374,7 +374,9 @@
             {actionMsg}
         </div>{/if}
 
-    <div class="flex-1 {error || actionMsg ? 'pt-8' : ''}">
+    <div
+        class="flex-1 flex flex-col min-h-0 {error || actionMsg ? 'pt-8' : ''}"
+    >
         {#if selectedStreamForEvents}
             <div class="h-full flex flex-col p-4 bg-gray-950">
                 <div
