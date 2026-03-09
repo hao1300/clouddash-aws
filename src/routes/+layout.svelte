@@ -588,89 +588,6 @@
           </div>
 
           <div class="flex-1 overflow-y-auto p-4 space-y-8 pb-10">
-            <!-- Profile & Region -->
-            <div class="space-y-4">
-              <span
-                class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1 block"
-                >Account & Region</span
-              >
-              <div class="grid grid-cols-1 gap-3">
-                <div class="space-y-1">
-                  <span class="text-[10px] text-gray-600 px-1">Profile</span>
-                  {#if authType === "profile"}
-                    <select
-                      bind:value={selectedProfile}
-                      onchange={() => {
-                        login();
-                        sideMenuOpen = false;
-                      }}
-                      class="w-full bg-gray-800 text-xs p-2.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
-                    >
-                      {#each visibleProfiles as p}<option value={p}>{p}</option
-                        >{/each}
-                    </select>
-                  {:else}
-                    <div
-                      class="w-full bg-gray-800 text-xs p-2.5 rounded text-blue-400 font-mono border border-gray-700"
-                    >
-                      🔑 Custom Keys
-                    </div>
-                  {/if}
-                </div>
-
-                <div class="space-y-1">
-                  <span class="text-[10px] text-gray-600 px-1">Region</span>
-                  <select
-                    bind:value={region}
-                    onchange={() => {
-                      login();
-                      sideMenuOpen = false;
-                    }}
-                    class="w-full bg-gray-800 text-xs p-2.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
-                  >
-                    {#each visibleRegions as r}<option value={r}>{r}</option
-                      >{/each}
-                  </select>
-                </div>
-
-                <div class="flex gap-2 pt-1">
-                  <button
-                    onclick={() => {
-                      refreshKey++;
-                      sideMenuOpen = false;
-                    }}
-                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2 text-white"
-                  >
-                    <span>⟳</span> Refresh
-                  </button>
-                  <button
-                    onclick={() => {
-                      showSettings = true;
-                      settingsTab = "profiles";
-                      sideMenuOpen = false;
-                    }}
-                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2 text-white"
-                  >
-                    <span>⚙</span> Settings
-                  </button>
-                  <button
-                    onclick={() => {
-                      invoke("fork_process", {
-                        path: activeId,
-                        region,
-                        profile:
-                          authType === "profile" ? selectedProfile : undefined,
-                      });
-                      sideMenuOpen = false;
-                    }}
-                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2 text-white"
-                  >
-                    <span>⧉</span> Fork
-                  </button>
-                </div>
-              </div>
-            </div>
-
             <!-- Services -->
             <div class="space-y-4">
               <div class="flex items-center justify-between px-1">
@@ -801,6 +718,93 @@
                   </button>
                 </div>
               {/if}
+            </div>
+          </div>
+
+          <!-- Account & Region Footer -->
+          <div
+            class="p-4 border-t border-gray-800 bg-gray-950/80 backdrop-blur-sm space-y-4"
+          >
+            <span
+              class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1 block"
+              >Account & Region</span
+            >
+            <div class="grid grid-cols-1 gap-3">
+              <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1">
+                  <span class="text-[10px] text-gray-600 px-1">Profile</span>
+                  {#if authType === "profile"}
+                    <select
+                      bind:value={selectedProfile}
+                      onchange={() => {
+                        login();
+                        sideMenuOpen = false;
+                      }}
+                      class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
+                    >
+                      {#each visibleProfiles as p}<option value={p}>{p}</option
+                        >{/each}
+                    </select>
+                  {:else}
+                    <div
+                      class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono border border-gray-700 truncate"
+                    >
+                      🔑 Custom
+                    </div>
+                  {/if}
+                </div>
+
+                <div class="space-y-1">
+                  <span class="text-[10px] text-gray-600 px-1">Region</span>
+                  <select
+                    bind:value={region}
+                    onchange={() => {
+                      login();
+                      sideMenuOpen = false;
+                    }}
+                    class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
+                  >
+                    {#each visibleRegions as r}<option value={r}>{r}</option
+                      >{/each}
+                  </select>
+                </div>
+              </div>
+
+              <div class="flex gap-2">
+                <button
+                  onclick={() => {
+                    refreshKey++;
+                    sideMenuOpen = false;
+                  }}
+                  class="flex-1 bg-gray-900 hover:bg-gray-800 p-2 rounded text-[11px] font-semibold border border-gray-800 transition flex items-center justify-center gap-1.5 text-white"
+                >
+                  <span>⟳</span>
+                </button>
+                <button
+                  onclick={() => {
+                    showSettings = true;
+                    settingsTab = "profiles";
+                    sideMenuOpen = false;
+                  }}
+                  class="flex-1 bg-gray-900 hover:bg-gray-800 p-2 rounded text-[11px] font-semibold border border-gray-800 transition flex items-center justify-center gap-1.5 text-white"
+                >
+                  <span>⚙</span>
+                </button>
+                <button
+                  onclick={() => {
+                    invoke("fork_process", {
+                      path: activeId,
+                      region,
+                      profile:
+                        authType === "profile" ? selectedProfile : undefined,
+                    });
+                    sideMenuOpen = false;
+                  }}
+                  class="flex-[2] bg-blue-600 hover:bg-blue-500 p-2 rounded text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-white shadow-lg"
+                >
+                  <span>⧉</span> Fork
+                </button>
+              </div>
             </div>
           </div>
         </div>

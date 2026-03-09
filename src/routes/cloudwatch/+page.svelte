@@ -14,25 +14,12 @@
     let loading = $state(false);
 
     let alarms = $state<any[]>([]);
-    let hideAutoScaling = $state(true);
     let alarmsLoading = $state(false);
     let alarmsTokenMap = $state<string[]>([]);
     let alarmsCurrentToken = $state<string | undefined>(undefined);
     let selectedAlarm = $state<any>(null);
     let alarmHistory = $state<any[]>([]);
     let alarmHistoryLoading = $state(false);
-
-    let filteredAlarms = $derived.by(() => {
-        let res = alarms;
-        if (hideAutoScaling) {
-            res = res.filter(
-                (a) =>
-                    !a.name.startsWith("TargetTracking-") &&
-                    !a.name.includes("AutoScaling"),
-            );
-        }
-        return res;
-    });
 
     $effect(() => {
         if (aws.cw && alarms.length === 0) {
@@ -307,7 +294,7 @@
             </div>
         {:else}
             <PaginatedTable
-                items={filteredAlarms}
+                items={alarms}
                 loading={alarmsLoading}
                 hasNext={!!alarmsCurrentToken}
                 hasPrev={alarmsTokenMap.length > 0}
@@ -349,20 +336,6 @@
                     },
                 ]}
             >
-                {#snippet headerActionsSnippet()}
-                    <label
-                        class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 hover:text-white transition mr-2 bg-gray-950 px-3 py-1.5 rounded border border-gray-800"
-                    >
-                        <input
-                            type="checkbox"
-                            bind:checked={hideAutoScaling}
-                            class="rounded border-gray-600 text-blue-500 focus:ring-blue-500 cursor-pointer accent-blue-500"
-                        />
-                        <span class="select-none font-medium text-xs"
-                            >Hide Auto-Scaling</span
-                        >
-                    </label>
-                {/snippet}
                 {#snippet actionsSnippet(item)}
                     <button
                         onclick={(e) => {
