@@ -11,6 +11,8 @@ pub fn run() {
             state::authenticate,
             state::get_credentials,
             state::save_profile,
+            state::fork_process,
+            state::get_initial_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

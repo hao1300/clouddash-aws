@@ -176,6 +176,12 @@
   }
 
   onMount(async () => {
+    const initialState = await invoke<{
+      path: string | null;
+      region: string | null;
+      profile: string | null;
+    }>("get_initial_state");
+
     const saved = loadState();
 
     // Load profiles from Rust
@@ -234,23 +240,38 @@
       saveProfileChecked = saved.saveProfileChecked;
     if (saved?.saveProfileName) saveProfileName = saved.saveProfileName;
 
-    if (saved?.profile && allProfiles.includes(saved.profile))
+    // Apply initial state from environment variables (forked process)
+    if (initialState.profile && allProfiles.includes(initialState.profile)) {
+      selectedProfile = initialState.profile;
+      authType = "profile";
+    } else if (saved?.profile && allProfiles.includes(saved.profile)) {
       selectedProfile = saved.profile;
-    else if (allProfiles.length > 0) selectedProfile = allProfiles[0];
-    if (saved?.region) region = saved.region;
+    } else if (allProfiles.length > 0) {
+      selectedProfile = allProfiles[0];
+    }
+
+    if (initialState.region) {
+      region = initialState.region;
+    } else if (saved?.region) {
+      region = saved.region;
+    }
 
     // Auto connect
     let shouldAutoConnect = false;
     if (authType === "manual" && accessKeyId && secretAccessKey) {
       shouldAutoConnect = true;
     } else if (authType === "profile" && selectedProfile) {
-      if (selectedProfile !== "default" || saved?.profile === "default") {
+      if (
+        selectedProfile !== "default" ||
+        saved?.profile === "default" ||
+        initialState.profile
+      ) {
         shouldAutoConnect = true;
       }
     }
 
     if (shouldAutoConnect) {
-      await login(true, saved?.activeId);
+      await login(true, initialState.path || saved?.activeId);
     }
   });
 
@@ -305,7 +326,15 @@
     }
   }
 
-  function switchTab(id: string) {
+  function switchTab(id: string, event?: MouseEvent) {
+    if (event?.ctrlKey || event?.metaKey) {
+      invoke("fork_process", {
+        path: id,
+        region,
+        profile: authType === "profile" ? selectedProfile : undefined,
+      });
+      return;
+    }
     // Rely completely on SvelteKit routing for top tabs
     goto(`/${id}`);
     saveState();
@@ -373,6 +402,19 @@
           >⟳</button
         >
         <button
+          onclick={() =>
+            invoke("fork_process", {
+              path: activeId,
+              region,
+              profile: authType === "profile" ? selectedProfile : undefined,
+            })}
+          class="px-2.5 py-1.5 rounded text-xs transition text-gray-400 hover:text-white hover:bg-gray-800 shrink-0 flex items-center gap-1"
+          title="Fork (New Window with current session)"
+        >
+          <span class="text-base">⧉</span>
+          <span class="hidden md:inline">Fork</span>
+        </button>
+        <button
           onclick={() => {
             showSettings = true;
             settingsTab = "profiles";
@@ -425,8 +467,8 @@
                     role="button"
                     tabindex="0"
                     class="group flex items-center justify-between w-full px-2 py-1.5 rounded hover:bg-gray-800 cursor-pointer transition text-left"
-                    onclick={() => {
-                      switchTab(svc.id);
+                    onclick={(e) => {
+                      switchTab(svc.id, e);
                       dropdownOpen = false;
                     }}
                     onkeydown={(e) => {
@@ -473,7 +515,7 @@
         >
           {#each enabledServices as svc}
             <button
-              onclick={() => switchTab(svc.id)}
+              onclick={(e) => switchTab(svc.id, e)}
               class="px-3 py-1.5 rounded flex-none text-xs font-semibold transition shrink-0 snap-start {activeId ===
               svc.id
                 ? 'bg-blue-600 text-white shadow'

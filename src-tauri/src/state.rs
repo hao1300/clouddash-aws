@@ -195,3 +195,38 @@ pub fn save_profile(name: String, access_key: String, secret_key: String, sessio
     Ok(())
 }
 
+#[derive(serde::Serialize)]
+pub struct InitialState {
+    pub path: Option<String>,
+    pub region: Option<String>,
+    pub profile: Option<String>,
+}
+
+#[tauri::command]
+pub fn fork_process(path: Option<String>, region: Option<String>, profile: Option<String>) -> Result<(), String> {
+    let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let mut cmd = std::process::Command::new(current_exe);
+    
+    if let Some(p) = path {
+        cmd.env("CLOUDDASH_INITIAL_PATH", p);
+    }
+    if let Some(r) = region {
+        cmd.env("CLOUDDASH_INITIAL_REGION", r);
+    }
+    if let Some(p) = profile {
+        cmd.env("CLOUDDASH_INITIAL_PROFILE", p);
+    }
+    
+    cmd.spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_initial_state() -> InitialState {
+    InitialState {
+        path: std::env::var("CLOUDDASH_INITIAL_PATH").ok(),
+        region: std::env::var("CLOUDDASH_INITIAL_REGION").ok(),
+        profile: std::env::var("CLOUDDASH_INITIAL_PROFILE").ok(),
+    }
+}
+
