@@ -4,6 +4,8 @@
         DeleteMessageCommand,
         SendMessageCommand,
         PurgeQueueCommand,
+        StartMessageMoveTaskCommand,
+        GetQueueAttributesCommand,
     } from "@aws-sdk/client-sqs";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
@@ -34,6 +36,30 @@
 
     let viewingMessage = $state<any>(null);
     let showModal = $state(false);
+
+    let queueArn = $state("");
+    let redriveLoading = $state(false);
+
+    $effect(() => {
+        if (aws.sqs && queueUrl) {
+            fetchQueueAttributes();
+        }
+    });
+
+    async function fetchQueueAttributes() {
+        if (!aws.sqs || !queueUrl) return;
+        try {
+            const resp = await aws.sqs.send(
+                new GetQueueAttributesCommand({
+                    QueueUrl: queueUrl,
+                    AttributeNames: ["QueueArn"],
+                }),
+            );
+            queueArn = resp.Attributes?.QueueArn || "";
+        } catch (e) {
+            console.error("Failed to fetch queue attributes", e);
+        }
+    }
 
     $effect(() => {
         if (viewingMessage) showModal = true;
@@ -153,6 +179,31 @@
             error = String(e);
         }
     }
+
+    async function handleRedrive() {
+        if (!aws.sqs || !queueArn) return;
+        if (
+            !confirm(
+                "Start DLQ redrive? This will move messages back to their source queue.",
+            )
+        )
+            return;
+        try {
+            redriveLoading = true;
+            error = "";
+            actionMsg = "";
+            await aws.sqs.send(
+                new StartMessageMoveTaskCommand({
+                    SourceArn: queueArn,
+                }),
+            );
+            actionMsg = "DLQ redrive task started successfully.";
+        } catch (e) {
+            error = String(e);
+        } finally {
+            redriveLoading = false;
+        }
+    }
 </script>
 
 <div class="h-full flex flex-col p-4 bg-gray-950 overflow-hidden relative">
@@ -168,10 +219,18 @@
         </div>{/if}
 
     <div
-        class="mb-4 shrink-0 bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm {error ||
+        class="mb-4 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm flex items-center justify-between shrink-0 {error ||
         actionMsg
             ? 'mt-8'
             : ''}"
+    >
+        <span class="text-sm font-bold text-gray-200"
+            >{$page.params.queueName}</span
+        >
+    </div>
+
+    <div
+        class="mb-4 shrink-0 bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
     >
         <div class="flex gap-2">
             <textarea
@@ -200,6 +259,14 @@
                     class="bg-red-600/20 hover:bg-red-600/40 text-red-400 px-3 py-1 rounded text-[10px] font-bold transition"
                     >Purge Queue</button
                 >
+                <button
+                    onclick={handleRedrive}
+                    disabled={!queueArn || redriveLoading}
+                    class="bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white px-3 py-1 rounded text-[10px] font-bold transition flex items-center gap-2"
+                >
+                    {#if redriveLoading}<span class="animate-spin">⟳</span>{/if}
+                    Start Redrive
+                </button>
                 <button
                     onclick={pollMessages}
                     disabled={msgLoading}

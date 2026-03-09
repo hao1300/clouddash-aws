@@ -382,21 +382,9 @@
                 <div
                     class="mb-4 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm flex items-center justify-between shrink-0"
                 >
-                    <div class="flex items-center gap-3">
-                        <button
-                            onclick={() => {
-                                selectedStreamForEvents = "";
-                                logEvents = [];
-                                logEventsNextToken = undefined;
-                                logEventsPrevToken = undefined;
-                            }}
-                            class="text-xs text-blue-400 hover:text-blue-300 transition px-3 py-1.5 rounded bg-blue-600/10 hover:bg-blue-600/20"
-                            >← Back</button
-                        >
-                        <span class="text-sm font-bold text-gray-200"
-                            >{selectedStreamForEvents}</span
-                        >
-                    </div>
+                    <span class="text-sm font-bold text-gray-200"
+                        >{selectedStreamForEvents}</span
+                    >
                 </div>
 
                 <div
@@ -523,21 +511,9 @@
                 <div
                     class="mb-4 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm flex items-center justify-between shrink-0"
                 >
-                    <div class="flex items-center gap-3">
-                        <button
-                            onclick={() => {
-                                selectedGroupForStreams = "";
-                                logStreams = [];
-                                logStreamsTokenMap = [];
-                                logStreamsCurrentToken = undefined;
-                            }}
-                            class="text-xs text-blue-400 hover:text-blue-300 transition px-3 py-1.5 rounded bg-blue-600/10 hover:bg-blue-600/20"
-                            >← Back</button
-                        >
-                        <span class="text-sm font-bold text-gray-200"
-                            >{selectedGroupForStreams}</span
-                        >
-                    </div>
+                    <span class="text-sm font-bold text-gray-200"
+                        >{selectedGroupForStreams}</span
+                    >
                     <button
                         onclick={() => deleteLogGroup(selectedGroupForStreams)}
                         class="text-xs text-red-400 hover:text-red-300 transition px-3 py-1.5 rounded bg-red-600/10 hover:bg-red-600/20 border border-red-900/30"

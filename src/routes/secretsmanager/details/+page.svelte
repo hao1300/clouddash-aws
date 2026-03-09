@@ -52,10 +52,6 @@
             valueLoading = false;
         }
     }
-
-    function handleBack() {
-        goto("/secretsmanager");
-    }
 </script>
 
 <div class="h-full flex flex-col bg-gray-950 overflow-hidden relative">
@@ -71,10 +67,6 @@
             : ''}"
     >
         <div class="flex items-center gap-3">
-            <button
-                onclick={handleBack}
-                class="text-xs text-blue-400 hover:text-blue-300">← Back</button
-            >
             <h2 class="text-sm font-bold text-gray-200">
                 {secretId.split(":").pop() || "Secret Details"}
             </h2>

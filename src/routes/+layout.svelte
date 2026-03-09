@@ -8,6 +8,7 @@
   import Login from "$lib/components/Login.svelte";
   import { aws } from "$lib/services/aws.svelte";
   import ServiceLayout from "$lib/components/ServiceLayout.svelte";
+  import BackButton from "$lib/components/BackButton.svelte";
 
   let { children }: { children: Snippet } = $props();
 
@@ -385,6 +386,7 @@
       <div
         class="flex items-center min-w-0 flex-1 order-2 sm:order-1 px-2 sm:px-3 py-1.5 gap-2"
       >
+        <BackButton />
         <!-- Service Dropdown Button -->
         <div class="relative shrink-0">
           <button
@@ -420,10 +422,18 @@
               <div class="max-h-80 overflow-y-auto p-1 py-2 space-y-0.5">
                 {#each filteredServices as svc}
                   <div
-                    class="group flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-800 cursor-pointer transition"
+                    role="button"
+                    tabindex="0"
+                    class="group flex items-center justify-between w-full px-2 py-1.5 rounded hover:bg-gray-800 cursor-pointer transition text-left"
                     onclick={() => {
                       switchTab(svc.id);
                       dropdownOpen = false;
+                    }}
+                    onkeydown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        switchTab(svc.id);
+                        dropdownOpen = false;
+                      }
                     }}
                   >
                     <span
@@ -431,7 +441,10 @@
                       >{svc.label}</span
                     >
                     <button
-                      onclick={(e) => toggleStar(svc.id, e)}
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        toggleStar(svc.id, e);
+                      }}
                       class="text-xs p-1 rounded hover:bg-gray-700 transition {serviceVisible.has(
                         svc.id,
                       )

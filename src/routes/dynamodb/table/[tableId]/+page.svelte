@@ -297,11 +297,6 @@
                     <h3 class="text-sm font-bold text-gray-200">
                         Table Details
                     </h3>
-                    <button
-                        onclick={() => history.back()}
-                        class="text-xs text-blue-400 hover:text-blue-300"
-                        >← Back</button
-                    >
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
                     <div>

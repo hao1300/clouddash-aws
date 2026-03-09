@@ -52,10 +52,6 @@
             loading = false;
         }
     }
-
-    function handleBack() {
-        goto("/ec2");
-    }
 </script>
 
 <div class="h-full flex flex-col bg-gray-950 overflow-auto p-6 relative">
@@ -66,11 +62,6 @@
         </div>{/if}
 
     <div class="flex items-center gap-3 mb-8 shrink-0">
-        <button
-            onclick={handleBack}
-            class="text-xs text-blue-400 hover:text-blue-300 transition"
-            >← Back to Instances</button
-        >
         <h2 class="text-sm font-bold text-gray-200">
             {instance?.name}
             <span class="text-gray-500 font-normal ml-2">{instanceId}</span>

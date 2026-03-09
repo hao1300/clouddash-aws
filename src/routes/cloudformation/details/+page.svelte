@@ -17,19 +17,21 @@
     let error = $state("");
 
     $effect(() => {
-        if (aws.cf && stackId) {
+        if (aws.cloudFormation && stackId) {
             loadStackDetails();
         }
     });
 
     async function loadStackDetails() {
-        if (!aws.cf || !stackId) return;
+        if (!aws.cloudFormation || !stackId) return;
         try {
             loading = true;
             error = "";
             const [resDetails, resResources] = await Promise.all([
-                aws.cf.send(new DescribeStacksCommand({ StackName: stackId })),
-                aws.cf.send(
+                aws.cloudFormation.send(
+                    new DescribeStacksCommand({ StackName: stackId }),
+                ),
+                aws.cloudFormation.send(
                     new DescribeStackResourcesCommand({ StackName: stackId }),
                 ),
             ]);
@@ -41,10 +43,6 @@
             loading = false;
         }
     }
-
-    function handleBack() {
-        goto("/cloudformation");
-    }
 </script>
 
 <div class="h-full flex flex-col bg-gray-950 overflow-auto p-6 relative">
@@ -55,11 +53,6 @@
         </div>{/if}
 
     <div class="flex items-center gap-3 mb-8 shrink-0">
-        <button
-            onclick={handleBack}
-            class="text-xs text-blue-400 hover:text-blue-300 transition"
-            >← Back to Stacks</button
-        >
         <h2 class="text-sm font-bold text-gray-200">
             {stackId}
             <span class="text-gray-500 font-normal ml-2"

@@ -145,10 +145,6 @@
             loading = false;
         }
     }
-
-    function handleBack() {
-        goto("/lambda");
-    }
 </script>
 
 <div class="h-full flex flex-col bg-gray-950 overflow-hidden relative">
@@ -170,10 +166,6 @@
             : ''}"
     >
         <div class="flex items-center gap-3">
-            <button
-                onclick={handleBack}
-                class="text-xs text-blue-400 hover:text-blue-300">← Back</button
-            >
             <h2 class="text-sm font-bold text-gray-200">{fnName}</h2>
         </div>
         <button

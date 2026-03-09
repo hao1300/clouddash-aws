@@ -14,17 +14,17 @@
     let history = $state<string[]>([]);
 
     $effect(() => {
-        if (aws.cf && stacks.length === 0) {
+        if (aws.cloudFormation && stacks.length === 0) {
             loadStacks();
         }
     });
 
     async function loadStacks(token?: string) {
-        if (!aws.cf) return;
+        if (!aws.cloudFormation) return;
         try {
             loading = true;
             error = "";
-            const res = await aws.cf.send(
+            const res = await aws.cloudFormation.send(
                 new DescribeStacksCommand({ NextToken: token }),
             );
             stacks = res.Stacks || [];

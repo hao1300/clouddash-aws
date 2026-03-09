@@ -12,17 +12,19 @@
     let error = $state("");
 
     $effect(() => {
-        if (aws.cf && stackSets.length === 0) {
+        if (aws.cloudFormation && stackSets.length === 0) {
             loadStackSets();
         }
     });
 
     async function loadStackSets() {
-        if (!aws.cf) return;
+        if (!aws.cloudFormation) return;
         try {
             loading = true;
             error = "";
-            const res = await aws.cf.send(new ListStackSetsCommand({}));
+            const res = await aws.cloudFormation.send(
+                new ListStackSetsCommand({}),
+            );
             stackSets = res.Summaries || [];
         } catch (e: any) {
             error = e.message || String(e);
