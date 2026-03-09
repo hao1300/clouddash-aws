@@ -696,46 +696,102 @@
                   />
                   <div class="grid grid-cols-1 gap-1">
                     {#each filteredServices as svc}
-                      <button
-                        onclick={() => {
-                          switchTab(svc.id);
-                          sideMenuOpen = false;
-                          dropdownOpen = false;
-                        }}
-                        class="flex items-center justify-between w-full px-3 py-2.5 rounded hover:bg-gray-800 transition text-left"
-                      >
-                        <span class="text-xs font-medium text-gray-300"
-                          >{svc.label}</span
+                      <div class="space-y-1">
+                        <div
+                          class="flex items-center justify-between w-full px-1 rounded {activeId ===
+                          svc.id
+                            ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
+                            : 'hover:bg-gray-800 text-gray-300 border border-transparent'} transition text-left"
                         >
-                        <span
-                          class="text-xs {serviceVisible.has(svc.id)
-                            ? 'text-yellow-400'
-                            : 'text-gray-700'}"
-                        >
-                          {serviceVisible.has(svc.id) ? "★" : "☆"}
-                        </span>
-                      </button>
+                          <button
+                            onclick={() => {
+                              switchTab(svc.id);
+                              sideMenuOpen = false;
+                              dropdownOpen = false;
+                            }}
+                            class="flex-1 px-2 py-2.5 text-xs font-semibold text-left"
+                          >
+                            {svc.label}
+                          </button>
+                          <button
+                            class="px-2 py-2.5 text-xs hover:scale-110 transition {serviceVisible.has(
+                              svc.id,
+                            )
+                              ? 'text-yellow-400'
+                              : 'text-gray-700'}"
+                            onclick={(e) => toggleStar(svc.id, e)}
+                          >
+                            {serviceVisible.has(svc.id) ? "★" : "☆"}
+                          </button>
+                        </div>
+
+                        {#if activeId === svc.id && serviceTabs.length > 0}
+                          <div
+                            class="ml-4 flex flex-col border-l border-gray-800"
+                          >
+                            {#each serviceTabs as tab}
+                              <button
+                                onclick={() => {
+                                  handleServiceTabChange(tab.id);
+                                  sideMenuOpen = false;
+                                }}
+                                class="w-full text-left px-4 py-2 text-[11px] transition {serviceActiveTab ===
+                                tab.id
+                                  ? 'text-blue-400 font-bold bg-blue-500/10'
+                                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}"
+                              >
+                                {tab.label}
+                              </button>
+                            {/each}
+                          </div>
+                        {/if}
+                      </div>
                     {/each}
                   </div>
                 </div>
               {:else}
                 <div class="grid grid-cols-1 gap-1">
                   {#each enabledServices as svc}
-                    <button
-                      onclick={() => {
-                        switchTab(svc.id);
-                        sideMenuOpen = false;
-                      }}
-                      class="flex items-center justify-between w-full px-3 py-2.5 rounded {activeId ===
-                      svc.id
-                        ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
-                        : 'hover:bg-gray-800 text-gray-300 border border-transparent'} transition text-left"
-                    >
-                      <span class="text-xs font-semibold">{svc.label}</span>
-                      {#if activeId === svc.id}
-                        <div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                    <div class="space-y-1">
+                      <button
+                        onclick={() => {
+                          switchTab(svc.id);
+                          sideMenuOpen = false;
+                        }}
+                        class="flex items-center justify-between w-full px-3 py-2.5 rounded {activeId ===
+                        svc.id
+                          ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
+                          : 'hover:bg-gray-800 text-gray-300 border border-transparent'} transition text-left"
+                      >
+                        <span class="text-xs font-semibold">{svc.label}</span>
+                        {#if activeId === svc.id}
+                          <div
+                            class="w-1.5 h-1.5 rounded-full bg-blue-500"
+                          ></div>
+                        {/if}
+                      </button>
+
+                      {#if activeId === svc.id && serviceTabs.length > 0}
+                        <div
+                          class="ml-4 flex flex-col border-l border-gray-800"
+                        >
+                          {#each serviceTabs as tab}
+                            <button
+                              onclick={() => {
+                                handleServiceTabChange(tab.id);
+                                sideMenuOpen = false;
+                              }}
+                              class="w-full text-left px-4 py-2 text-[11px] transition {serviceActiveTab ===
+                              tab.id
+                                ? 'text-blue-400 font-bold bg-blue-500/10'
+                                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}"
+                            >
+                              {tab.label}
+                            </button>
+                          {/each}
+                        </div>
                       {/if}
-                    </button>
+                    </div>
                   {/each}
                   <button
                     onclick={() => (dropdownOpen = true)}

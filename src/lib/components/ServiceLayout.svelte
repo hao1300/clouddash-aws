@@ -46,7 +46,7 @@
 >
     <!-- Sidebar -->
     <aside
-        class="w-full md:w-56 bg-gray-900 border-b md:border-b-0 md:border-r border-gray-800 flex flex-col shrink-0"
+        class="hidden md:flex md:w-56 bg-gray-900 md:border-r border-gray-800 flex-col shrink-0"
     >
         {#if title}
             <div
@@ -56,11 +56,11 @@
             </div>
         {/if}
         <nav
-            class="md:flex-1 w-full overflow-x-auto md:overflow-y-auto py-2 px-2 md:px-0 scrollbar-hide"
+            class="hidden md:flex md:flex-1 w-full overflow-x-auto md:overflow-y-auto py-2 md:py-0 px-2 md:px-0 scrollbar-hide"
         >
-            <ul class="flex md:flex-col gap-1 md:gap-0 md:space-y-0.5">
+            <ul class="flex md:flex-col gap-1 md:gap-0 md:space-y-0 w-full">
                 {#each tabs as tab}
-                    <li class="shrink-0 md:shrink">
+                    <li class="shrink-0 md:shrink md:w-full text-sans">
                         <button
                             onclick={() => {
                                 if (onTabChange) {
@@ -82,7 +82,7 @@
         </nav>
 
         <div
-            class="p-3 border-t border-gray-800 bg-gray-900/50 mt-auto shrink-0 hidden md:block"
+            class="p-3 md:p-0 md:py-3 border-t border-gray-800 bg-gray-900/50 mt-auto shrink-0 hidden md:block"
         >
             <button
                 onclick={() => {
@@ -95,9 +95,9 @@
                     }
                     bookmarks.toggle(extractedLabel);
                 }}
-                class="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded text-xs font-medium border transition-colors {bookmarks.isBookmarked
+                class="w-full flex items-center justify-center gap-2 py-1.5 px-3 md:px-4 rounded md:rounded-none text-xs font-medium border md:border-x-0 transition-colors {bookmarks.isBookmarked
                     ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/20'
-                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
+                    : 'bg-gray-800 md:bg-transparent border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
             >
                 {#if bookmarks.isBookmarked}
                     <span>★ Bookmarked</span>
@@ -114,12 +114,12 @@
                         Bookmarks
                     </div>
                     <ul
-                        class="space-y-0.5 max-h-32 overflow-y-auto pr-1 scrollbar-hide"
+                        class="space-y-0.5 md:space-y-0 max-h-32 overflow-y-auto md:pr-0 pr-1 scrollbar-hide w-full"
                     >
                         {#each bookmarks.all as b}
-                            <li class="relative font-sans">
+                            <li class="relative font-sans md:w-full">
                                 <div
-                                    class="flex items-center w-full rounded transition-colors {b.url ===
+                                    class="flex items-center w-full rounded md:rounded-none transition-colors {b.url ===
                                     $page.url.pathname + $page.url.search
                                         ? 'bg-blue-600/20 text-blue-400'
                                         : 'text-gray-400 hover:bg-gray-800'}"
@@ -128,7 +128,7 @@
                                         onclick={() => {
                                             goto(b.url);
                                         }}
-                                        class="flex-1 text-left px-2 py-1.5 text-[11px] truncate flex items-center"
+                                        class="flex-1 text-left px-2 md:px-4 py-1.5 text-[11px] truncate flex items-center"
                                         title={b.label}
                                     >
                                         <span
