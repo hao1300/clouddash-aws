@@ -41,8 +41,11 @@
     let logEventsPrevToken = $state<string | undefined>(undefined);
     let logEventsFilter = $state("");
 
+    let initialLoadDone = false;
+
     $effect(() => {
-        if (aws.cwLogs && logGroupsTable.length === 0) {
+        if (aws.cwLogs && !initialLoadDone) {
+            initialLoadDone = true;
             const group = $page.url.searchParams.get("group");
             const stream = $page.url.searchParams.get("stream");
             const time = $page.url.searchParams.get("time");
@@ -53,8 +56,8 @@
                 const timeMs = time ? parseInt(time) : undefined;
                 if (timeMs) {
                     loadLogEvents(group, stream, {
-                        startTime: timeMs - 300000,
-                        endTime: timeMs + 300000,
+                        startTime: timeMs,
+                        endTime: timeMs + 5000,
                     });
                 } else {
                     loadLogEvents(group, stream);
@@ -323,7 +326,11 @@
                     params.startFromHead = true;
                 }
 
-                if (startTime) params.startTime = startTime;
+                if (startTime) {
+                    params.startTime = startTime;
+                } else {
+                    delete params.startFromHead;
+                }
                 if (endTime) params.endTime = endTime;
 
                 const resp = await aws.cwLogs.send(

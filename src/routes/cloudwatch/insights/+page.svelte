@@ -154,11 +154,9 @@
         const stream = row["@logStream"];
         const timestamp = row["@timestamp"];
         if (group && stream && timestamp) {
-            const timeDate = new Date(timestamp).getTime();
-            const start = timeDate - 1000;
-            const end = timeDate + 1000;
+            const timeMs = new Date(timestamp + "Z").getTime();
             goto(
-                `/cloudwatch/logs?group=${encodeURIComponent(group)}&stream=${encodeURIComponent(stream)}&start=${start}&end=${end}&type=absolute`,
+                `/cloudwatch/logs?group=${encodeURIComponent(group)}&stream=${encodeURIComponent(stream)}&time=${timeMs}`,
             );
         }
     }
