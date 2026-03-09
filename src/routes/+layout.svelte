@@ -2,6 +2,7 @@
   import "../app.css";
   import { invoke } from "@tauri-apps/api/core";
   import { onMount, type Snippet } from "svelte";
+  import { flip } from "svelte/animate";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
@@ -95,19 +96,45 @@
   let dropdownOpen = $state(false);
   let sideMenuOpen = $state(false);
   let searchQuery = $state("");
+
   let filteredServices = $derived(
     services.filter((s) =>
       s.label.toLowerCase().includes(searchQuery.toLowerCase()),
     ),
   );
 
+  let mobileServices = $derived.by(() => {
+    const query = searchQuery.toLowerCase();
+    const all = services
+      .filter((s) => s.label.toLowerCase().includes(query))
+      .sort((a, b) => {
+        const aStarred = serviceVisible.has(a.id);
+        const bStarred = serviceVisible.has(b.id);
+        if (aStarred && !bStarred) return -1;
+        if (!aStarred && bStarred) return 1;
+        return a.label.localeCompare(b.label);
+      });
+
+    return all.map((svc, i) => ({
+      ...svc,
+      isStarred: serviceVisible.has(svc.id),
+      prevIsStarred: i > 0 ? serviceVisible.has(all[i - 1].id) : true,
+    }));
+  });
+
   function toggleStar(id: string, e: MouseEvent) {
     e.stopPropagation();
     const next = new Set(serviceVisible);
-    if (next.has(id)) next.delete(id);
+    const wasStarred = next.has(id);
+    if (wasStarred) next.delete(id);
     else next.add(id);
     serviceVisible = next;
     saveState();
+
+    if (!wasStarred) {
+      // If we just starred it, switch to it and close
+      switchTab(id);
+    }
   }
 
   // Derived
@@ -590,29 +617,37 @@
           <div class="flex-1 overflow-y-auto p-4 space-y-8 pb-10">
             <!-- Services -->
             <div class="space-y-4">
-              <div class="flex items-center justify-between px-1">
+              <div class="px-1">
                 <span
                   class="text-[10px] font-bold text-gray-500 uppercase tracking-widest"
                   >Services</span
                 >
-                <button
-                  onclick={() => (dropdownOpen = !dropdownOpen)}
-                  class="text-[10px] font-bold text-blue-500 hover:text-blue-400"
-                >
-                  {dropdownOpen ? "Show Starred" : "Browse All"}
-                </button>
               </div>
 
-              {#if dropdownOpen}
-                <div class="space-y-2">
+              <div class="space-y-4">
+                <div class="px-1">
                   <input
                     type="text"
                     bind:value={searchQuery}
                     placeholder="Search services..."
-                    class="w-full bg-black border border-gray-800 rounded p-2 text-xs text-white outline-none focus:border-blue-500 transition"
+                    class="w-full bg-black border border-gray-800 rounded p-2.5 text-xs text-white outline-none focus:border-blue-500 transition shadow-inner"
                   />
-                  <div class="grid grid-cols-1 gap-1">
-                    {#each filteredServices as svc}
+                </div>
+
+                <div class="grid grid-cols-1 gap-1">
+                  {#each mobileServices as svc, i (svc.id)}
+                    <div animate:flip={{ duration: 300 }}>
+                      {#if !searchQuery && !svc.isStarred && svc.prevIsStarred}
+                        <div
+                          class="mt-4 mb-2 px-2 pb-1 border-b border-gray-800"
+                        >
+                          <span
+                            class="text-[10px] font-bold text-gray-600 uppercase tracking-widest"
+                            >All Services</span
+                          >
+                        </div>
+                      {/if}
+
                       <div class="space-y-1">
                         <div
                           class="flex items-center justify-between w-full px-1 rounded {activeId ===
@@ -624,27 +659,29 @@
                             onclick={() => {
                               switchTab(svc.id);
                               sideMenuOpen = false;
-                              dropdownOpen = false;
                             }}
-                            class="flex-1 px-2 py-2.5 text-xs font-semibold text-left"
+                            class="flex-1 px-2 py-3 text-xs font-semibold text-left flex items-center gap-2"
                           >
                             {svc.label}
+                            {#if activeId === svc.id}
+                              <div
+                                class="w-1 h-1 rounded-full bg-blue-500"
+                              ></div>
+                            {/if}
                           </button>
                           <button
-                            class="px-2 py-2.5 text-xs hover:scale-110 transition {serviceVisible.has(
-                              svc.id,
-                            )
+                            class="px-3 py-3 text-xs hover:scale-110 transition {svc.isStarred
                               ? 'text-yellow-400'
-                              : 'text-gray-700'}"
+                              : 'text-gray-700 hover:text-gray-500'}"
                             onclick={(e) => toggleStar(svc.id, e)}
                           >
-                            {serviceVisible.has(svc.id) ? "★" : "☆"}
+                            {svc.isStarred ? "★" : "☆"}
                           </button>
                         </div>
 
                         {#if activeId === svc.id && serviceTabs.length > 0}
                           <div
-                            class="ml-4 flex flex-col border-l border-gray-800"
+                            class="ml-4 flex flex-col border-l border-gray-800 bg-gray-900/30 rounded-r"
                           >
                             {#each serviceTabs as tab}
                               <button
@@ -652,7 +689,7 @@
                                   handleServiceTabChange(tab.id);
                                   sideMenuOpen = false;
                                 }}
-                                class="w-full text-left px-4 py-2 text-[11px] transition {serviceActiveTab ===
+                                class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
                                 tab.id
                                   ? 'text-blue-400 font-bold bg-blue-500/10'
                                   : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}"
@@ -663,61 +700,18 @@
                           </div>
                         {/if}
                       </div>
-                    {/each}
-                  </div>
-                </div>
-              {:else}
-                <div class="grid grid-cols-1 gap-1">
-                  {#each enabledServices as svc}
-                    <div class="space-y-1">
-                      <button
-                        onclick={() => {
-                          switchTab(svc.id);
-                          sideMenuOpen = false;
-                        }}
-                        class="flex items-center justify-between w-full px-3 py-2.5 rounded {activeId ===
-                        svc.id
-                          ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
-                          : 'hover:bg-gray-800 text-gray-300 border border-transparent'} transition text-left"
-                      >
-                        <span class="text-xs font-semibold">{svc.label}</span>
-                        {#if activeId === svc.id}
-                          <div
-                            class="w-1.5 h-1.5 rounded-full bg-blue-500"
-                          ></div>
-                        {/if}
-                      </button>
-
-                      {#if activeId === svc.id && serviceTabs.length > 0}
-                        <div
-                          class="ml-4 flex flex-col border-l border-gray-800"
-                        >
-                          {#each serviceTabs as tab}
-                            <button
-                              onclick={() => {
-                                handleServiceTabChange(tab.id);
-                                sideMenuOpen = false;
-                              }}
-                              class="w-full text-left px-4 py-2 text-[11px] transition {serviceActiveTab ===
-                              tab.id
-                                ? 'text-blue-400 font-bold bg-blue-500/10'
-                                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}"
-                            >
-                              {tab.label}
-                            </button>
-                          {/each}
-                        </div>
-                      {/if}
                     </div>
                   {/each}
-                  <button
-                    onclick={() => (dropdownOpen = true)}
-                    class="w-full px-3 py-2.5 rounded border border-dashed border-gray-800 text-gray-500 text-xs font-medium hover:border-gray-700 hover:text-gray-400 mt-2"
-                  >
-                    + Add more services
-                  </button>
+
+                  {#if mobileServices.length === 0}
+                    <div class="p-8 text-center">
+                      <div class="text-gray-600 text-xs italic">
+                        No services found matching "{searchQuery}"
+                      </div>
+                    </div>
+                  {/if}
                 </div>
-              {/if}
+              </div>
             </div>
           </div>
 
