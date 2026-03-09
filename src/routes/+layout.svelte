@@ -429,8 +429,8 @@
         </select>
         <button
           onclick={() => refreshKey++}
-          class="bg-gray-800 hover:bg-gray-700 px-2 py-1.5 rounded text-xs font-semibold border border-gray-700 transition shrink-0 ml-auto sm:ml-0"
-          >⟳</button
+          class="text-white hover:text-gray-200 transition shrink-0 ml-auto sm:ml-0 px-2"
+          title="Refresh data">⟳</button
         >
         <button
           onclick={() =>
@@ -439,7 +439,7 @@
               region,
               profile: authType === "profile" ? selectedProfile : undefined,
             })}
-          class="px-2.5 py-1.5 rounded text-xs transition text-gray-400 hover:text-white hover:bg-gray-800 shrink-0 flex items-center gap-1"
+          class="px-2.5 py-1.5 rounded text-xs transition text-white hover:bg-gray-800 shrink-0 flex items-center gap-1"
           title="Fork (New Window with current session)"
         >
           <span class="text-base">⧉</span>
@@ -450,7 +450,7 @@
             showSettings = true;
             settingsTab = "profiles";
           }}
-          class="px-2.5 py-1.5 rounded text-xs transition text-gray-500 hover:text-gray-300 hover:bg-gray-800 shrink-0"
+          class="px-2.5 py-1.5 rounded text-xs transition text-white hover:bg-gray-800 shrink-0"
           title="Settings">⚙</button
         >
       </div>
@@ -639,7 +639,7 @@
                       refreshKey++;
                       sideMenuOpen = false;
                     }}
-                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2"
+                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2 text-white"
                   >
                     <span>⟳</span> Refresh
                   </button>
@@ -649,7 +649,7 @@
                       settingsTab = "profiles";
                       sideMenuOpen = false;
                     }}
-                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2"
+                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2 text-white"
                   >
                     <span>⚙</span> Settings
                   </button>
@@ -663,7 +663,7 @@
                       });
                       sideMenuOpen = false;
                     }}
-                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2"
+                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2 text-white"
                   >
                     <span>⧉</span> Fork
                   </button>
