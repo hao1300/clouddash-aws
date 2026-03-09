@@ -17,6 +17,7 @@
         onTabChange?: (id: string) => void;
         children: Snippet;
     } = $props();
+    import { bookmarks } from "$lib/services/bookmarks.svelte";
 
     // -- Action for Portal --
     function portal(node: HTMLElement) {
@@ -30,78 +31,6 @@
         };
     }
 
-    // -- Bookmarks State --
-    let bookmarks = $state<
-        {
-            id: string;
-            url: string;
-            label: string;
-        }[]
-    >([]);
-
-    $effect(() => {
-        const stored = localStorage.getItem("cw_bookmarks");
-        if (stored) {
-            try {
-                // Migrate old bookmarks if they exist by throwing them away or adapting
-                const parsed = JSON.parse(stored);
-                bookmarks = parsed.map((b: any) => ({
-                    id: b.id || crypto.randomUUID(),
-                    url: b.url || `/${b.tabId || "cloudwatch"}`,
-                    label: b.label || "Unknown",
-                }));
-            } catch (e) {}
-        }
-    });
-
-    function toggleBookmark() {
-        const currentUrl = $page.url.pathname + $page.url.search;
-        const existingIndex = bookmarks.findIndex((b) => b.url === currentUrl);
-        let newBookmarks;
-        if (existingIndex >= 0) {
-            newBookmarks = bookmarks.filter((_, i) => i !== existingIndex);
-        } else {
-            // Attempt to derive a sensible default label: "Tab - param1 - param2"
-            let paramValues = Array.from(
-                $page.url.searchParams.values(),
-            ).filter((v) => v);
-            let extractedLabel = activeTabLabel;
-            if (paramValues.length > 0) {
-                extractedLabel += ` (${paramValues.join(", ")})`;
-            }
-
-            newBookmarks = [
-                ...bookmarks,
-                {
-                    id: crypto.randomUUID(),
-                    url: currentUrl,
-                    label: extractedLabel,
-                },
-            ];
-        }
-        bookmarks = newBookmarks;
-        localStorage.setItem("cw_bookmarks", JSON.stringify(newBookmarks));
-    }
-
-    function renameBookmark(id: string) {
-        const b = bookmarks.find((x) => x.id === id);
-        if (!b) return;
-        const newLabel = prompt("Rename bookmark:", b.label);
-        if (newLabel && newLabel.trim()) {
-            bookmarks = bookmarks.map((x) =>
-                x.id === id ? { ...x, label: newLabel.trim() } : x,
-            );
-            localStorage.setItem("cw_bookmarks", JSON.stringify(bookmarks));
-        }
-        menuOpenId = "";
-    }
-
-    function deleteBookmark(id: string) {
-        bookmarks = bookmarks.filter((x) => x.id !== id);
-        localStorage.setItem("cw_bookmarks", JSON.stringify(bookmarks));
-        menuOpenId = "";
-    }
-
     let menuOpenId = $state("");
     let menuX = $state(0);
     let menuY = $state(0);
@@ -109,11 +38,6 @@
 
     let activeTabLabel = $derived(
         tabs.find((t) => t.id === activeTab)?.label || "",
-    );
-    let isBookmarked = $derived(
-        !!bookmarks.find(
-            (b) => b.url === $page.url.pathname + $page.url.search,
-        ),
     );
 </script>
 
@@ -158,22 +82,31 @@
         </nav>
 
         <div
-            class="p-3 border-t border-gray-800 bg-gray-900/50 mt-auto shrink-0"
+            class="p-3 border-t border-gray-800 bg-gray-900/50 mt-auto shrink-0 hidden md:block"
         >
             <button
-                onclick={toggleBookmark}
-                class="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded text-xs font-medium border transition-colors {isBookmarked
+                onclick={() => {
+                    let paramValues = Array.from(
+                        $page.url.searchParams.values(),
+                    ).filter((v) => v);
+                    let extractedLabel = activeTabLabel;
+                    if (paramValues.length > 0) {
+                        extractedLabel += ` (${paramValues.join(", ")})`;
+                    }
+                    bookmarks.toggle(extractedLabel);
+                }}
+                class="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded text-xs font-medium border transition-colors {bookmarks.isBookmarked
                     ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/20'
                     : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
             >
-                {#if isBookmarked}
+                {#if bookmarks.isBookmarked}
                     <span>★ Bookmarked</span>
                 {:else}
                     <span>☆ Bookmark Current</span>
                 {/if}
             </button>
 
-            {#if bookmarks.length > 0}
+            {#if bookmarks.all.length > 0}
                 <div class="mt-4">
                     <div
                         class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 px-1"
@@ -183,7 +116,7 @@
                     <ul
                         class="space-y-0.5 max-h-32 overflow-y-auto pr-1 scrollbar-hide"
                     >
-                        {#each bookmarks as b}
+                        {#each bookmarks.all as b}
                             <li class="relative font-sans">
                                 <div
                                     class="flex items-center w-full rounded transition-colors {b.url ===
@@ -248,7 +181,20 @@
                                         <button
                                             onclick={(e) => {
                                                 e.stopPropagation();
-                                                renameBookmark(b.id);
+                                                const newLabel = prompt(
+                                                    "Rename bookmark:",
+                                                    b.label,
+                                                );
+                                                if (
+                                                    newLabel &&
+                                                    newLabel.trim()
+                                                ) {
+                                                    bookmarks.rename(
+                                                        b.id,
+                                                        newLabel.trim(),
+                                                    );
+                                                }
+                                                menuOpenId = "";
                                             }}
                                             class="block w-full text-left px-3 py-1.5 text-[11px] text-gray-300 hover:bg-gray-700"
                                             >Rename</button
@@ -256,7 +202,8 @@
                                         <button
                                             onclick={(e) => {
                                                 e.stopPropagation();
-                                                deleteBookmark(b.id);
+                                                bookmarks.remove(b.id);
+                                                menuOpenId = "";
                                             }}
                                             class="block w-full text-left px-3 py-1.5 text-[11px] text-red-400 hover:bg-gray-700"
                                             >Delete</button

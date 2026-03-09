@@ -7,6 +7,7 @@
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
   import Login from "$lib/components/Login.svelte";
   import { aws } from "$lib/services/aws.svelte";
+  import { bookmarks } from "$lib/services/bookmarks.svelte";
   import ServiceLayout from "$lib/components/ServiceLayout.svelte";
   import BackButton from "$lib/components/BackButton.svelte";
 
@@ -92,6 +93,7 @@
 
   // Service Dropdown
   let dropdownOpen = $state(false);
+  let sideMenuOpen = $state(false);
   let searchQuery = $state("");
   let filteredServices = $derived(
     services.filter((s) =>
@@ -369,9 +371,38 @@
     <header
       class="flex flex-col sm:flex-row sm:items-center bg-gray-900 border-b border-gray-800 shrink-0"
     >
+      <!-- Mobile Top Bar -->
+      <div class="flex items-center sm:hidden px-3 py-1.5 gap-2 w-full">
+        <button
+          onclick={() => (sideMenuOpen = !sideMenuOpen)}
+          class="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition"
+        >
+          <span class="text-xl">☰</span>
+        </button>
+        <BackButton />
+        <span class="text-sm font-bold truncate flex-1"
+          >{serviceTitle || "AWS Console"}</span
+        >
+        <div class="ml-auto">
+          <button
+            onclick={() => {
+              let label = serviceTitle;
+              if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
+              bookmarks.toggle(label);
+            }}
+            class="p-2 rounded-full hover:bg-gray-800 transition {bookmarks.isBookmarked
+              ? 'text-yellow-400'
+              : 'text-gray-500'}"
+            title={bookmarks.isBookmarked ? "Unbookmark" : "Bookmark Current"}
+          >
+            <span class="text-xl">{bookmarks.isBookmarked ? "★" : "☆"}</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Profile/Region Controls -->
       <div
-        class="flex items-center gap-1.5 sm:ml-auto w-full sm:w-auto order-1 sm:order-2 shrink-0 border-b sm:border-0 border-gray-800 px-2 sm:px-3 py-1.5 overflow-x-auto scrollbar-hide"
+        class="hidden sm:flex items-center gap-1.5 sm:ml-auto w-full sm:w-auto order-1 sm:order-2 shrink-0 border-b sm:border-0 border-gray-800 px-2 sm:px-3 py-1.5 overflow-x-auto scrollbar-hide"
       >
         {#if authType === "profile"}
           <select
@@ -426,7 +457,7 @@
 
       <!-- Services List (SvelteKit routes) -->
       <div
-        class="flex items-center min-w-0 flex-1 order-2 sm:order-1 px-2 sm:px-3 py-1.5 gap-2"
+        class="hidden sm:flex items-center min-w-0 flex-1 order-2 sm:order-1 px-2 sm:px-3 py-1.5 gap-2"
       >
         <BackButton />
         <!-- Service Dropdown Button -->
@@ -526,6 +557,199 @@
         </nav>
       </div>
     </header>
+
+    {#if sideMenuOpen}
+      <div class="fixed inset-0 z-[150] flex sm:hidden">
+        <!-- Overlay -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+          onclick={() => (sideMenuOpen = false)}
+        ></div>
+
+        <!-- Drawer -->
+        <div
+          class="relative w-80 max-w-[85vw] bg-gray-900 h-full shadow-2xl flex flex-col border-r border-gray-800 animate-in slide-in-from-left duration-200"
+        >
+          <div
+            class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950"
+          >
+            <div class="flex items-center gap-2">
+              <span class="text-blue-500 text-xl">☁</span>
+              <span class="font-bold text-gray-100">AWS Console</span>
+            </div>
+            <button
+              onclick={() => (sideMenuOpen = false)}
+              class="p-2 rounded-full hover:bg-gray-800 text-gray-400 transition"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-4 space-y-8 pb-10">
+            <!-- Profile & Region -->
+            <div class="space-y-4">
+              <span
+                class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1 block"
+                >Account & Region</span
+              >
+              <div class="grid grid-cols-1 gap-3">
+                <div class="space-y-1">
+                  <span class="text-[10px] text-gray-600 px-1">Profile</span>
+                  {#if authType === "profile"}
+                    <select
+                      bind:value={selectedProfile}
+                      onchange={() => {
+                        login();
+                        sideMenuOpen = false;
+                      }}
+                      class="w-full bg-gray-800 text-xs p-2.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
+                    >
+                      {#each visibleProfiles as p}<option value={p}>{p}</option
+                        >{/each}
+                    </select>
+                  {:else}
+                    <div
+                      class="w-full bg-gray-800 text-xs p-2.5 rounded text-blue-400 font-mono border border-gray-700"
+                    >
+                      🔑 Custom Keys
+                    </div>
+                  {/if}
+                </div>
+
+                <div class="space-y-1">
+                  <span class="text-[10px] text-gray-600 px-1">Region</span>
+                  <select
+                    bind:value={region}
+                    onchange={() => {
+                      login();
+                      sideMenuOpen = false;
+                    }}
+                    class="w-full bg-gray-800 text-xs p-2.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
+                  >
+                    {#each visibleRegions as r}<option value={r}>{r}</option
+                      >{/each}
+                  </select>
+                </div>
+
+                <div class="flex gap-2 pt-1">
+                  <button
+                    onclick={() => {
+                      refreshKey++;
+                      sideMenuOpen = false;
+                    }}
+                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2"
+                  >
+                    <span>⟳</span> Refresh
+                  </button>
+                  <button
+                    onclick={() => {
+                      showSettings = true;
+                      settingsTab = "profiles";
+                      sideMenuOpen = false;
+                    }}
+                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2"
+                  >
+                    <span>⚙</span> Settings
+                  </button>
+                  <button
+                    onclick={() => {
+                      invoke("fork_process", {
+                        path: activeId,
+                        region,
+                        profile:
+                          authType === "profile" ? selectedProfile : undefined,
+                      });
+                      sideMenuOpen = false;
+                    }}
+                    class="flex-1 bg-gray-800 hover:bg-gray-700 p-2.5 rounded text-xs font-semibold border border-gray-700 transition flex items-center justify-center gap-2"
+                  >
+                    <span>⧉</span> Fork
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Services -->
+            <div class="space-y-4">
+              <div class="flex items-center justify-between px-1">
+                <span
+                  class="text-[10px] font-bold text-gray-500 uppercase tracking-widest"
+                  >Services</span
+                >
+                <button
+                  onclick={() => (dropdownOpen = !dropdownOpen)}
+                  class="text-[10px] font-bold text-blue-500 hover:text-blue-400"
+                >
+                  {dropdownOpen ? "Show Starred" : "Browse All"}
+                </button>
+              </div>
+
+              {#if dropdownOpen}
+                <div class="space-y-2">
+                  <input
+                    type="text"
+                    bind:value={searchQuery}
+                    placeholder="Search services..."
+                    class="w-full bg-black border border-gray-800 rounded p-2 text-xs text-white outline-none focus:border-blue-500 transition"
+                  />
+                  <div class="grid grid-cols-1 gap-1">
+                    {#each filteredServices as svc}
+                      <button
+                        onclick={() => {
+                          switchTab(svc.id);
+                          sideMenuOpen = false;
+                          dropdownOpen = false;
+                        }}
+                        class="flex items-center justify-between w-full px-3 py-2.5 rounded hover:bg-gray-800 transition text-left"
+                      >
+                        <span class="text-xs font-medium text-gray-300"
+                          >{svc.label}</span
+                        >
+                        <span
+                          class="text-xs {serviceVisible.has(svc.id)
+                            ? 'text-yellow-400'
+                            : 'text-gray-700'}"
+                        >
+                          {serviceVisible.has(svc.id) ? "★" : "☆"}
+                        </span>
+                      </button>
+                    {/each}
+                  </div>
+                </div>
+              {:else}
+                <div class="grid grid-cols-1 gap-1">
+                  {#each enabledServices as svc}
+                    <button
+                      onclick={() => {
+                        switchTab(svc.id);
+                        sideMenuOpen = false;
+                      }}
+                      class="flex items-center justify-between w-full px-3 py-2.5 rounded {activeId ===
+                      svc.id
+                        ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
+                        : 'hover:bg-gray-800 text-gray-300 border border-transparent'} transition text-left"
+                    >
+                      <span class="text-xs font-semibold">{svc.label}</span>
+                      {#if activeId === svc.id}
+                        <div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                      {/if}
+                    </button>
+                  {/each}
+                  <button
+                    onclick={() => (dropdownOpen = true)}
+                    class="w-full px-3 py-2.5 rounded border border-dashed border-gray-800 text-gray-500 text-xs font-medium hover:border-gray-700 hover:text-gray-400 mt-2"
+                  >
+                    + Add more services
+                  </button>
+                </div>
+              {/if}
+            </div>
+          </div>
+        </div>
+      </div>
+    {/if}
 
     {#if error}<div
         class="bg-red-500/20 text-red-300 px-3 py-1.5 text-xs border-b border-red-500/30"
