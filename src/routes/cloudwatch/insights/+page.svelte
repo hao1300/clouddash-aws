@@ -7,8 +7,6 @@
         PutQueryDefinitionCommand,
         GetLogGroupFieldsCommand,
     } from "@aws-sdk/client-cloudwatch-logs";
-    import { formatBytes } from "$lib/utils/pagination";
-    import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { goto } from "$app/navigation";
 
@@ -19,7 +17,7 @@
     let lgLoading = $state(false);
     let selectedLogGroup = $state("");
     let logQuery = $state(
-        "fields @timestamp, @message, @logStream\n| sort @timestamp desc\n| limit 20",
+        "fields @timestamp, @logStream, @message\n| sort @timestamp desc\n| limit 20",
     );
     let logResults = $state<any[]>([]);
     let logColumns = $state<string[]>([]);
@@ -239,7 +237,9 @@
                 }
 
                 const firstRow = displayResults[0];
-                logColumns = firstRow.map((f: any) => f.field || "");
+                logColumns = firstRow
+                    .map((f: any) => f.field || "")
+                    .filter((col: string) => col !== "@ptr");
                 logResults = displayResults.map((row) => {
                     const obj: any = {};
                     row.forEach((f: any) => {
@@ -272,7 +272,7 @@
         </div>{/if}
 
     <div
-        class="flex-1 p-4 flex flex-col gap-4 {error || actionMsg
+        class="flex-1 p-4 flex flex-col gap-4 min-h-0 {error || actionMsg
             ? 'pt-8'
             : ''}"
     >
@@ -550,59 +550,56 @@
                             Executing Query... This may take a moment.
                         </div>
                     {:else if logResults.length > 0}
-                        <div class="overflow-x-auto">
-                            <table
-                                class="w-full text-left text-sm whitespace-nowrap"
+                        <table
+                            class="w-full text-left text-sm whitespace-nowrap"
+                        >
+                            <thead
+                                class="sticky top-0 bg-gray-900 border-b border-gray-800 shadow-sm z-10"
                             >
-                                <thead
-                                    class="sticky top-0 bg-gray-900 border-b border-gray-800 shadow-sm z-10"
-                                >
-                                    <tr>
-                                        {#each logColumns as col}
-                                            <th
-                                                class="px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider cursor-pointer hover:text-gray-200 transition-colors"
-                                                onclick={() => sortResults(col)}
+                                <tr>
+                                    {#each logColumns as col}
+                                        <th
+                                            class="px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider cursor-pointer hover:text-gray-200 transition-colors"
+                                            onclick={() => sortResults(col)}
+                                        >
+                                            <div
+                                                class="flex items-center gap-1"
                                             >
-                                                <div
-                                                    class="flex items-center gap-1"
-                                                >
-                                                    {col}
-                                                    {#if sortColumn === col}
-                                                        <span
-                                                            class="text-blue-400"
-                                                            >{sortDirection ===
-                                                            "asc"
-                                                                ? "↑"
-                                                                : "↓"}</span
-                                                        >
-                                                    {/if}
-                                                </div>
-                                            </th>
+                                                {col}
+                                                {#if sortColumn === col}
+                                                    <span class="text-blue-400"
+                                                        >{sortDirection ===
+                                                        "asc"
+                                                            ? "↑"
+                                                            : "↓"}</span
+                                                    >
+                                                {/if}
+                                            </div>
+                                        </th>
+                                    {/each}
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-800/50">
+                                {#each logResults as row}
+                                    <tr
+                                        class="hover:bg-gray-800/40 transition-colors group cursor-pointer"
+                                        onclick={() => navigateToLog(row)}
+                                        title="Click to view in log stream"
+                                    >
+                                        {#each logColumns as col}
+                                            <td
+                                                class="px-4 py-2.5 text-gray-300 group-hover:text-blue-300 font-mono text-xs {col ===
+                                                '@message'
+                                                    ? 'whitespace-pre-wrap min-w-[400px]'
+                                                    : ''}"
+                                            >
+                                                {row[col] ?? "-"}
+                                            </td>
                                         {/each}
                                     </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-800/50">
-                                    {#each logResults as row}
-                                        <tr
-                                            class="hover:bg-gray-800/40 transition-colors group cursor-pointer"
-                                            onclick={() => navigateToLog(row)}
-                                            title="Click to view in log stream"
-                                        >
-                                            {#each logColumns as col}
-                                                <td
-                                                    class="px-4 py-2.5 text-gray-300 group-hover:text-blue-300 font-mono text-xs {col ===
-                                                    '@message'
-                                                        ? 'whitespace-pre-wrap min-w-[400px]'
-                                                        : ''}"
-                                                >
-                                                    {row[col] ?? "-"}
-                                                </td>
-                                            {/each}
-                                        </tr>
-                                    {/each}
-                                </tbody>
-                            </table>
-                        </div>
+                                {/each}
+                            </tbody>
+                        </table>
                     {:else if !logQueryLoading && selectedLogGroup && actionMsg.includes("completed")}
                         <div
                             class="h-64 flex items-center justify-center text-gray-500 text-sm"
