@@ -96,7 +96,7 @@
   // Service Dropdown
   let dropdownOpen = $state(false);
   let sideMenuOpen = $state(false);
-  let rightSidebarOpen = $state(false);
+  let activeSidebarTab = $state<"services" | "bookmarks">("services");
   let searchQuery = $state("");
 
   let filteredServices = $derived(
@@ -396,7 +396,8 @@
       onLogin={() => login()}
       onSwitchAuthType={switchAuthType}
     />
-  {:else}<div class="flex h-full w-full overflow-hidden">
+  {:else}
+    <div class="flex h-full w-full overflow-hidden">
       {#if sideMenuOpen}
         <!-- Overlay for mobile -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -428,95 +429,182 @@
           </button>
         </div>
 
+        <!-- Tab Switcher -->
+        <div class="px-4 pt-4 flex border-b border-gray-800 bg-gray-950 shrink-0">
+          <button
+            onclick={() => (activeSidebarTab = "services")}
+            class="flex-1 pb-3 text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {activeSidebarTab ===
+            'services'
+              ? 'text-blue-400 border-blue-500'
+              : 'text-gray-500 border-transparent hover:text-gray-300'}"
+          >
+            Services
+          </button>
+          <button
+            onclick={() => (activeSidebarTab = "bookmarks")}
+            class="flex-1 pb-3 text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {activeSidebarTab ===
+            'bookmarks'
+              ? 'text-blue-400 border-blue-500'
+              : 'text-gray-500 border-transparent hover:text-gray-300'}"
+          >
+            Bookmarks
+          </button>
+        </div>
+
         <div class="flex-1 overflow-y-auto p-4 space-y-8 pb-10">
-          <!-- Services -->
-          <div class="space-y-4">
+          {#if activeSidebarTab === "services"}
+            <!-- Services -->
             <div class="space-y-4">
-              <div class="px-1">
-                <input
-                  type="text"
-                  bind:value={searchQuery}
-                  placeholder="Search services..."
-                  class="w-full bg-black border border-gray-800 rounded p-2.5 text-xs text-white outline-none focus:border-blue-500 transition shadow-inner"
-                />
-              </div>
+              <div class="space-y-4">
+                <div class="px-1">
+                  <input
+                    type="text"
+                    bind:value={searchQuery}
+                    placeholder="Search services..."
+                    class="w-full bg-black border border-gray-800 rounded p-2.5 text-xs text-white outline-none focus:border-blue-500 transition shadow-inner"
+                  />
+                </div>
 
-              <div class="grid grid-cols-1 gap-1">
-                {#each mobileServices as svc, i (svc.id)}
-                  <div animate:flip={{ duration: 300 }}>
-                    {#if !searchQuery && !svc.isStarred && svc.prevIsStarred}
-                      <div class="mt-4 mb-2 px-2 pb-1 border-b border-gray-800">
-                        <span
-                          class="text-[10px] font-bold text-gray-600 uppercase tracking-widest"
-                          >All Services</span
-                        >
-                      </div>
-                    {/if}
-
-                    <div class="space-y-1">
-                      <div
-                        class="flex items-center justify-between w-full px-1 rounded {activeId ===
-                        svc.id
-                          ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
-                          : 'hover:bg-gray-800 text-gray-300 border border-transparent'} transition text-left"
-                      >
-                        <button
-                          onclick={() => {
-                            switchTab(svc.id);
-                            if (window.innerWidth < 640) sideMenuOpen = false;
-                          }}
-                          class="flex-1 px-2 py-3 text-xs font-semibold text-left flex items-center gap-2"
-                        >
-                          {svc.label}
-                          {#if activeId === svc.id}
-                            <div class="w-1 h-1 rounded-full bg-blue-500"></div>
-                          {/if}
-                        </button>
-                        <button
-                          class="px-3 py-3 text-xs hover:scale-110 transition {svc.isStarred
-                            ? 'text-yellow-400'
-                            : 'text-gray-700 hover:text-gray-500'}"
-                          onclick={(e) => toggleStar(svc.id, e)}
-                        >
-                          {svc.isStarred ? "★" : "☆"}
-                        </button>
-                      </div>
-
-                      {#if activeId === svc.id && serviceTabs.length > 0}
-                        <div
-                          class="ml-4 flex flex-col border-l border-gray-800 bg-gray-900/30 rounded-r"
-                        >
-                          {#each serviceTabs as tab}
-                            <button
-                              onclick={() => {
-                                handleServiceTabChange(tab.id);
-                                if (window.innerWidth < 640)
-                                  sideMenuOpen = false;
-                              }}
-                              class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
-                              tab.id
-                                ? 'text-blue-400 font-bold bg-blue-500/10'
-                                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}"
-                            >
-                              {tab.label}
-                            </button>
-                          {/each}
+                <div class="grid grid-cols-1 gap-1">
+                  {#each mobileServices as svc, i (svc.id)}
+                    <div animate:flip={{ duration: 300 }}>
+                      {#if !searchQuery && !svc.isStarred && svc.prevIsStarred}
+                        <div class="mt-4 mb-2 px-2 pb-1 border-b border-gray-800">
+                          <span
+                            class="text-[10px] font-bold text-gray-600 uppercase tracking-widest"
+                            >All Services</span
+                          >
                         </div>
                       {/if}
+
+                      <div class="space-y-1">
+                        <div
+                          class="flex items-center justify-between w-full px-1 rounded {activeId ===
+                          svc.id
+                            ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
+                            : 'hover:bg-gray-800 text-gray-300 border border-transparent'} transition text-left"
+                        >
+                          <button
+                            onclick={() => {
+                              switchTab(svc.id);
+                              if (window.innerWidth < 640) sideMenuOpen = false;
+                            }}
+                            class="flex-1 px-2 py-3 text-xs font-semibold text-left flex items-center gap-2"
+                          >
+                            {svc.label}
+                            {#if activeId === svc.id}
+                              <div class="w-1 h-1 rounded-full bg-blue-500"></div>
+                            {/if}
+                          </button>
+                          <button
+                            class="px-3 py-3 text-xs hover:scale-110 transition {svc.isStarred
+                              ? 'text-yellow-400'
+                              : 'text-gray-700 hover:text-gray-500'}"
+                            onclick={(e) => toggleStar(svc.id, e)}
+                          >
+                            {svc.isStarred ? "★" : "☆"}
+                          </button>
+                        </div>
+
+                        {#if activeId === svc.id && serviceTabs.length > 0}
+                          <div
+                            class="ml-4 flex flex-col border-l border-gray-800 bg-gray-900/30 rounded-r"
+                          >
+                            {#each serviceTabs as tab}
+                              <button
+                                onclick={() => {
+                                  handleServiceTabChange(tab.id);
+                                  if (window.innerWidth < 640)
+                                    sideMenuOpen = false;
+                                }}
+                                class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
+                                tab.id
+                                  ? 'text-blue-400 font-bold bg-blue-500/10'
+                                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}"
+                              >
+                                {tab.label}
+                              </button>
+                            {/each}
+                          </div>
+                        {/if}
+                      </div>
                     </div>
+                  {/each}
+
+                  {#if mobileServices.length === 0}
+                    <div class="p-8 text-center">
+                      <div class="text-gray-600 text-xs italic">
+                        No services found matching "{searchQuery}"
+                      </div>
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            </div>
+          {:else}
+            <!-- Bookmarks -->
+            <div class="space-y-4">
+              <button
+                onclick={() => {
+                  let label = serviceTitle;
+                  if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
+                  bookmarks.toggle(label);
+                }}
+                class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded text-xs font-bold border border-gray-700 transition shadow-lg"
+              >
+                <span
+                  class={bookmarks.isBookmarked
+                    ? "text-yellow-400"
+                    : "text-gray-400"}
+                >
+                  {bookmarks.isBookmarked ? "★" : "☆"}
+                </span>
+                <span>
+                  {bookmarks.isBookmarked
+                    ? "Remove Current Page"
+                    : "Bookmark Current Page"}
+                </span>
+              </button>
+
+              <div class="grid grid-cols-1 gap-1">
+                {#each bookmarks.all as bkm}
+                  <div
+                    class="group flex items-center w-full bg-gray-800/50 border border-gray-800 rounded hover:border-gray-700 transition overflow-hidden"
+                  >
+                    <button
+                      onclick={() => {
+                        goto(bkm.url);
+                        if (window.innerWidth < 640) sideMenuOpen = false;
+                      }}
+                      class="flex-1 px-3 py-3 text-left hover:bg-gray-800 transition"
+                    >
+                      <span
+                        class="text-xs text-blue-400 font-medium break-words leading-tight block"
+                        >{bkm.label}</span
+                      >
+                    </button>
+                    <button
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        bookmarks.remove(bkm.id);
+                      }}
+                      class="p-3 text-gray-500 hover:text-red-400 transition"
+                      title="Remove bookmark"
+                    >
+                      ✕
+                    </button>
                   </div>
                 {/each}
-
-                {#if mobileServices.length === 0}
+                {#if bookmarks.all.length === 0}
                   <div class="p-8 text-center">
                     <div class="text-gray-600 text-xs italic">
-                      No services found matching "{searchQuery}"
+                      No bookmarks yet.
                     </div>
                   </div>
                 {/if}
               </div>
             </div>
-          </div>
+          {/if}
         </div>
 
         <!-- Account & Region Footer -->
@@ -625,156 +713,29 @@
           <span class="text-sm font-bold truncate flex-1 text-white"
             >{serviceTitle || "AWS Console"}</span
           >
-
-          <button
-            onclick={() => (rightSidebarOpen = !rightSidebarOpen)}
-            class="px-3 py-1.5 rounded-full hover:bg-gray-800 transition border border-transparent hover:border-gray-700 {rightSidebarOpen
-              ? 'text-blue-400 bg-gray-800 border-gray-700'
-              : 'text-gray-400'}"
-            title="Bookmarks"
-          >
-            <span
-              class="text-sm font-semibold tracking-wider flex items-center gap-2"
-            >
-              <span
-                class={bookmarks.isBookmarked
-                  ? "text-yellow-400"
-                  : "text-gray-500"}
-              >
-                {bookmarks.isBookmarked ? "★" : "☆"}
-              </span>
-              Bookmarks
-            </span>
-          </button>
         </header>
 
-        {#if error}<div
+        {#if error}
+          <div
             class="bg-red-500/20 text-red-300 px-3 py-1.5 text-xs border-b border-red-500/30 shrink-0"
           >
             {error}
-          </div>{/if}
-
-        <div class="flex-1 flex overflow-hidden relative">
-          <!-- Dynamic SvelteKit Content Slot -->
-          <div class="flex-1 overflow-hidden relative flex flex-col min-w-0">
-            <ServiceLayout
-              title={serviceTitle}
-              tabs={serviceTabs}
-              activeTab={serviceActiveTab}
-              onTabChange={handleServiceTabChange}
-            >
-              <div class="absolute inset-0">
-                {#key refreshKey}
-                  {@render children()}
-                {/key}
-              </div>
-            </ServiceLayout>
           </div>
+        {/if}
 
-          {#if rightSidebarOpen}
-            <!-- Bookmarks Sidebar -->
-            <!-- Overlay for mobile -->
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              transition:fade={{ duration: 200 }}
-              class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity sm:hidden z-[150]"
-              onclick={() => (rightSidebarOpen = false)}
-            ></div>
-
-            <div
-              transition:fly={{ x: 300, duration: 300 }}
-              class="fixed sm:static inset-y-0 right-0 z-[160] sm:z-auto w-72 max-w-[85vw] bg-gray-900 shadow-2xl sm:shadow-none flex flex-col border-l border-gray-800 shrink-0"
-            >
-              <div
-                class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950 shrink-0"
-              >
-                <div class="flex items-center gap-2">
-                  <span class="text-yellow-500 text-lg">★</span>
-                  <span class="font-bold text-gray-100">Bookmarks</span>
-                </div>
-                <button
-                  onclick={() => (rightSidebarOpen = false)}
-                  class="p-2 rounded-full hover:bg-gray-800 text-gray-400 transition"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div
-                class="p-3 border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm shrink-0"
-              >
-                <button
-                  onclick={() => {
-                    let label = serviceTitle;
-                    if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
-                    bookmarks.toggle(label);
-                  }}
-                  class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded text-xs font-semibold border border-gray-700 transition"
-                >
-                  <span
-                    class={bookmarks.isBookmarked
-                      ? "text-yellow-400"
-                      : "text-gray-400"}
-                  >
-                    {bookmarks.isBookmarked ? "★" : "☆"}
-                  </span>
-                  <span>
-                    {bookmarks.isBookmarked
-                      ? "Remove Current Page"
-                      : "Bookmark Current Page"}
-                  </span>
-                </button>
-              </div>
-
-              <div class="flex-1 overflow-y-auto p-2 space-y-1">
-                {#each bookmarks.all as bkm}
-                  <div
-                    class="group flex flex-col w-full bg-gray-900 border border-gray-800 rounded hover:border-gray-700 transition overflow-hidden"
-                  >
-                    <button
-                      onclick={() => {
-                        goto(bkm.url);
-                        rightSidebarOpen = false;
-                        if (window.innerWidth < 640) sideMenuOpen = false;
-                      }}
-                      class="px-3 py-2 text-left hover:bg-gray-800 transition"
-                    >
-                      <span
-                        class="text-xs text-blue-400 font-medium break-words leading-tight block"
-                        >{bkm.label}</span
-                      >
-                      <span
-                        class="text-[10px] text-gray-500 font-mono truncate block mt-0.5"
-                        >{bkm.url}</span
-                      >
-                    </button>
-                    <div
-                      class="flex border-t border-gray-800 divide-x divide-gray-800 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-950 lg:opacity-100"
-                    >
-                      <button
-                        onclick={(e) => {
-                          e.stopPropagation();
-                          bookmarks.remove(bkm.id);
-                        }}
-                        class="flex-1 p-1.5 text-[10px] text-red-400 hover:text-red-300 hover:bg-red-900/20 uppercase tracking-wider font-semibold transition"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                {/each}
-                {#if bookmarks.all.length === 0}
-                  <div class="p-6 text-center">
-                    <div class="text-gray-500 text-xs italic">
-                      No bookmarks yet.
-                    </div>
-                  </div>
-                {/if}
-              </div>
-
+        <div class="flex-1 overflow-hidden relative flex flex-col min-w-0">
+          <ServiceLayout
+            title={serviceTitle}
+            tabs={serviceTabs}
+            activeTab={serviceActiveTab}
+            onTabChange={handleServiceTabChange}
+          >
+            <div class="absolute inset-0">
+              {#key refreshKey}
+                {@render children()}
+              {/key}
             </div>
-          {/if}
+          </ServiceLayout>
         </div>
       </div>
     </div>
