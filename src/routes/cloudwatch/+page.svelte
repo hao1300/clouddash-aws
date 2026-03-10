@@ -1,5 +1,7 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { page } from "$app/stores";
+    import { titleService } from "$lib/services/title.svelte";
     import {
         DescribeAlarmsCommand,
         DescribeAlarmHistoryCommand,
@@ -17,7 +19,11 @@
     let alarmsLoading = $state(false);
     let alarmsTokenMap = $state<string[]>([]);
     let alarmsCurrentToken = $state<string | undefined>(undefined);
-    let selectedAlarm = $state<any>(null);
+    let selectedAlarm = $derived.by(() => {
+        const name = $page.url.searchParams.get("alarm");
+        if (!name) return null;
+        return alarms.find(a => a.name === name) || { name, state: "LOADING" };
+    });
     let alarmHistory = $state<any[]>([]);
     let alarmHistoryLoading = $state(false);
 
@@ -25,6 +31,29 @@
         if (aws.cw && alarms.length === 0) {
             loadAlarms();
         }
+    });
+
+    $effect(() => {
+        if (aws.cw && selectedAlarm && selectedAlarm.state === "LOADING") {
+             // If we deep linked, we might need to fetch this specific alarm or wait for list
+             if (alarms.length > 0) {
+                 // Already tried to find it in derived, maybe it's on another page?
+                 // For now let's just make sure history is loaded if we have a name
+                 loadAlarmHistory(selectedAlarm.name);
+             }
+        }
+    });
+
+    $effect(() => {
+        if (aws.cw && selectedAlarm && selectedAlarm.name && selectedAlarm.state !== "LOADING") {
+            if (alarmHistory.length === 0 || alarmHistory[0]?.alarmName !== selectedAlarm.name) {
+                loadAlarmHistory(selectedAlarm.name);
+            }
+        }
+    });
+
+    $effect(() => {
+        titleService.setResource(selectedAlarm?.name || "");
     });
 
     async function loadAlarms(token?: string) {
@@ -103,7 +132,7 @@
                 }),
             );
             actionMsg = `Alarm "${alarmName}" deleted.`;
-            selectedAlarm = null;
+            goto("?");
             alarmsTokenMap = [];
             await loadAlarms();
         } catch (e) {
@@ -147,7 +176,7 @@
                 >
                     <button
                         onclick={() => {
-                            selectedAlarm = null;
+                            goto("?");
                             alarmHistory = [];
                         }}
                         class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
@@ -309,8 +338,7 @@
                         key: "name",
                         label: "Alarm Name",
                         onClick: (item) => {
-                            selectedAlarm = item;
-                            loadAlarmHistory(item.name);
+                            goto(`?alarm=${encodeURIComponent(item.name)}`);
                         },
                     },
                     {

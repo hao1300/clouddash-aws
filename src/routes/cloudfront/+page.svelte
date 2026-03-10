@@ -3,14 +3,17 @@
     import { GetMetricDataCommand } from "@aws-sdk/client-cloudwatch";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { page } from "$app/stores";
+    import { goto } from "$app/navigation";
+    import { titleService } from "$lib/services/title.svelte";
 
     let items = $state<any[]>([]);
     let loading = $state(false);
     let error = $state("");
     let marker = $state<string | undefined>(undefined);
     let history = $state<string[]>([]);
-
-    let selectedDist = $state<any>(null);
+    let selectedDistId = $derived($page.url.searchParams.get("id") || "");
+    let selectedDist = $derived(items.find(i => i.id === selectedDistId));
     let metricsData = $state<any>(null);
     let metricsLoading = $state(false);
     let metricPeriod = $state(3600);
@@ -19,6 +22,29 @@
         if (aws.cloudfront && items.length === 0) {
             loadDistributions();
         }
+    });
+
+    $effect(() => {
+        if (aws.cloudfront && selectedDistId && (!selectedDist || selectedDist.id !== selectedDistId)) {
+            // If we deep linked, we might need to fetch the list first
+            if (items.length > 0) {
+                 // Even if we have items, the ID might be on the next page.
+                 // For now, let's just assume it's in the list or we can't show it easily without a GetDistribution command.
+                 // But we can at least load metrics if we have the ID.
+            }
+        }
+    });
+
+    $effect(() => {
+        if (aws.cw && selectedDistId) {
+            if (!metricsData || metricsData._id !== selectedDistId) {
+                loadMetrics(selectedDistId);
+            }
+        }
+    });
+
+    $effect(() => {
+        titleService.setResource(selectedDistId || "");
     });
 
     async function loadDistributions(token?: string) {
@@ -52,9 +78,7 @@
     }
 
     async function viewDistribution(dist: any) {
-        selectedDist = dist;
-        metricsData = null;
-        await loadMetrics(dist.id);
+        goto(`?id=${encodeURIComponent(dist.id)}`);
     }
 
     async function loadMetrics(distId: string) {
@@ -108,7 +132,7 @@
                     latest: vals[0] ?? 0,
                 };
             }
-            metricsData = result;
+            metricsData = { ...result, _id: distId };
         } catch (e) {
             metricsData = {};
         } finally {
@@ -146,12 +170,12 @@
             >
                 <button
                     onclick={() => {
-                        selectedDist = null;
+                        goto("?");
                         metricsData = null;
                     }}
                     class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
                     >← Back</button
-                >
+                    >
                 <span class="text-sm font-bold text-gray-200 truncate flex-1"
                     >{selectedDist.id}
                     <span class="text-gray-500 font-normal ml-2"

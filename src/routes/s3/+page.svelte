@@ -11,6 +11,7 @@
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { goto } from "$app/navigation";
+    import { titleService } from "$lib/services/title.svelte";
 
     let buckets = $state<any[]>([]);
     let loading = $state(false);
@@ -30,6 +31,9 @@
         }
     });
 
+    $effect(() => {
+        titleService.setResource("");
+    });
     async function loadBuckets() {
         if (!aws.s3) return;
         try {

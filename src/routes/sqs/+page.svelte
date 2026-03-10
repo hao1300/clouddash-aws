@@ -9,7 +9,7 @@
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { goto } from "$app/navigation";
-
+    import { titleService } from "$lib/services/title.svelte";
     let queues = $state<any[]>([]);
     let loading = $state(false);
     let error = $state("");
@@ -53,6 +53,9 @@
         }
     });
 
+    $effect(() => {
+        titleService.setResource("");
+    });
     async function loadQueues() {
         if (!aws.sqs) return;
         try {

@@ -8,8 +8,14 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
+    import { titleService } from "$lib/services/title.svelte";
 
     let stackId = $derived($page.url.searchParams.get("id") || "");
+
+    $effect(() => {
+        const name = stack?.StackName || stackId.split("/")[1] || stackId;
+        titleService.setResource(name);
+    });
 
     let resources = $state<StackResource[]>([]);
     let stack = $state<any>(null);

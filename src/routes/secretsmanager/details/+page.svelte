@@ -6,8 +6,14 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
+    import { titleService } from "$lib/services/title.svelte";
 
     let secretId = $derived($page.url.searchParams.get("id") || "");
+
+    $effect(() => {
+        const name = secretId.split(":").pop() || secretId;
+        titleService.setResource(name);
+    });
 
     let loading = $state(false);
     let error = $state("");

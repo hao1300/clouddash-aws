@@ -10,6 +10,7 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
+    import { titleService } from "$lib/services/title.svelte";
 
     let bucket = $derived($page.params.bucketName || "");
     let prefix = $derived($page.url.searchParams.get("prefix") || "");
@@ -36,6 +37,10 @@
         if (aws.s3 && bucket) {
             loadObjects();
         }
+    });
+
+    $effect(() => {
+        titleService.setResource(bucket);
     });
 
     async function loadObjects(token?: string) {

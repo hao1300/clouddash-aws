@@ -15,6 +15,8 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
+    import { goto } from "$app/navigation";
+    import { titleService } from "$lib/services/title.svelte";
 
     let error = $state("");
     let actionMsg = $state("");
@@ -24,7 +26,7 @@
     let logGroupsLoading = $state(false);
     let logGroupsTokenMap = $state<string[]>([]);
     let logGroupsCurrentToken = $state<string | undefined>(undefined);
-    let selectedGroupForStreams = $state("");
+    let selectedGroupForStreams = $derived($page.url.searchParams.get("group") || "");
 
     // --- Log Streams ---
     let logStreams = $state<any[]>([]);
@@ -32,7 +34,7 @@
     let logStreamsLoading = $state(false);
     let logStreamsTokenMap = $state<string[]>([]);
     let logStreamsCurrentToken = $state<string | undefined>(undefined);
-    let selectedStreamForEvents = $state("");
+    let selectedStreamForEvents = $derived($page.url.searchParams.get("stream") || "");
 
     // --- Log Events ---
     let logEvents = $state<any[]>([]);
@@ -46,26 +48,45 @@
     $effect(() => {
         if (aws.cwLogs && !initialLoadDone) {
             initialLoadDone = true;
-            const group = $page.url.searchParams.get("group");
-            const stream = $page.url.searchParams.get("stream");
-            const time = $page.url.searchParams.get("time");
-
-            if (group && stream) {
-                selectedGroupForStreams = group;
-                selectedStreamForEvents = stream;
+            if (selectedGroupForStreams && selectedStreamForEvents) {
+                const time = $page.url.searchParams.get("time");
                 const timeMs = time ? parseInt(time) : undefined;
                 if (timeMs) {
-                    loadLogEvents(group, stream, {
+                    loadLogEvents(selectedGroupForStreams, selectedStreamForEvents, {
                         startTime: timeMs,
                         endTime: timeMs + 5000,
                     });
                 } else {
-                    loadLogEvents(group, stream);
+                    loadLogEvents(selectedGroupForStreams, selectedStreamForEvents);
                 }
+            } else if (selectedGroupForStreams) {
+                loadLogStreams(selectedGroupForStreams);
             } else {
                 loadLogGroupsTable();
             }
         }
+    });
+
+    $effect(() => {
+        if (aws.cwLogs && initialLoadDone) {
+            if (selectedGroupForStreams && selectedStreamForEvents) {
+                if (logEvents.length === 0 || selectedStreamForEvents !== logEvents[0]?.streamName) {
+                     loadLogEvents(selectedGroupForStreams, selectedStreamForEvents);
+                }
+            } else if (selectedGroupForStreams) {
+                if (logStreams.length === 0) {
+                    loadLogStreams(selectedGroupForStreams);
+                }
+            } else {
+                if (logGroupsTable.length === 0) {
+                    loadLogGroupsTable();
+                }
+            }
+        }
+    });
+
+    $effect(() => {
+        titleService.setResource(selectedStreamForEvents || selectedGroupForStreams || "");
     });
 
     async function loadLogGroupsTable(token?: string) {
@@ -230,7 +251,6 @@
     async function loadLogStreams(logGroupName: string, token?: string) {
         if (!aws.cwLogs) return;
         try {
-            selectedGroupForStreams = logGroupName;
             logStreamsLoading = true;
             error = "";
             actionMsg = "";
@@ -281,7 +301,6 @@
         if (!aws.cwLogs) return;
         const { token, direction = "next", startTime, endTime } = options;
         try {
-            selectedStreamForEvents = logStreamName;
             logEventsLoading = true;
             error = "";
             actionMsg = "";
@@ -380,8 +399,17 @@
         {#if selectedStreamForEvents}
             <div class="h-full flex flex-col p-4 bg-gray-950">
                 <div
-                    class="mb-4 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm flex items-center justify-between shrink-0"
+                    class="mb-4 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm flex items-center gap-3 shrink-0"
                 >
+                    <button
+                        onclick={() => {
+                            const params = new URLSearchParams($page.url.searchParams);
+                            params.delete("stream");
+                            goto(`?${params.toString()}`);
+                        }}
+                        class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
+                        >← Back</button
+                    >
                     <span class="text-sm font-bold text-gray-200"
                         >{selectedStreamForEvents}</span
                     >
@@ -509,14 +537,21 @@
         {:else if selectedGroupForStreams}
             <div class="h-full flex flex-col p-4 bg-gray-950">
                 <div
-                    class="mb-4 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm flex items-center justify-between shrink-0"
+                    class="mb-4 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm flex items-center gap-3 shrink-0"
                 >
+                    <button
+                        onclick={() => {
+                            goto("?");
+                        }}
+                        class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
+                        >← Back</button
+                    >
                     <span class="text-sm font-bold text-gray-200"
                         >{selectedGroupForStreams}</span
                     >
                     <button
                         onclick={() => deleteLogGroup(selectedGroupForStreams)}
-                        class="text-xs text-red-400 hover:text-red-300 transition px-3 py-1.5 rounded bg-red-600/10 hover:bg-red-600/20 border border-red-900/30"
+                        class="text-xs text-red-400 hover:text-red-300 transition px-3 py-1.5 rounded bg-red-600/10 hover:bg-red-600/20 border border-red-900/30 ml-auto"
                         >Delete Log Group</button
                     >
                 </div>
@@ -545,10 +580,9 @@
                             key: "name",
                             label: "Log Stream Name",
                             onClick: (item) => {
-                                loadLogEvents(
-                                    selectedGroupForStreams,
-                                    item.name,
-                                );
+                                const params = new URLSearchParams($page.url.searchParams);
+                                params.set("stream", item.name);
+                                goto(`?${params.toString()}`);
                             },
                         },
                         { key: "creationTime", label: "Creation Time" },
@@ -610,7 +644,7 @@
                         key: "name",
                         label: "Log Group Name",
                         onClick: (item) => {
-                            loadLogStreams(item.name);
+                            goto(`?group=${encodeURIComponent(item.name)}`);
                         },
                     },
                     { key: "retentionDays", label: "Retention" },

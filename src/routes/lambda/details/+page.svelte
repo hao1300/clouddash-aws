@@ -9,8 +9,13 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
+    import { titleService } from "$lib/services/title.svelte";
 
     let fnName = $derived($page.url.searchParams.get("id") || "");
+
+    $effect(() => {
+        titleService.setResource(fnName);
+    });
 
     let loading = $state(false);
     let error = $state("");

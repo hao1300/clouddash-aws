@@ -10,6 +10,7 @@
   import Login from "$lib/components/Login.svelte";
   import { aws } from "$lib/services/aws.svelte";
   import { bookmarks } from "$lib/services/bookmarks.svelte";
+  import { titleService } from "$lib/services/title.svelte";
   import ServiceLayout from "$lib/components/ServiceLayout.svelte";
   import BackButton from "$lib/components/BackButton.svelte";
 
@@ -157,9 +158,11 @@
 
   // To highlight active tab on top
   let activeId = $derived($page.url.pathname.split("/")[1] || "");
-  let serviceTitle = $derived(
-    services.find((s) => s.id === activeId)?.label || "",
-  );
+  let serviceTitle = $derived(titleService.parts.map(p => p.label).join(" > ") || "AWS Console");
+
+  $effect(() => {
+    titleService.updateFromUrl($page.url.pathname);
+  });
   let serviceTabs = $derived($page.data.tabs || []);
   let serviceActiveTab = $derived(
     $page.data.activeTab ||
@@ -710,9 +713,26 @@
 
           <BackButton />
 
-          <span class="text-sm font-bold truncate flex-1 text-white"
-            >{serviceTitle || "AWS Console"}</span
-          >
+          <div class="flex items-center gap-1.5 text-sm font-bold truncate flex-1 text-white min-w-0">
+            {#if titleService.parts.length === 0}
+              <span>AWS Console</span>
+            {:else}
+              {#each titleService.parts as part, i}
+                {#if i > 0}
+                  <span class="text-gray-600 shrink-0 hidden sm:inline">/</span>
+                {/if}
+                <a
+                  href={part.href || "javascript:void(0)"}
+                  class="hover:text-blue-400 transition-colors truncate {i < titleService.parts.length - 1 ? 'hidden sm:inline text-gray-500 font-medium' : ''}"
+                  onclick={(e) => {
+                    if (!part.href) e.preventDefault();
+                  }}
+                >
+                  {part.label}
+                </a>
+              {/each}
+            {/if}
+          </div>
         </header>
 
         {#if error}

@@ -7,6 +7,7 @@
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
+    import { titleService } from "$lib/services/title.svelte";
 
     let tableName = $derived($page.params.tableId || "");
 
@@ -52,6 +53,10 @@
             loadDetails();
             loadTtl();
         }
+    });
+
+    $effect(() => {
+        titleService.setResource(tableName);
     });
 
     async function loadDetails() {

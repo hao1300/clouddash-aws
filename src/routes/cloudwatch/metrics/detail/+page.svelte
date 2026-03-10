@@ -3,6 +3,7 @@
     import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
     import { aws } from "$lib/services/aws.svelte";
     import { goto } from "$app/navigation";
+    import { titleService } from "$lib/services/title.svelte";
 
     let namespace = $derived($page.url.searchParams.get("namespace") || "");
     let metricName = $derived($page.url.searchParams.get("name") || "");
@@ -84,6 +85,10 @@
         if (aws.cw && namespace && metricName) {
             loadMetricStats();
         }
+    });
+
+    $effect(() => {
+        titleService.setResource(metricName);
     });
 
     async function loadMetricStats() {

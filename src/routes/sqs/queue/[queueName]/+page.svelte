@@ -11,8 +11,14 @@
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
+    import { titleService } from "$lib/services/title.svelte";
 
+    let queueName = $derived($page.params.queueName || "");
     let queueUrl = $derived($page.url.searchParams.get("url") || "");
+
+    $effect(() => {
+        titleService.setResource(queueName);
+    });
 
     let error = $state("");
     let actionMsg = $state("");

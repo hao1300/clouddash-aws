@@ -3,8 +3,16 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
+    import { titleService } from "$lib/services/title.svelte";
 
     let instanceId = $derived($page.url.searchParams.get("id") || "");
+
+    $effect(() => {
+        const name = instance?.name && instance.name !== "Unnamed" 
+            ? `${instance.name} (${instanceId})` 
+            : instanceId;
+        titleService.setResource(name);
+    });
 
     let instance = $state<any | null>(null);
     let loading = $state(false);

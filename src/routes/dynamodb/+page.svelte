@@ -9,6 +9,7 @@
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { goto } from "$app/navigation";
+    import { titleService } from "$lib/services/title.svelte";
 
     let error = $state("");
     let loading = $state(false);
@@ -50,6 +51,10 @@
             __loadTables_loaded = true;
             loadTables();
         }
+    });
+
+    $effect(() => {
+        titleService.setResource("");
     });
 
     // --- Pagination Helpers ---
