@@ -95,6 +95,7 @@
   // Service Dropdown
   let dropdownOpen = $state(false);
   let sideMenuOpen = $state(false);
+  let rightSidebarOpen = $state(false);
   let searchQuery = $state("");
 
   let filteredServices = $derived(
@@ -394,213 +395,23 @@
       onLogin={() => login()}
       onSwitchAuthType={switchAuthType}
     />
-  {:else}
-    <header
-      class="flex flex-col sm:flex-row sm:items-center bg-gray-900 border-b border-gray-800 shrink-0"
-    >
-      <!-- Mobile Top Bar -->
-      <div class="flex items-center sm:hidden px-3 py-1.5 gap-2 w-full">
-        <button
-          onclick={() => (sideMenuOpen = !sideMenuOpen)}
-          class="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition"
-        >
-          <span class="text-xl">☰</span>
-        </button>
-        <BackButton />
-        <span class="text-sm font-bold truncate flex-1"
-          >{serviceTitle || "AWS Console"}</span
-        >
-        <div class="ml-auto">
-          <button
-            onclick={() => {
-              let label = serviceTitle;
-              if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
-              bookmarks.toggle(label);
-            }}
-            class="p-2 rounded-full hover:bg-gray-800 transition {bookmarks.isBookmarked
-              ? 'text-yellow-400'
-              : 'text-gray-500'}"
-            title={bookmarks.isBookmarked ? "Unbookmark" : "Bookmark Current"}
-          >
-            <span class="text-xl">{bookmarks.isBookmarked ? "★" : "☆"}</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Profile/Region Controls -->
-      <div
-        class="hidden sm:flex items-center gap-1.5 sm:ml-auto w-full sm:w-auto order-1 sm:order-2 shrink-0 border-b sm:border-0 border-gray-800 px-2 sm:px-3 py-1.5 overflow-x-auto scrollbar-hide"
-      >
-        {#if authType === "profile"}
-          <select
-            bind:value={selectedProfile}
-            onchange={() => login()}
-            class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500 shrink-0 max-w-[120px] sm:max-w-none"
-          >
-            {#each visibleProfiles as p}<option value={p}>{p}</option>{/each}
-          </select>
-        {:else}
-          <div
-            class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono border border-gray-700 shrink-0"
-            title="Logged in with API Keys"
-          >
-            🔑 Custom Keys
-          </div>
-        {/if}
-        <select
-          bind:value={region}
-          onchange={() => login()}
-          class="bg-gray-800 text-xs p-1.5 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500 shrink-0 max-w-[100px] sm:max-w-none"
-        >
-          {#each visibleRegions as r}<option value={r}>{r}</option>{/each}
-        </select>
-        <button
-          onclick={() => refreshKey++}
-          class="text-white hover:text-gray-200 transition shrink-0 ml-auto sm:ml-0 px-2"
-          title="Refresh data">⟳</button
-        >
-        <button
-          onclick={() =>
-            invoke("fork_process", {
-              path: activeId,
-              region,
-              profile: authType === "profile" ? selectedProfile : undefined,
-            })}
-          class="px-2.5 py-1.5 rounded text-xs transition text-white hover:bg-gray-800 shrink-0 flex items-center gap-1"
-          title="Fork (New Window with current session)"
-        >
-          <span class="text-base">⧉</span>
-          <span class="hidden md:inline">Fork</span>
-        </button>
-        <button
-          onclick={() => {
-            showSettings = true;
-            settingsTab = "profiles";
-          }}
-          class="px-2.5 py-1.5 rounded text-xs transition text-white hover:bg-gray-800 shrink-0"
-          title="Settings">⚙</button
-        >
-      </div>
-
-      <!-- Services List (SvelteKit routes) -->
-      <div
-        class="hidden sm:flex items-center min-w-0 flex-1 order-2 sm:order-1 px-2 sm:px-3 py-1.5 gap-2"
-      >
-        <BackButton />
-        <!-- Service Dropdown Button -->
-        <div class="relative shrink-0">
-          <button
-            onclick={() => (dropdownOpen = !dropdownOpen)}
-            class="px-3 py-1.5 rounded flex items-center gap-2 text-xs font-bold transition whitespace-nowrap {dropdownOpen
-              ? 'bg-blue-600 text-white shadow'
-              : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-700'}"
-          >
-            <span class="text-blue-400">☰</span> Services
-          </button>
-
-          {#if dropdownOpen}
-            <!-- Click outside overlay -->
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              class="fixed inset-0 z-[90] bg-transparent"
-              onclick={() => (dropdownOpen = false)}
-            ></div>
-
-            <div
-              class="absolute top-full left-0 mt-2 w-64 bg-gray-900 border border-gray-800 rounded-lg shadow-2xl z-[100] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150"
-            >
-              <div class="p-2 border-b border-gray-800 bg-gray-900/50">
-                <input
-                  type="text"
-                  bind:value={searchQuery}
-                  placeholder="Search services..."
-                  class="w-full bg-black border border-gray-800 rounded p-1.5 text-xs text-white outline-none focus:border-blue-500 transition"
-                  onclick={(e) => e.stopPropagation()}
-                />
-              </div>
-              <div class="max-h-80 overflow-y-auto p-1 py-2 space-y-0.5">
-                {#each filteredServices as svc}
-                  <div
-                    role="button"
-                    tabindex="0"
-                    class="group flex items-center justify-between w-full px-2 py-1.5 rounded hover:bg-gray-800 cursor-pointer transition text-left"
-                    onclick={(e) => {
-                      switchTab(svc.id, e);
-                      dropdownOpen = false;
-                    }}
-                    onkeydown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        switchTab(svc.id);
-                        dropdownOpen = false;
-                      }
-                    }}
-                  >
-                    <span
-                      class="text-xs font-medium text-gray-300 group-hover:text-white"
-                      >{svc.label}</span
-                    >
-                    <button
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        toggleStar(svc.id, e);
-                      }}
-                      class="text-xs p-1 rounded hover:bg-gray-700 transition {serviceVisible.has(
-                        svc.id,
-                      )
-                        ? 'text-yellow-400'
-                        : 'text-gray-600 hover:text-gray-400'}"
-                      title={serviceVisible.has(svc.id) ? "Unstar" : "Star"}
-                    >
-                      {serviceVisible.has(svc.id) ? "★" : "☆"}
-                    </button>
-                  </div>
-                {/each}
-                {#if filteredServices.length === 0}
-                  <div
-                    class="px-3 py-4 text-center text-xs text-gray-500 italic"
-                  >
-                    No services found
-                  </div>
-                {/if}
-              </div>
-            </div>
-          {/if}
-        </div>
-
-        <nav
-          class="flex gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-hide snap-x pt-0.5"
-        >
-          {#each enabledServices as svc}
-            <button
-              onclick={(e) => switchTab(svc.id, e)}
-              class="px-3 py-1.5 rounded flex-none text-xs font-semibold transition shrink-0 snap-start {activeId ===
-              svc.id
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'}"
-              >{svc.label}</button
-            >
-          {/each}
-        </nav>
-      </div>
-    </header>
-
-    {#if sideMenuOpen}
-      <div class="fixed inset-0 z-[150] flex sm:hidden">
-        <!-- Overlay -->
+  {:else}<div class="flex h-full w-full overflow-hidden">
+      {#if sideMenuOpen}
+        <!-- Overlay for mobile -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-          class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+          class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity sm:hidden z-[150]"
           onclick={() => (sideMenuOpen = false)}
         ></div>
+      {/if}
 
-        <!-- Drawer -->
-        <div
-          class="relative w-80 max-w-[85vw] bg-gray-900 h-full shadow-2xl flex flex-col border-r border-gray-800 animate-in slide-in-from-left duration-200"
-        >
+      <!-- Left Sidebar -->
+      <div
+        class="fixed sm:static inset-y-0 left-0 z-[160] sm:z-auto w-72 max-w-[85vw] bg-gray-900 shadow-2xl sm:shadow-none flex flex-col border-r border-gray-800 shrink-0 transition-transform duration-300 {sideMenuOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0'}"
+      >
           <div
-            class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950"
+            class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950 shrink-0"
           >
             <div class="flex items-center gap-2">
               <span class="text-blue-500 text-xl">☁</span>
@@ -608,7 +419,7 @@
             </div>
             <button
               onclick={() => (sideMenuOpen = false)}
-              class="p-2 rounded-full hover:bg-gray-800 text-gray-400 transition"
+              class="p-2 rounded-full hover:bg-gray-800 text-gray-400 transition sm:hidden"
             >
               ✕
             </button>
@@ -658,7 +469,7 @@
                           <button
                             onclick={() => {
                               switchTab(svc.id);
-                              sideMenuOpen = false;
+                              if (window.innerWidth < 640) sideMenuOpen = false;
                             }}
                             class="flex-1 px-2 py-3 text-xs font-semibold text-left flex items-center gap-2"
                           >
@@ -687,7 +498,8 @@
                               <button
                                 onclick={() => {
                                   handleServiceTabChange(tab.id);
-                                  sideMenuOpen = false;
+                                  if (window.innerWidth < 640)
+                                    sideMenuOpen = false;
                                 }}
                                 class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
                                 tab.id
@@ -717,7 +529,7 @@
 
           <!-- Account & Region Footer -->
           <div
-            class="p-4 border-t border-gray-800 bg-gray-950/80 backdrop-blur-sm space-y-4"
+            class="p-4 border-t border-gray-800 bg-gray-950/80 backdrop-blur-sm space-y-4 shrink-0"
           >
             <span
               class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1 block"
@@ -732,7 +544,7 @@
                       bind:value={selectedProfile}
                       onchange={() => {
                         login();
-                        sideMenuOpen = false;
+                        if (window.innerWidth < 640) sideMenuOpen = false;
                       }}
                       class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
                     >
@@ -754,7 +566,7 @@
                     bind:value={region}
                     onchange={() => {
                       login();
-                      sideMenuOpen = false;
+                      if (window.innerWidth < 640) sideMenuOpen = false;
                     }}
                     class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
                   >
@@ -768,9 +580,10 @@
                 <button
                   onclick={() => {
                     refreshKey++;
-                    sideMenuOpen = false;
+                    if (window.innerWidth < 640) sideMenuOpen = false;
                   }}
                   class="flex-1 bg-gray-900 hover:bg-gray-800 p-2 rounded text-[11px] font-semibold border border-gray-800 transition flex items-center justify-center gap-1.5 text-white"
+                  title="Refresh data"
                 >
                   <span>⟳</span>
                 </button>
@@ -778,9 +591,10 @@
                   onclick={() => {
                     showSettings = true;
                     settingsTab = "profiles";
-                    sideMenuOpen = false;
+                    if (window.innerWidth < 640) sideMenuOpen = false;
                   }}
                   class="flex-1 bg-gray-900 hover:bg-gray-800 p-2 rounded text-[11px] font-semibold border border-gray-800 transition flex items-center justify-center gap-1.5 text-white"
+                  title="Settings"
                 >
                   <span>⚙</span>
                 </button>
@@ -792,9 +606,10 @@
                       profile:
                         authType === "profile" ? selectedProfile : undefined,
                     });
-                    sideMenuOpen = false;
+                    if (window.innerWidth < 640) sideMenuOpen = false;
                   }}
                   class="flex-[2] bg-blue-600 hover:bg-blue-500 p-2 rounded text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-white shadow-lg"
+                  title="Fork to new window"
                 >
                   <span>⧉</span> Fork
                 </button>
@@ -802,14 +617,176 @@
             </div>
           </div>
         </div>
-      </div>
-    {/if}
 
-    {#if error}<div
-        class="bg-red-500/20 text-red-300 px-3 py-1.5 text-xs border-b border-red-500/30"
-      >
-        {error}
-      </div>{/if}
+      <!-- Main Content Area -->
+      <div class="flex-1 flex flex-col min-w-0 bg-gray-950 relative">
+        <!-- Unified Top Bar -->
+        <header
+          class="flex items-center bg-gray-900 border-b border-gray-800 shrink-0 px-3 py-2 gap-3"
+        >
+          <button
+            onclick={() => (sideMenuOpen = !sideMenuOpen)}
+            class="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition sm:hidden"
+            title="Toggle Sidebar"
+          >
+            <span class="text-xl">☰</span>
+          </button>
+
+          <BackButton />
+
+          <span class="text-sm font-bold truncate flex-1 text-white"
+            >{serviceTitle || "AWS Console"}</span
+          >
+
+          <button
+            onclick={() => (rightSidebarOpen = !rightSidebarOpen)}
+            class="px-3 py-1.5 rounded-full hover:bg-gray-800 transition border border-transparent hover:border-gray-700 {rightSidebarOpen
+              ? 'text-blue-400 bg-gray-800 border-gray-700'
+              : 'text-gray-400'}"
+            title="Bookmarks"
+          >
+            <span
+              class="text-sm font-semibold tracking-wider flex items-center gap-2"
+            >
+              <span
+                class={bookmarks.isBookmarked
+                  ? "text-yellow-400"
+                  : "text-gray-500"}
+              >
+                {bookmarks.isBookmarked ? "★" : "☆"}
+              </span>
+              Bookmarks
+            </span>
+          </button>
+        </header>
+
+        {#if error}<div
+            class="bg-red-500/20 text-red-300 px-3 py-1.5 text-xs border-b border-red-500/30 shrink-0"
+          >
+            {error}
+          </div>{/if}
+
+        <div class="flex-1 flex overflow-hidden relative">
+          <!-- Dynamic SvelteKit Content Slot -->
+          <div class="flex-1 overflow-hidden relative flex flex-col min-w-0">
+            <ServiceLayout
+              title={serviceTitle}
+              tabs={serviceTabs}
+              activeTab={serviceActiveTab}
+              onTabChange={handleServiceTabChange}
+            >
+              <div class="absolute inset-0">
+                {#key refreshKey}
+                  {@render children()}
+                {/key}
+              </div>
+            </ServiceLayout>
+          </div>
+
+          {#if rightSidebarOpen}
+            <!-- Bookmarks Sidebar -->
+            <!-- Overlay for mobile -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity sm:hidden z-[150]"
+              onclick={() => (rightSidebarOpen = false)}
+            ></div>
+
+            <div
+              class="fixed sm:static inset-y-0 right-0 z-[160] sm:z-auto w-72 max-w-[85vw] bg-gray-900 shadow-2xl sm:shadow-none flex flex-col border-l border-gray-800 animate-in slide-in-from-right duration-200 shrink-0"
+            >
+              <div
+                class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950 shrink-0"
+              >
+                <div class="flex items-center gap-2">
+                  <span class="text-yellow-500 text-lg">★</span>
+                  <span class="font-bold text-gray-100">Bookmarks</span>
+                </div>
+                <button
+                  onclick={() => (rightSidebarOpen = false)}
+                  class="p-2 rounded-full hover:bg-gray-800 text-gray-400 transition"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div class="flex-1 overflow-y-auto p-2 space-y-1">
+                {#each bookmarks.all as bkm}
+                  <div
+                    class="group flex flex-col w-full bg-gray-900 border border-gray-800 rounded hover:border-gray-700 transition overflow-hidden"
+                  >
+                    <button
+                      onclick={() => {
+                        goto(bkm.url);
+                        rightSidebarOpen = false;
+                        if (window.innerWidth < 640) sideMenuOpen = false;
+                      }}
+                      class="px-3 py-2 text-left hover:bg-gray-800 transition"
+                    >
+                      <span
+                        class="text-xs text-blue-400 font-medium break-words leading-tight block"
+                        >{bkm.label}</span
+                      >
+                      <span
+                        class="text-[10px] text-gray-500 font-mono truncate block mt-0.5"
+                        >{bkm.url}</span
+                      >
+                    </button>
+                    <div
+                      class="flex border-t border-gray-800 divide-x divide-gray-800 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-950 lg:opacity-100"
+                    >
+                      <button
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          bookmarks.remove(bkm.id);
+                        }}
+                        class="flex-1 p-1.5 text-[10px] text-red-400 hover:text-red-300 hover:bg-red-900/20 uppercase tracking-wider font-semibold transition"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                {/each}
+                {#if bookmarks.all.length === 0}
+                  <div class="p-6 text-center">
+                    <div class="text-gray-500 text-xs italic">
+                      No bookmarks yet.
+                    </div>
+                  </div>
+                {/if}
+              </div>
+
+              <div
+                class="p-3 border-t border-gray-800 bg-gray-950/80 backdrop-blur-sm shrink-0"
+              >
+                <button
+                  onclick={() => {
+                    let label = serviceTitle;
+                    if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
+                    bookmarks.toggle(label);
+                  }}
+                  class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded text-xs font-semibold border border-gray-700 transition"
+                >
+                  <span
+                    class={bookmarks.isBookmarked
+                      ? "text-yellow-400"
+                      : "text-gray-400"}
+                  >
+                    {bookmarks.isBookmarked ? "★" : "☆"}
+                  </span>
+                  <span>
+                    {bookmarks.isBookmarked
+                      ? "Remove Current Page"
+                      : "Bookmark Current Page"}
+                  </span>
+                </button>
+              </div>
+            </div>
+          {/if}
+        </div>
+      </div>
+    </div>
 
     <SettingsDialog
       bind:open={showSettings}
@@ -822,21 +799,5 @@
       services={services as any}
       onChange={saveState}
     />
-
-    <!-- Dynamic SvelteKit Content Slot -->
-    <div class="flex-1 overflow-hidden relative">
-      <ServiceLayout
-        title={serviceTitle}
-        tabs={serviceTabs}
-        activeTab={serviceActiveTab}
-        onTabChange={handleServiceTabChange}
-      >
-        <div class="absolute inset-0">
-          {#key refreshKey}
-            {@render children()}
-          {/key}
-        </div>
-      </ServiceLayout>
-    </div>
   {/if}
 </main>
