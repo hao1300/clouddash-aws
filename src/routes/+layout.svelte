@@ -711,7 +711,11 @@
             <span class="text-xl">☰</span>
           </button>
 
-          <BackButton />
+          <div class="sm:hidden flex items-center">
+            {#if titleService.parts.length > 1}
+              <BackButton href={titleService.parts[titleService.parts.length - 2].href} />
+            {/if}
+          </div>
 
           <div class="flex items-center gap-1.5 text-sm font-bold truncate flex-1 text-white min-w-0">
             {#if titleService.parts.length === 0}

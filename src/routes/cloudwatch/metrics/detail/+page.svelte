@@ -157,11 +157,6 @@
     <div
         class="flex items-center gap-3 mb-6 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm shrink-0"
     >
-        <button
-            onclick={() => goto("/cloudwatch/metrics")}
-            class="text-xs text-blue-400 hover:text-blue-300 bg-blue-600/10 hover:bg-blue-600/20 px-3 py-1.5 rounded transition"
-            >← Back to Metrics</button
-        >
         <span class="text-sm font-bold text-gray-200 truncate flex-1">
             {metricName}
             <span class="text-xs font-normal text-gray-500 ml-2"

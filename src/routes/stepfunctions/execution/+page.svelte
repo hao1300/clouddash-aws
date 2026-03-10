@@ -116,10 +116,6 @@
             : ''}"
     >
         <div class="flex items-center gap-3">
-            <button
-                onclick={handleBack}
-                class="text-xs text-blue-400 hover:text-blue-300">← Back</button
-            >
             <h2 class="text-sm font-bold text-gray-200">Execution Detail</h2>
         </div>
         <div class="flex gap-2">

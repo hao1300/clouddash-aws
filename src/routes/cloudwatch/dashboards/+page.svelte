@@ -136,11 +136,6 @@
             <div class="p-4 h-full flex flex-col pt-2 bg-gray-950">
                 <div class="mb-4 flex items-center justify-between shrink-0">
                     <div class="flex items-center gap-3">
-                        <button
-                            onclick={() => (selectedDash = "")}
-                            class="text-xs text-blue-400 hover:text-blue-300 transition px-3 py-1.5 rounded bg-blue-600/10 hover:bg-blue-600/20"
-                            >← Back</button
-                        >
                         <span class="text-sm font-bold text-gray-200"
                             >{selectedDash}</span
                         >
