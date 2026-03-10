@@ -3,6 +3,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onMount, type Snippet } from "svelte";
   import { flip } from "svelte/animate";
+  import { fly, fade } from "svelte/transition";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
@@ -408,215 +409,202 @@
 
       <!-- Left Sidebar -->
       <div
-        class="fixed sm:static inset-y-0 left-0 z-[160] sm:z-auto w-72 max-w-[85vw] bg-gray-900 shadow-2xl sm:shadow-none flex flex-col border-r border-gray-800 shrink-0 transition-transform duration-300 {sideMenuOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0'}"
+        class="fixed sm:static inset-y-0 left-0 z-[160] sm:z-auto w-72 max-w-[85vw] bg-gray-900 shadow-2xl sm:shadow-none flex flex-col border-r border-gray-800 shrink-0 transition-transform duration-300 {sideMenuOpen
+          ? 'translate-x-0'
+          : '-translate-x-full sm:translate-x-0'}"
       >
-          <div
-            class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950 shrink-0"
-          >
-            <div class="flex items-center gap-2">
-              <span class="text-blue-500 text-xl">☁</span>
-              <span class="font-bold text-gray-100">AWS Console</span>
-            </div>
-            <button
-              onclick={() => (sideMenuOpen = false)}
-              class="p-2 rounded-full hover:bg-gray-800 text-gray-400 transition sm:hidden"
-            >
-              ✕
-            </button>
+        <div
+          class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950 shrink-0 sm:hidden"
+        >
+          <div class="flex items-center gap-2">
+            <img src="/logo.png" alt="CloudDash" class="h-6 w-6" />
+            <span class="font-bold text-gray-100">CloudDash for AWS</span>
           </div>
+          <button
+            onclick={() => (sideMenuOpen = false)}
+            class="p-2 rounded-full hover:bg-gray-800 text-gray-400 transition sm:hidden"
+          >
+            ✕
+          </button>
+        </div>
 
-          <div class="flex-1 overflow-y-auto p-4 space-y-8 pb-10">
-            <!-- Services -->
+        <div class="flex-1 overflow-y-auto p-4 space-y-8 pb-10">
+          <!-- Services -->
+          <div class="space-y-4">
             <div class="space-y-4">
               <div class="px-1">
-                <span
-                  class="text-[10px] font-bold text-gray-500 uppercase tracking-widest"
-                  >Services</span
-                >
+                <input
+                  type="text"
+                  bind:value={searchQuery}
+                  placeholder="Search services..."
+                  class="w-full bg-black border border-gray-800 rounded p-2.5 text-xs text-white outline-none focus:border-blue-500 transition shadow-inner"
+                />
               </div>
 
-              <div class="space-y-4">
-                <div class="px-1">
-                  <input
-                    type="text"
-                    bind:value={searchQuery}
-                    placeholder="Search services..."
-                    class="w-full bg-black border border-gray-800 rounded p-2.5 text-xs text-white outline-none focus:border-blue-500 transition shadow-inner"
-                  />
-                </div>
-
-                <div class="grid grid-cols-1 gap-1">
-                  {#each mobileServices as svc, i (svc.id)}
-                    <div animate:flip={{ duration: 300 }}>
-                      {#if !searchQuery && !svc.isStarred && svc.prevIsStarred}
-                        <div
-                          class="mt-4 mb-2 px-2 pb-1 border-b border-gray-800"
+              <div class="grid grid-cols-1 gap-1">
+                {#each mobileServices as svc, i (svc.id)}
+                  <div animate:flip={{ duration: 300 }}>
+                    {#if !searchQuery && !svc.isStarred && svc.prevIsStarred}
+                      <div class="mt-4 mb-2 px-2 pb-1 border-b border-gray-800">
+                        <span
+                          class="text-[10px] font-bold text-gray-600 uppercase tracking-widest"
+                          >All Services</span
                         >
-                          <span
-                            class="text-[10px] font-bold text-gray-600 uppercase tracking-widest"
-                            >All Services</span
-                          >
+                      </div>
+                    {/if}
+
+                    <div class="space-y-1">
+                      <div
+                        class="flex items-center justify-between w-full px-1 rounded {activeId ===
+                        svc.id
+                          ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
+                          : 'hover:bg-gray-800 text-gray-300 border border-transparent'} transition text-left"
+                      >
+                        <button
+                          onclick={() => {
+                            switchTab(svc.id);
+                            if (window.innerWidth < 640) sideMenuOpen = false;
+                          }}
+                          class="flex-1 px-2 py-3 text-xs font-semibold text-left flex items-center gap-2"
+                        >
+                          {svc.label}
+                          {#if activeId === svc.id}
+                            <div class="w-1 h-1 rounded-full bg-blue-500"></div>
+                          {/if}
+                        </button>
+                        <button
+                          class="px-3 py-3 text-xs hover:scale-110 transition {svc.isStarred
+                            ? 'text-yellow-400'
+                            : 'text-gray-700 hover:text-gray-500'}"
+                          onclick={(e) => toggleStar(svc.id, e)}
+                        >
+                          {svc.isStarred ? "★" : "☆"}
+                        </button>
+                      </div>
+
+                      {#if activeId === svc.id && serviceTabs.length > 0}
+                        <div
+                          class="ml-4 flex flex-col border-l border-gray-800 bg-gray-900/30 rounded-r"
+                        >
+                          {#each serviceTabs as tab}
+                            <button
+                              onclick={() => {
+                                handleServiceTabChange(tab.id);
+                                if (window.innerWidth < 640)
+                                  sideMenuOpen = false;
+                              }}
+                              class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
+                              tab.id
+                                ? 'text-blue-400 font-bold bg-blue-500/10'
+                                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}"
+                            >
+                              {tab.label}
+                            </button>
+                          {/each}
                         </div>
                       {/if}
-
-                      <div class="space-y-1">
-                        <div
-                          class="flex items-center justify-between w-full px-1 rounded {activeId ===
-                          svc.id
-                            ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
-                            : 'hover:bg-gray-800 text-gray-300 border border-transparent'} transition text-left"
-                        >
-                          <button
-                            onclick={() => {
-                              switchTab(svc.id);
-                              if (window.innerWidth < 640) sideMenuOpen = false;
-                            }}
-                            class="flex-1 px-2 py-3 text-xs font-semibold text-left flex items-center gap-2"
-                          >
-                            {svc.label}
-                            {#if activeId === svc.id}
-                              <div
-                                class="w-1 h-1 rounded-full bg-blue-500"
-                              ></div>
-                            {/if}
-                          </button>
-                          <button
-                            class="px-3 py-3 text-xs hover:scale-110 transition {svc.isStarred
-                              ? 'text-yellow-400'
-                              : 'text-gray-700 hover:text-gray-500'}"
-                            onclick={(e) => toggleStar(svc.id, e)}
-                          >
-                            {svc.isStarred ? "★" : "☆"}
-                          </button>
-                        </div>
-
-                        {#if activeId === svc.id && serviceTabs.length > 0}
-                          <div
-                            class="ml-4 flex flex-col border-l border-gray-800 bg-gray-900/30 rounded-r"
-                          >
-                            {#each serviceTabs as tab}
-                              <button
-                                onclick={() => {
-                                  handleServiceTabChange(tab.id);
-                                  if (window.innerWidth < 640)
-                                    sideMenuOpen = false;
-                                }}
-                                class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
-                                tab.id
-                                  ? 'text-blue-400 font-bold bg-blue-500/10'
-                                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}"
-                              >
-                                {tab.label}
-                              </button>
-                            {/each}
-                          </div>
-                        {/if}
-                      </div>
                     </div>
-                  {/each}
+                  </div>
+                {/each}
 
-                  {#if mobileServices.length === 0}
-                    <div class="p-8 text-center">
-                      <div class="text-gray-600 text-xs italic">
-                        No services found matching "{searchQuery}"
-                      </div>
+                {#if mobileServices.length === 0}
+                  <div class="p-8 text-center">
+                    <div class="text-gray-600 text-xs italic">
+                      No services found matching "{searchQuery}"
                     </div>
-                  {/if}
-                </div>
+                  </div>
+                {/if}
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- Account & Region Footer -->
-          <div
-            class="p-4 border-t border-gray-800 bg-gray-950/80 backdrop-blur-sm space-y-4 shrink-0"
-          >
-            <span
-              class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1 block"
-              >Account & Region</span
-            >
-            <div class="grid grid-cols-1 gap-3">
-              <div class="grid grid-cols-2 gap-3">
-                <div class="space-y-1">
-                  <span class="text-[10px] text-gray-600 px-1">Profile</span>
-                  {#if authType === "profile"}
-                    <select
-                      bind:value={selectedProfile}
-                      onchange={() => {
-                        login();
-                        if (window.innerWidth < 640) sideMenuOpen = false;
-                      }}
-                      class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
-                    >
-                      {#each visibleProfiles as p}<option value={p}>{p}</option
-                        >{/each}
-                    </select>
-                  {:else}
-                    <div
-                      class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono border border-gray-700 truncate"
-                    >
-                      🔑 Custom
-                    </div>
-                  {/if}
-                </div>
-
-                <div class="space-y-1">
-                  <span class="text-[10px] text-gray-600 px-1">Region</span>
+        <!-- Account & Region Footer -->
+        <div
+          class="p-2 border-t border-gray-800 bg-gray-950/80 backdrop-blur-sm space-y-4 shrink-0"
+        >
+          <div class="grid grid-cols-1 gap-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div class="space-y-1">
+                <span class="text-[10px] text-gray-600 px-1">Profile</span>
+                {#if authType === "profile"}
                   <select
-                    bind:value={region}
+                    bind:value={selectedProfile}
                     onchange={() => {
                       login();
                       if (window.innerWidth < 640) sideMenuOpen = false;
                     }}
                     class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
                   >
-                    {#each visibleRegions as r}<option value={r}>{r}</option
+                    {#each visibleProfiles as p}<option value={p}>{p}</option
                       >{/each}
                   </select>
-                </div>
+                {:else}
+                  <div
+                    class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono border border-gray-700 truncate"
+                  >
+                    🔑 Custom
+                  </div>
+                {/if}
               </div>
 
-              <div class="flex gap-2">
-                <button
-                  onclick={() => {
-                    refreshKey++;
+              <div class="space-y-1">
+                <span class="text-[10px] text-gray-600 px-1">Region</span>
+                <select
+                  bind:value={region}
+                  onchange={() => {
+                    login();
                     if (window.innerWidth < 640) sideMenuOpen = false;
                   }}
-                  class="flex-1 bg-gray-900 hover:bg-gray-800 p-2 rounded text-[11px] font-semibold border border-gray-800 transition flex items-center justify-center gap-1.5 text-white"
-                  title="Refresh data"
+                  class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
                 >
-                  <span>⟳</span>
-                </button>
-                <button
-                  onclick={() => {
-                    showSettings = true;
-                    settingsTab = "profiles";
-                    if (window.innerWidth < 640) sideMenuOpen = false;
-                  }}
-                  class="flex-1 bg-gray-900 hover:bg-gray-800 p-2 rounded text-[11px] font-semibold border border-gray-800 transition flex items-center justify-center gap-1.5 text-white"
-                  title="Settings"
-                >
-                  <span>⚙</span>
-                </button>
-                <button
-                  onclick={() => {
-                    invoke("fork_process", {
-                      path: activeId,
-                      region,
-                      profile:
-                        authType === "profile" ? selectedProfile : undefined,
-                    });
-                    if (window.innerWidth < 640) sideMenuOpen = false;
-                  }}
-                  class="flex-[2] bg-blue-600 hover:bg-blue-500 p-2 rounded text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-white shadow-lg"
-                  title="Fork to new window"
-                >
-                  <span>⧉</span> Fork
-                </button>
+                  {#each visibleRegions as r}<option value={r}>{r}</option
+                    >{/each}
+                </select>
               </div>
+            </div>
+
+            <div class="flex gap-2">
+              <button
+                onclick={() => {
+                  refreshKey++;
+                  if (window.innerWidth < 640) sideMenuOpen = false;
+                }}
+                class="flex-1 bg-gray-900 hover:bg-gray-800 p-2 rounded text-[11px] font-semibold border border-gray-800 transition flex items-center justify-center gap-1.5 text-white"
+                title="Refresh data"
+              >
+                <span>⟳</span>
+              </button>
+              <button
+                onclick={() => {
+                  showSettings = true;
+                  settingsTab = "profiles";
+                  if (window.innerWidth < 640) sideMenuOpen = false;
+                }}
+                class="flex-1 bg-gray-900 hover:bg-gray-800 p-2 rounded text-[11px] font-semibold border border-gray-800 transition flex items-center justify-center gap-1.5 text-white"
+                title="Settings"
+              >
+                <span>⚙</span>
+              </button>
+              <button
+                onclick={() => {
+                  invoke("fork_process", {
+                    path: activeId,
+                    region,
+                    profile:
+                      authType === "profile" ? selectedProfile : undefined,
+                  });
+                  if (window.innerWidth < 640) sideMenuOpen = false;
+                }}
+                class="flex-[2] bg-blue-600 hover:bg-blue-500 p-2 rounded text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-white shadow-lg"
+                title="Fork to new window"
+              >
+                <span>⧉</span> Fork
+              </button>
             </div>
           </div>
         </div>
+      </div>
 
       <!-- Main Content Area -->
       <div class="flex-1 flex flex-col min-w-0 bg-gray-950 relative">
@@ -689,12 +677,14 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
+              transition:fade={{ duration: 200 }}
               class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity sm:hidden z-[150]"
               onclick={() => (rightSidebarOpen = false)}
             ></div>
 
             <div
-              class="fixed sm:static inset-y-0 right-0 z-[160] sm:z-auto w-72 max-w-[85vw] bg-gray-900 shadow-2xl sm:shadow-none flex flex-col border-l border-gray-800 animate-in slide-in-from-right duration-200 shrink-0"
+              transition:fly={{ x: 300, duration: 300 }}
+              class="fixed sm:static inset-y-0 right-0 z-[160] sm:z-auto w-72 max-w-[85vw] bg-gray-900 shadow-2xl sm:shadow-none flex flex-col border-l border-gray-800 shrink-0"
             >
               <div
                 class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950 shrink-0"
@@ -708,6 +698,32 @@
                   class="p-2 rounded-full hover:bg-gray-800 text-gray-400 transition"
                 >
                   ✕
+                </button>
+              </div>
+
+              <div
+                class="p-3 border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm shrink-0"
+              >
+                <button
+                  onclick={() => {
+                    let label = serviceTitle;
+                    if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
+                    bookmarks.toggle(label);
+                  }}
+                  class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded text-xs font-semibold border border-gray-700 transition"
+                >
+                  <span
+                    class={bookmarks.isBookmarked
+                      ? "text-yellow-400"
+                      : "text-gray-400"}
+                  >
+                    {bookmarks.isBookmarked ? "★" : "☆"}
+                  </span>
+                  <span>
+                    {bookmarks.isBookmarked
+                      ? "Remove Current Page"
+                      : "Bookmark Current Page"}
+                  </span>
                 </button>
               </div>
 
@@ -757,31 +773,6 @@
                 {/if}
               </div>
 
-              <div
-                class="p-3 border-t border-gray-800 bg-gray-950/80 backdrop-blur-sm shrink-0"
-              >
-                <button
-                  onclick={() => {
-                    let label = serviceTitle;
-                    if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
-                    bookmarks.toggle(label);
-                  }}
-                  class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded text-xs font-semibold border border-gray-700 transition"
-                >
-                  <span
-                    class={bookmarks.isBookmarked
-                      ? "text-yellow-400"
-                      : "text-gray-400"}
-                  >
-                    {bookmarks.isBookmarked ? "★" : "☆"}
-                  </span>
-                  <span>
-                    {bookmarks.isBookmarked
-                      ? "Remove Current Page"
-                      : "Bookmark Current Page"}
-                  </span>
-                </button>
-              </div>
             </div>
           {/if}
         </div>
