@@ -204,7 +204,12 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div class="bg-gray-950 p-4 rounded-lg border border-gray-800 flex flex-col min-w-0">
                                 <div class="text-[10px] text-gray-500 uppercase font-bold mb-1 shrink-0">Namespace</div>
-                                <div class="text-sm font-bold text-gray-200 break-all">{alarm.namespace}</div>
+                                <a
+                                    href="/cloudwatch/metrics/{encodeURIComponent(alarm.namespace)}"
+                                    class="text-sm font-bold text-blue-400 hover:underline break-all"
+                                >
+                                    {alarm.namespace}
+                                </a>
                             </div>
                             <div class="bg-gray-950 p-4 rounded-lg border border-gray-800 flex flex-col min-w-0">
                                 <div class="text-[10px] text-gray-500 uppercase font-bold mb-1 shrink-0">Metric</div>

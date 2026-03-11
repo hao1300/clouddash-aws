@@ -134,196 +134,139 @@
     }
 </script>
 
-<div
-    class="h-full relative overflow-hidden flex flex-col p-4 bg-gray-950 text-white"
->
+<div class="h-full relative overflow-hidden flex flex-col p-4 bg-gray-950 text-white">
     {#if error}
-        <div
-            class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
-        >
+        <div class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30">
             {error}
         </div>
     {/if}
 
-    <div class="flex-1 overflow-auto p-4">
+    <div class="flex-1 overflow-auto p-4 transition-all duration-300 ease-in-out">
         <DetailLayout title={metricName}>
             {#snippet mainSnippet()}
-                <div
-                    class="p-6 bg-gray-900 rounded-lg border border-gray-800 shadow-sm overflow-hidden flex flex-col"
-                >
-                    <h3
-                        class="text-xs font-bold text-gray-400 tracking-wide uppercase mb-4"
-                    >
-                        Last 24 Hours Metrics
-                    </h3>
-
-                    {#if loading}
-                        <div
-                            class="h-40 flex items-center justify-center text-gray-400 text-sm animate-pulse"
-                        >
-                            <span class="animate-spin mr-2">⟳</span> Loading statistics...
-                        </div>
-                    {:else if metricStats.length === 0}
-                        <div
-                            class="h-40 flex items-center justify-center text-gray-500 text-sm italic"
-                        >
-                            No data points available for the last 24 hours.
-                        </div>
-                    {:else}
-                        {#if metricChartData}
-                            <div
-                                class="relative w-full bg-gray-950 rounded-lg border border-gray-800/80 p-4 shadow-inner mb-6"
+                <div class="flex flex-col gap-6">
+                    <!-- Namespace and Dimensions Header -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-gray-900 rounded-lg border border-gray-800 p-4 shadow-sm group">
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 group-hover:text-blue-400 transition-colors">Namespace</h4>
+                            <a 
+                                href="/cloudwatch/metrics/{encodeURIComponent(namespace)}"
+                                class="text-xs text-blue-400 font-mono bg-gray-950 px-3 py-2 rounded border border-gray-800/50 block hover:bg-blue-500/10 hover:border-blue-500/30 transition-all truncate"
                             >
-                                <svg
-                                    viewBox="0 0 {metricChartData.width} {metricChartData.height}"
-                                    class="w-full h-auto max-h-[180px]"
-                                >
-                                    <path
-                                        d={metricChartData.path}
-                                        fill="none"
-                                        stroke="#3B82F6"
-                                        stroke-width="2"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                    />
-                                    {#each metricChartData.points as p}
-                                        <circle
-                                            cx={p.x}
-                                            cy={p.y}
-                                            r="2.5"
-                                            fill="#60A5FA"
-                                        />
-                                    {/each}
-                                </svg>
-                                <div
-                                    class="flex justify-between mt-2 px-10 text-[10px] text-gray-500 font-mono"
-                                >
-                                    <span
-                                        >{new Date(
-                                            metricChartData.minT,
-                                        ).toLocaleTimeString()}</span
-                                    >
-                                    <span
-                                        >{new Date(
-                                            metricChartData.maxT,
-                                        ).toLocaleTimeString()}</span
-                                    >
-                                </div>
+                                {namespace}
+                            </a>
+                        </div>
+                        <div class="bg-gray-900 rounded-lg border border-gray-800 p-4 shadow-sm">
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Dimensions</h4>
+                            <div class="flex flex-wrap gap-2">
+                                {#each rawDimensions as d}
+                                    <div class="bg-gray-950 px-2 py-1 rounded border border-gray-800/50 text-[11px] font-mono text-gray-300 hover:border-gray-700 transition-colors">
+                                        <span class="text-gray-500 text-[10px]">{d.Name}:</span> {d.Value}
+                                    </div>
+                                {/each}
+                                {#if rawDimensions.length === 0}
+                                    <span class="text-xs text-gray-600 italic">None</span>
+                                {/if}
                             </div>
-                        {/if}
-
-                        <div
-                            class="bg-gray-950/20 rounded shadow-inner overflow-hidden border border-gray-800/50"
-                        >
-                            <table
-                                class="w-full text-left text-sm whitespace-nowrap"
-                            >
-                                <thead
-                                    class="sticky top-0 bg-gray-900 border-b border-gray-800 uppercase text-[10px] tracking-wider text-gray-400 font-semibold"
-                                >
-                                    <tr>
-                                        <th class="px-3 py-2">Timestamp</th>
-                                        <th class="px-3 py-2 text-right"
-                                            >Average</th
-                                        >
-                                        <th class="px-3 py-2 text-right"
-                                            >Maximum</th
-                                        >
-                                        <th class="px-3 py-2 text-right"
-                                            >Minimum</th
-                                        >
-                                        <th class="px-3 py-2 text-right"
-                                            >SampleCount</th
-                                        >
-                                    </tr>
-                                </thead>
-                                <tbody
-                                    class="divide-y divide-gray-800/30 font-mono text-xs"
-                                >
-                                    {#each metricStats as stat}
-                                        <tr
-                                            class="hover:bg-gray-800/40 transition-colors text-gray-300"
-                                        >
-                                            <td
-                                                class="px-3 py-1.5 text-gray-400"
-                                                >{stat.timestamp}</td
-                                            >
-                                            <td
-                                                class="px-3 py-1.5 text-blue-300 text-right"
-                                                >{stat.average}</td
-                                            >
-                                            <td class="px-3 py-1.5 text-right"
-                                                >{stat.max}</td
-                                            >
-                                            <td class="px-3 py-1.5 text-right"
-                                                >{stat.min}</td
-                                            >
-                                            <td
-                                                class="px-3 py-1.5 text-gray-500 text-right"
-                                            >
-                                                {stat.count}
-                                                <span
-                                                    class="text-[9px] text-gray-600 ml-0.5"
-                                                    >{stat.unit}</span
-                                                >
-                                            </td>
-                                        </tr>
-                                    {/each}
-                                </tbody>
-                            </table>
                         </div>
-                    {/if}
+                    </div>
+
+                    <!-- Chart Section -->
+                    <div class="p-6 bg-gray-900 rounded-lg border border-gray-800 shadow-sm overflow-hidden flex flex-col">
+                        <h3 class="text-xs font-bold text-gray-400 tracking-wide uppercase mb-4">
+                            Last 24 Hours Metrics
+                        </h3>
+
+                        {#if loading}
+                            <div class="h-40 flex items-center justify-center text-gray-400 text-sm animate-pulse">
+                                <span class="animate-spin mr-2">⟳</span> Loading visualization...
+                            </div>
+                        {:else if metricStats.length === 0}
+                            <div class="h-40 flex items-center justify-center text-gray-500 text-sm italic">
+                                No data points available for the last 24 hours.
+                            </div>
+                        {:else}
+                            {#if metricChartData}
+                                <div class="relative w-full bg-gray-950 rounded-lg border border-gray-800/80 p-4 shadow-inner">
+                                    <svg viewBox="0 0 {metricChartData.width} {metricChartData.height}" class="w-full h-auto max-h-[180px]">
+                                        <path d={metricChartData.path} fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                        {#each metricChartData.points as p}
+                                            <circle cx={p.x} cy={p.y} r="2.5" fill="#60A5FA" />
+                                        {/each}
+                                    </svg>
+                                    <div class="flex justify-between mt-2 px-10 text-[10px] text-gray-500 font-mono">
+                                        <span>{new Date(metricChartData.minT).toLocaleTimeString()}</span>
+                                        <span>{new Date(metricChartData.maxT).toLocaleTimeString()}</span>
+                                    </div>
+                                </div>
+                            {/if}
+                        {/if}
+                    </div>
                 </div>
             {/snippet}
 
             {#snippet sidebarSnippet()}
-                <div
-                    class="bg-gray-900 rounded-lg border border-gray-800 p-4 shadow-sm flex flex-col gap-4"
-                >
-                    <div>
-                        <h4
-                            class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3"
-                        >
-                            Namespace
-                        </h4>
-                        <div
-                            class="text-xs text-blue-400 font-mono bg-gray-950 px-2.5 py-2 rounded border border-gray-800/50 break-all leading-relaxed"
-                        >
-                            {namespace}
-                        </div>
+                <div class="bg-gray-900 rounded-lg border border-gray-800 flex flex-col h-full overflow-hidden shadow-sm">
+                    <div class="p-4 border-b border-gray-800 bg-gray-900/50 shrink-0">
+                        <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Statistics List</h3>
                     </div>
-                    <div>
-                        <h4
-                            class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3"
-                        >
-                            Dimensions
-                        </h4>
-                        <div class="space-y-2">
-                            {#each rawDimensions as d}
-                                <div
-                                    class="bg-gray-950 p-2.5 rounded border border-gray-800/50 group"
-                                >
-                                    <div
-                                        class="text-[9px] text-gray-600 font-bold uppercase tracking-tight mb-0.5"
-                                    >
-                                        {d.Name}
-                                    </div>
-                                    <div
-                                        class="text-xs text-gray-300 font-mono break-all"
-                                    >
-                                        {d.Value}
-                                    </div>
+
+                    <div class="flex-1 overflow-auto bg-gray-950/20 custom-scrollbar">
+                        {#if loading && metricStats.length === 0}
+                            <div class="p-8 text-center text-gray-600 animate-pulse text-xs italic">
+                                Fetching datapoints...
+                            </div>
+                        {:else if metricStats.length === 0}
+                            <div class="p-8 text-center text-gray-700 text-xs italic">
+                                No statistics available.
+                            </div>
+                        {:else}
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-[11px] whitespace-nowrap">
+                                    <thead class="sticky top-0 bg-gray-900 border-b border-gray-800 uppercase text-[9px] tracking-tight text-gray-500 font-bold">
+                                        <tr>
+                                            <th class="px-3 py-2">Time</th>
+                                            <th class="px-3 py-2 text-right">Avg</th>
+                                            <th class="px-3 py-2 text-right">Max</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-800/20 font-mono">
+                                        {#each metricStats as stat}
+                                            <tr class="hover:bg-gray-800/30 transition-colors">
+                                                <td class="px-3 py-2 text-gray-500 font-sans">{stat.timestamp.split(', ')[1]}</td>
+                                                <td class="px-3 py-2 text-blue-400 text-right font-bold">{stat.average}</td>
+                                                <td class="px-3 py-2 text-gray-400 text-right">{stat.max}</td>
+                                            </tr>
+                                        {/each}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="p-3 bg-gray-900/40 border-t border-gray-800 shrink-0">
+                                <div class="text-[9px] text-gray-600 italic">
+                                    Showing last {metricStats.length} data points.
                                 </div>
-                            {/each}
-                            {#if rawDimensions.length === 0}
-                                <div class="text-xs text-gray-500 italic px-1">
-                                    No dimensions defined
-                                </div>
-                            {/if}
-                        </div>
+                            </div>
+                        {/if}
                     </div>
                 </div>
             {/snippet}
         </DetailLayout>
     </div>
 </div>
+
+<style>
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #1f2937;
+        border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #374151;
+    }
+</style>
