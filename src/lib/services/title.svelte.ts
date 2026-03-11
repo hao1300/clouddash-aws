@@ -23,6 +23,11 @@ class TitleService {
      */
     updateFromUrl(pathname: string) {
         this.currentPath = pathname;
+        // Clear resources from previous pages (only if needed to avoid reactive loops)
+        const filtered = this.resources.filter(r => pathname.startsWith(r.path));
+        if (filtered.length !== this.resources.length) {
+            this.resources = filtered;
+        }
         const parts = pathname.split("/").filter(Boolean);
         const serviceId = parts[0];
         const subserviceId = parts[1] || "";

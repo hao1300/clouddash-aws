@@ -9,6 +9,7 @@
     } from "@aws-sdk/client-cloudwatch-logs";
     import { aws } from "$lib/services/aws.svelte";
     import { goto } from "$app/navigation";
+    import { page } from "$app/stores";
     import DetailLayout from "$lib/components/DetailLayout.svelte";
     import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
 
@@ -17,14 +18,23 @@
 
     let logGroups = $state<any[]>([]);
     let lgLoading = $state(false);
-    let selectedLogGroups = $state<string[]>([]);
+
+    // Read initial state from URL params
+    const initialGroups = $page.url.searchParams.get("groups");
+    const initialQuery = $page.url.searchParams.get("query");
+    const initialTimeRange = $page.url.searchParams.get("timeRange");
+
+    let selectedLogGroups = $state<string[]>(
+        initialGroups ? initialGroups.split(",").filter(Boolean) : [],
+    );
     let logQuery = $state(
-        "fields @timestamp, @logStream, @message\n| sort @timestamp desc\n| limit 20",
+        initialQuery ||
+            "fields @timestamp, @logStream, @message\n| sort @timestamp desc\n| limit 20",
     );
     let logResults = $state<any[]>([]);
     let logColumns = $state<string[]>([]);
     let logQueryLoading = $state(false);
-    let timeRange = $state(3600); // 1 hour default
+    let timeRange = $state(initialTimeRange ? parseInt(initialTimeRange) : 3600);
 
     let savedQueries = $state<any[]>([]);
     let selectedSavedQueryId = $state("");
@@ -34,6 +44,31 @@
 
     let sortColumn = $state("");
     let sortDirection = $state<"asc" | "desc">("desc");
+
+    // Sync state to URL so back button works
+    import { untrack } from "svelte";
+    $effect(() => {
+        const params = new URLSearchParams();
+        if (selectedLogGroups.length > 0)
+            params.set("groups", selectedLogGroups.join(","));
+        if (
+            logQuery &&
+            logQuery !==
+                "fields @timestamp, @logStream, @message\n| sort @timestamp desc\n| limit 20"
+        )
+            params.set("query", logQuery);
+        if (timeRange !== 3600) params.set("timeRange", String(timeRange));
+        const qs = params.toString();
+        const newUrl = qs
+            ? `/cloudwatch/insights?${qs}`
+            : "/cloudwatch/insights";
+        untrack(() => {
+            const currentUrl = $page.url.pathname + $page.url.search;
+            if (newUrl !== currentUrl) {
+                history.replaceState(history.state, "", newUrl);
+            }
+        });
+    });
 
     $effect(() => {
         if (aws.cwLogs && logGroups.length === 0 && !lgLoading) {
