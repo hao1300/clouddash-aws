@@ -522,16 +522,18 @@
 
     {#snippet sidebarSnippet()}
         <div
-            class="bg-gray-900 border border-gray-800 rounded-lg shadow-sm flex flex-col"
+            class="bg-gray-900 border border-gray-800 rounded-lg shadow-sm flex flex-col h-full"
         >
-            <div class="px-4 py-3 border-b border-gray-800 bg-gray-900/80">
+            <div
+                class="px-4 py-3 border-b border-gray-800 bg-gray-900/80 shrink-0"
+            >
                 <h3
                     class="text-xs font-bold text-gray-400 uppercase tracking-wider"
                 >
                     Log Fields
                 </h3>
             </div>
-            <div class="p-4 overflow-y-auto">
+            <div class="p-4 overflow-y-auto flex-1" style="max-height: 300px;">
                 {#if fieldsLoading}
                     <div class="text-xs text-gray-500 animate-pulse">
                         Loading fields...
