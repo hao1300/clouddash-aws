@@ -20,9 +20,61 @@
     let logEventsPrevToken = $state<string | undefined>(undefined);
     let logEventsFilter = $state("");
     let loadingDirection = $state<"next" | "prev" | "initial" | "none">("none");
+    let useLocalTime = $state(true);
 
     let scrollContainer: HTMLDivElement;
     import { tick } from "svelte";
+
+    function formatTimestamp(ts: number | undefined) {
+        if (!ts) return "-";
+        const d = new Date(ts);
+        if (useLocalTime) {
+            return d.toLocaleString();
+        } else {
+            return d.toISOString().replace("T", " ").replace("Z", " UTC");
+        }
+    }
+
+    function escapeHtmlBlock(str: string) {
+        return str
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+    }
+
+    function formatMessage(msg: string) {
+        try {
+            const obj = JSON.parse(msg);
+            if (typeof obj === "object" && obj !== null) {
+                const jsonStr = JSON.stringify(obj, null, 2);
+                let highlighted = escapeHtmlBlock(jsonStr);
+                highlighted = highlighted.replace(
+                    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+                    function (match) {
+                        let cls = "text-blue-400";
+                        if (/^"/.test(match)) {
+                            if (/:$/.test(match)) {
+                                cls = "text-blue-300";
+                            } else {
+                                cls = "text-green-400";
+                            }
+                        } else if (/true|false/.test(match)) {
+                            cls = "text-yellow-400";
+                        } else if (/null/.test(match)) {
+                            cls = "text-gray-500";
+                        } else {
+                            cls = "text-orange-400";
+                        }
+                        return '<span class="' + cls + '">' + match + "</span>";
+                    },
+                );
+                return highlighted;
+            }
+        } catch {
+            // Not JSON
+        }
+        return escapeHtmlBlock(msg);
+    }
 
     $effect(() => {
         if (aws.cwLogs && logGroupName && logStreamName) {
@@ -76,9 +128,7 @@
                     new FilterLogEventsCommand(params),
                 );
                 const newEvents = (resp.events ?? []).map((e) => ({
-                    timestamp: e.timestamp
-                        ? new Date(e.timestamp).toLocaleString()
-                        : "-",
+                    timestamp: e.timestamp,
                     message: e.message ?? "",
                 }));
 
@@ -126,9 +176,7 @@
                 );
 
                 const newEvents = (resp.events ?? []).map((e) => ({
-                    timestamp: e.timestamp
-                        ? new Date(e.timestamp).toLocaleString()
-                        : "-",
+                    timestamp: e.timestamp,
                     message: e.message ?? "",
                 }));
 
@@ -225,6 +273,14 @@
                             >Clear</button
                         >
                     {/if}
+                    <div class="h-4 w-px bg-gray-700 mx-1"></div>
+                    <button 
+                        onclick={() => useLocalTime = !useLocalTime}
+                        class="text-xs text-gray-400 hover:text-white transition-colors px-2 font-bold select-none"
+                        title="Toggle timezone"
+                    >
+                        {useLocalTime ? 'Local Time' : 'UTC'}
+                    </button>
                 </div>
             </div>
             <div 
@@ -268,12 +324,12 @@
                                 <div
                                     class="text-[10px] text-gray-500 whitespace-nowrap pt-0.5 select-none font-sans mt-[2px]"
                                 >
-                                    {event.timestamp}
+                                    {formatTimestamp(event.timestamp)}
                                 </div>
                                 <div
                                     class="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed flex-1 break-all"
                                 >
-                                    {event.message}
+                                    {@html formatMessage(event.message)}
                                 </div>
                             </div>
                         {/each}
