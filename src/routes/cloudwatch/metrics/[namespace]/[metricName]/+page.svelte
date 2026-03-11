@@ -4,6 +4,7 @@
     import { aws } from "$lib/services/aws.svelte";
     import { titleService } from "$lib/services/title.svelte";
     import DetailLayout from "$lib/components/DetailLayout.svelte";
+    import InfoCard from "$lib/components/InfoCard.svelte";
 
     let namespace = $derived($page.params.namespace || "");
     let metricName = $derived($page.params.metricName || "");
@@ -147,28 +148,25 @@
                 <div class="flex flex-col gap-6">
                     <!-- Namespace and Dimensions Header -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="bg-gray-900 rounded-lg border border-gray-800 p-4 shadow-sm group">
-                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 group-hover:text-blue-400 transition-colors">Namespace</h4>
-                            <a 
-                                href="/cloudwatch/metrics/{encodeURIComponent(namespace)}"
-                                class="text-xs text-blue-400 font-mono bg-gray-950 px-3 py-2 rounded border border-gray-800/50 block hover:bg-blue-500/10 hover:border-blue-500/30 transition-all truncate"
-                            >
-                                {namespace}
-                            </a>
-                        </div>
-                        <div class="bg-gray-900 rounded-lg border border-gray-800 p-4 shadow-sm">
-                            <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Dimensions</h4>
-                            <div class="flex flex-wrap gap-2">
-                                {#each rawDimensions as d}
-                                    <div class="bg-gray-950 px-2 py-1 rounded border border-gray-800/50 text-[11px] font-mono text-gray-300 hover:border-gray-700 transition-colors">
-                                        <span class="text-gray-500 text-[10px]">{d.Name}:</span> {d.Value}
-                                    </div>
-                                {/each}
-                                {#if rawDimensions.length === 0}
-                                    <span class="text-xs text-gray-600 italic">None</span>
-                                {/if}
-                            </div>
-                        </div>
+                        <InfoCard 
+                            label="Namespace" 
+                            value={namespace} 
+                            href="/cloudwatch/metrics/{encodeURIComponent(namespace)}"
+                        />
+                        <InfoCard label="Dimensions">
+                            {#snippet children()}
+                                <div class="flex flex-wrap gap-2">
+                                    {#each rawDimensions as d}
+                                        <div class="bg-gray-950/60 px-2 py-1 rounded border border-gray-800/50 text-[11px] font-mono text-gray-300 hover:border-gray-700 transition-colors">
+                                            <span class="text-gray-500 text-[10px]">{d.Name}:</span> {d.Value}
+                                        </div>
+                                    {/each}
+                                    {#if rawDimensions.length === 0}
+                                        <span class="text-xs text-gray-600 italic">None</span>
+                                    {/if}
+                                </div>
+                            {/snippet}
+                        </InfoCard>
                     </div>
 
                     <!-- Chart Section -->

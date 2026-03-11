@@ -9,6 +9,7 @@
     } from "@aws-sdk/client-cloudwatch";
     import { aws } from "$lib/services/aws.svelte";
     import DetailLayout from "$lib/components/DetailLayout.svelte";
+    import InfoCard from "$lib/components/InfoCard.svelte";
 
     let error = $state("");
     let actionMsg = $state("");
@@ -202,25 +203,20 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div class="bg-gray-950 p-4 rounded-lg border border-gray-800 flex flex-col min-w-0">
-                                <div class="text-[10px] text-gray-500 uppercase font-bold mb-1 shrink-0">Namespace</div>
-                                <a
-                                    href="/cloudwatch/metrics/{encodeURIComponent(alarm.namespace)}"
-                                    class="text-sm font-bold text-blue-400 hover:underline break-all"
-                                >
-                                    {alarm.namespace}
-                                </a>
-                            </div>
-                            <div class="bg-gray-950 p-4 rounded-lg border border-gray-800 flex flex-col min-w-0">
-                                <div class="text-[10px] text-gray-500 uppercase font-bold mb-1 shrink-0">Metric</div>
-                                <button onclick={navigateToMetric} class="text-sm font-bold text-blue-400 hover:underline text-left break-all">
-                                    {alarm.metric}
-                                </button>
-                            </div>
-                            <div class="bg-gray-950 p-4 rounded-lg border border-gray-800 flex flex-col min-w-0">
-                                <div class="text-[10px] text-gray-500 uppercase font-bold mb-1 shrink-0">Condition</div>
-                                <div class="text-sm font-bold text-gray-200 break-words">{alarm.condition}</div>
-                            </div>
+                            <InfoCard 
+                                label="Namespace" 
+                                value={alarm.namespace} 
+                                href="/cloudwatch/metrics/{encodeURIComponent(alarm.namespace)}"
+                            />
+                            <InfoCard 
+                                label="Metric" 
+                                value={alarm.metric} 
+                                onclick={navigateToMetric}
+                            />
+                            <InfoCard 
+                                label="Condition" 
+                                value={alarm.condition} 
+                            />
                         </div>
                     </div>
 
