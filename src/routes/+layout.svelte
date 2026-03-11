@@ -520,8 +520,7 @@
                                   if (window.innerWidth < 640)
                                     sideMenuOpen = false;
                                 }}
-                                class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
-                                tab.id
+                                class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab === tab.id || (tab.id && serviceActiveTab.startsWith(tab.id + '/'))
                                   ? 'text-blue-400 font-bold bg-blue-500/10'
                                   : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}"
                               >

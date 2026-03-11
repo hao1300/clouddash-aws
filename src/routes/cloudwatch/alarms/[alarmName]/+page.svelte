@@ -14,7 +14,7 @@
     let actionMsg = $state("");
     let loading = $state(false);
 
-    let alarmName = $derived($page.params.name);
+    let alarmName = $derived($page.params.alarmName);
     let alarm = $state<any>(null);
     let alarmHistory = $state<any[]>([]);
     let historyLoading = $state(false);
@@ -26,10 +26,6 @@
         }
     });
 
-    $effect(() => {
-        titleService.setResource(alarmName || "");
-    });
-
     async function loadAlarm() {
         if (!aws.cw) return;
         try {
@@ -37,7 +33,7 @@
             error = "";
             const resp = await aws.cw.send(
                 new DescribeAlarmsCommand({
-                    AlarmNames: [alarmName],
+                    AlarmNames: [alarmName as string],
                 }),
             );
             const a = resp.MetricAlarms?.[0];
@@ -129,7 +125,7 @@
                     AlarmNames: [alarmName],
                 }),
             );
-            goto("/cloudwatch");
+            goto("/cloudwatch/alarms");
         } catch (e) {
             error = String(e);
             loading = false;
@@ -183,7 +179,7 @@
                         <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                             <div class="space-y-1 flex-1 min-w-0">
                                 <div class="text-xs text-gray-500 uppercase font-bold tracking-wider">Description</div>
-                                <p class="text-gray-300 leading-relaxed font-mono text-sm bg-gray-950/50 p-3 rounded border border-gray-800 break-words">
+                                <p class="text-gray-300 text-sm bg-gray-950/50 p-3 rounded border border-gray-800 break-words">
                                     {alarm.description || "No description provided."}
                                 </p>
                             </div>

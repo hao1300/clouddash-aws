@@ -5,7 +5,7 @@ export const SERVICE_MANIFEST: Record<string, { label: string; tabs: Record<stri
     cloudwatch: {
         label: "CloudWatch",
         tabs: {
-            "": "Alarms",
+            alarms: "Alarms",
             metrics: "Metrics",
             dashboards: "Dashboards",
             logs: "Log Groups",

@@ -35,6 +35,12 @@ class TitleService {
                     label: subLabel, 
                     href: `/${serviceId}${subserviceId ? '/' + subserviceId : ''}` 
                 };
+            } else if (manifest.tabs[""] !== undefined) {
+                // Default to the "" tab if no match and it exists
+                this.subservice = {
+                    label: manifest.tabs[""],
+                    href: `/${serviceId}`
+                };
             } else {
                 this.subservice = { label: "", href: "" };
             }
