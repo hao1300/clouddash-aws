@@ -143,7 +143,7 @@
                 })
                 .filter((d: any) => d.Name && d.Value),
         );
-        const url = `/cloudwatch/metrics/detail?namespace=${encodeURIComponent(alarm.namespace)}&name=${encodeURIComponent(alarm.metric)}&dimensions=${encodeURIComponent(dimensions)}`;
+        const url = `/cloudwatch/metrics/${encodeURIComponent(alarm.namespace)}/${encodeURIComponent(alarm.metric)}?dimensions=${encodeURIComponent(dimensions)}`;
         goto(url);
     }
 </script>

@@ -21,7 +21,7 @@
     // Breadcrumb title
     $effect(() => {
         if (namespace) {
-            titleService.setResource(namespace);
+            titleService.setResource(namespace, `/cloudwatch/metrics/${encodeURIComponent(namespace)}`);
         }
     });
 
@@ -112,7 +112,7 @@
     hasPrev={metricsTokenMap.length > 0}
     {error}
     {actionMsg}
-    onNext={() => loadMetrics(metricsCurrentToken)}
+    onNext={() => loadMetrics(metricsCurrentToken ?? undefined)}
     onPrev={() => loadMetrics(popToken(metricsTokenMap))}
     onRefresh={() => {
         metricsTokenMap = [];
