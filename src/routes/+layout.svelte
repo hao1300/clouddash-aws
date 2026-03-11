@@ -502,7 +502,7 @@
                       {#if !searchQuery && !svc.isStarred && svc.prevIsStarred}
                         <div class="mt-4 mb-2 px-2 pb-1 border-b border-gray-800">
                           <span
-                            class="text-[10px] font-bold text-gray-600 uppercase tracking-widest"
+                            class="text-[10px] font-bold text-gray-300 uppercase tracking-widest"
                             >All Services</span
                           >
                         </div>
@@ -550,7 +550,7 @@
                                 }}
                                 class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab === tab.id || (tab.id && serviceActiveTab.startsWith(tab.id + '/'))
                                   ? 'text-blue-400 font-bold bg-blue-500/10'
-                                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}"
+                                  : 'text-gray-300 hover:text-white hover:bg-gray-800'}"
                               >
                                 {tab.label}
                               </button>
@@ -644,7 +644,7 @@
           <div class="grid grid-cols-1 gap-3">
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-1">
-                <span class="text-[10px] text-gray-600 px-1">Profile</span>
+                <span class="text-[10px] text-gray-300 px-1">Profile</span>
                 {#if authType === "profile"}
                   <select
                     bind:value={selectedProfile}
@@ -667,7 +667,7 @@
               </div>
 
               <div class="space-y-1">
-                <span class="text-[10px] text-gray-600 px-1">Region</span>
+                <span class="text-[10px] text-gray-300 px-1">Region</span>
                 <select
                   bind:value={region}
                   onchange={() => {

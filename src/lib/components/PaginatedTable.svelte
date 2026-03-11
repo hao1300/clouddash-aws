@@ -150,7 +150,7 @@
                     <tr>
                         {#each columns as col}
                         <th
-                            class="border-b border-gray-800 px-4 py-2 font-semibold text-gray-400 {col.sortable !==
+                            class="border-b border-gray-800 px-4 py-2 font-semibold text-gray-300 {col.sortable !==
                             false
                                 ? 'cursor-pointer hover:text-gray-200'
                                 : ''} transition-colors whitespace-nowrap"
@@ -168,7 +168,7 @@
                     {/each}
                     {#if actionsSnippet}
                         <th
-                            class="border-b border-gray-800 px-4 py-2 font-semibold text-gray-400 text-right"
+                            class="border-b border-gray-800 px-4 py-2 font-semibold text-gray-300 text-right"
                             >Actions</th
                         >
                     {/if}

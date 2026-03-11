@@ -163,7 +163,7 @@
 
             <!-- Chart Section -->
             <div class="p-6 bg-gray-900 rounded-lg border border-gray-800 shadow-sm overflow-hidden flex flex-col">
-                <h3 class="text-xs font-bold text-gray-400 tracking-wide uppercase mb-4">
+                <h3 class="text-xs font-bold text-gray-300 tracking-wide uppercase mb-4">
                     Last 24 Hours Metrics
                 </h3>
 

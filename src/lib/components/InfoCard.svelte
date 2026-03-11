@@ -19,7 +19,7 @@
 </script>
 
 <div class="bg-gray-900/50 rounded-lg border border-gray-800 p-4 shadow-sm group transition-all duration-200 hover:border-gray-700/50 flex flex-col min-w-0 {className}">
-    <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 group-hover:text-gray-400 transition-colors shrink-0">
+    <h4 class="text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-2 group-hover:text-gray-200 transition-colors shrink-0">
         {label}
     </h4>
     

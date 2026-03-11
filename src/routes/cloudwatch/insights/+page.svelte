@@ -280,7 +280,7 @@
                 <div class="flex-1 min-w-[300px]">
                     <label
                         for="log-group-select"
-                        class="block text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider"
+                        class="block text-xs text-gray-300 font-bold mb-1 uppercase tracking-wider"
                         >Log Groups</label
                     >
                     <div class="flex flex-col gap-2">
@@ -370,7 +370,7 @@
                 <div class="w-48">
                     <label
                         for="time-range-select"
-                        class="block text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider"
+                        class="block text-xs text-gray-300 font-bold mb-1 uppercase tracking-wider"
                         >Time Range</label
                     >
                     <div class="relative">
@@ -407,7 +407,7 @@
                     <div class="flex-1 max-w-sm mr-4">
                         <label
                             for="saved-query-select"
-                            class="block text-xs text-gray-400 font-bold uppercase tracking-wider mb-1"
+                            class="block text-xs text-gray-300 font-bold uppercase tracking-wider mb-1"
                         >
                             Saved Queries
                         </label>
@@ -528,7 +528,7 @@
                 class="px-4 py-3 border-b border-gray-800 bg-gray-900/80 shrink-0"
             >
                 <h3
-                    class="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                    class="text-xs font-bold text-gray-300 uppercase tracking-wider"
                 >
                     Log Fields
                 </h3>
@@ -555,7 +555,7 @@
                                 >
                                     {field.name}
                                 </button>
-                                <div class="text-[10px] text-gray-600">
+                                <div class="text-[10px] text-gray-500">
                                     {field.percent}% of events
                                 </div>
                             </li>
@@ -574,7 +574,7 @@
                 class="px-4 py-3 border-b border-gray-800 bg-gray-900/80 shrink-0 flex justify-between items-center"
             >
                 <h3
-                    class="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                    class="text-xs font-bold text-gray-300 uppercase tracking-wider"
                 >
                     Query Results
                     {#if logResults.length > 0}
@@ -600,7 +600,7 @@
                             <tr>
                                 {#each logColumns as col}
                                     <th
-                                        class="px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider cursor-pointer hover:text-gray-200 transition-colors"
+                                        class="px-4 py-3 font-semibold text-gray-300 text-[10px] uppercase tracking-wider cursor-pointer hover:text-gray-200 transition-colors"
                                         onclick={() => sortResults(col)}
                                     >
                                         <div class="flex items-center gap-1">
