@@ -39,7 +39,14 @@
 
     $effect(() => {
         if (aws.cwLogs && logGroupName && logStreamName) {
-            loadLogEvents();
+            const timeParam = $page.url.searchParams.get("time");
+            if (timeParam) {
+                const timeMs = parseInt(timeParam);
+                // Load events in a ±5 minute window around the target timestamp
+                loadLogEvents({ startTime: timeMs });
+            } else {
+                loadLogEvents();
+            }
         }
     });
 
@@ -106,7 +113,7 @@
                 } else {
                     logEvents = newEvents;
                 }
-                
+
                 logEventsNextToken = resp.nextToken;
                 logEventsPrevToken = undefined;
                 if (resp.events && resp.events.length === 0) {
@@ -172,9 +179,9 @@
                 const oldScrollTop = scrollContainer.scrollTop;
                 await tick(); // Wait for DOM to update with new events
                 const newScrollHeight = scrollContainer.scrollHeight;
-                scrollContainer.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
+                scrollContainer.scrollTop =
+                    oldScrollTop + (newScrollHeight - oldScrollHeight);
             }
-
         } catch (e) {
             error = String(e);
         } finally {
@@ -235,19 +242,16 @@
                         >
                     {/if}
                     <div class="h-4 w-px bg-gray-700 mx-1"></div>
-                    <button 
-                        onclick={() => useLocalTime = !useLocalTime}
+                    <button
+                        onclick={() => (useLocalTime = !useLocalTime)}
                         class="text-xs text-gray-400 hover:text-white transition-colors px-2 font-bold select-none"
                         title="Toggle timezone"
                     >
-                        {useLocalTime ? 'Local Time' : 'UTC'}
+                        {useLocalTime ? "Local Time" : "UTC"}
                     </button>
                 </div>
             </div>
-            <div 
-                bind:this={scrollContainer}
-                class="flex-1 overflow-auto p-4"
-            >
+            <div bind:this={scrollContainer} class="flex-1 overflow-auto p-4">
                 {#if logEventsLoading && loadingDirection === "initial"}
                     <div
                         class="h-40 flex items-center justify-center text-gray-400 text-sm animate-pulse"
@@ -268,7 +272,8 @@
                                     token: logEventsPrevToken,
                                     direction: "prev",
                                 })}
-                            disabled={logEventsLoading || logEventsFilter.trim() !== ""}
+                            disabled={logEventsLoading ||
+                                logEventsFilter.trim() !== ""}
                             class="mb-2 text-xs font-bold text-blue-400 hover:text-blue-300 transition disabled:opacity-30 disabled:cursor-not-allowed bg-gray-900 border border-gray-800 rounded px-6 py-2 shadow-sm flex items-center gap-2"
                         >
                             {#if loadingDirection === "prev"}
@@ -287,7 +292,10 @@
                                 >
                                     {formatTimestamp(event.timestamp)}
                                 </div>
-                                    <JsonLogViewer message={event.message} class="text-xs text-gray-300 flex-1" />
+                                <JsonLogViewer
+                                    message={event.message}
+                                    class="text-xs text-gray-300 flex-1"
+                                />
                             </div>
                         {/each}
 

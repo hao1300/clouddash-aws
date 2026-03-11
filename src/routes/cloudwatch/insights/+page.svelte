@@ -154,11 +154,13 @@
             (selectedLogGroups.length === 1 ? selectedLogGroups[0] : null);
         const stream = row["@logStream"];
         const timestamp = row["@timestamp"];
-        if (group && stream && timestamp) {
-            const timeMs = new Date(timestamp + "Z").getTime();
-            goto(
-                `/cloudwatch/logs?group=${encodeURIComponent(group)}&stream=${encodeURIComponent(stream)}&time=${timeMs}`,
-            );
+        if (group && stream) {
+            let url = `/cloudwatch/logs/${encodeURIComponent(group)}/${encodeURIComponent(stream)}`;
+            if (timestamp) {
+                const timeMs = new Date(timestamp + "Z").getTime();
+                url += `?time=${timeMs}`;
+            }
+            goto(url);
         }
     }
 
