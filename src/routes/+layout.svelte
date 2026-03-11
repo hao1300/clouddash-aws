@@ -11,6 +11,7 @@
   import { aws } from "$lib/services/aws.svelte";
   import { bookmarks } from "$lib/services/bookmarks.svelte";
   import { titleService } from "$lib/services/title.svelte";
+  import { SERVICE_MANIFEST } from "$lib/services/service-manifest";
   import ServiceLayout from "$lib/components/ServiceLayout.svelte";
   import BackButton from "$lib/components/BackButton.svelte";
 
@@ -163,7 +164,34 @@
   $effect(() => {
     titleService.updateFromUrl($page.url.pathname);
   });
-  let serviceTabs = $derived($page.data.tabs || []);
+  let serviceTabs = $derived.by(() => {
+    const manifest = SERVICE_MANIFEST[activeId];
+    if (!manifest) return $page.data.tabs || [];
+    
+    // Convert Record<id, label> to Array<{id, label}>
+    const tabs = Object.entries(manifest.tabs).map(([id, label]) => ({
+      id,
+      label
+    }));
+
+    // Filter dynamic tabs if needed
+    // For now, only show details if there's a resource (id, name, etc) in searchParams
+    const detailTabs = ["details"];
+    const hasResource = 
+      $page.url.searchParams.get("id") || 
+      $page.url.searchParams.get("name") ||
+      $page.url.searchParams.get("tableName") ||
+      $page.url.searchParams.get("alarmName") ||
+      $page.url.searchParams.get("functionName") ||
+      $page.url.pathname.includes("/bucket/") ||
+      $page.url.pathname.includes("/table/");
+
+    return tabs.filter(t => {
+      if (detailTabs.includes(t.id)) return !!hasResource;
+      return true;
+    });
+  });
+
   let serviceActiveTab = $derived(
     $page.data.activeTab ||
       $page.url.pathname.split("/").slice(2).join("/") ||

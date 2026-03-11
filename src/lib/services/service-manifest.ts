@@ -7,7 +7,6 @@ export const SERVICE_MANIFEST: Record<string, { label: string; tabs: Record<stri
         tabs: {
             alarms: "Alarms",
             metrics: "Metrics",
-            dashboards: "Dashboards",
             logs: "Log Groups",
             insights: "Logs Insights",
         }
