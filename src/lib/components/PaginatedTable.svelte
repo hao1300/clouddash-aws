@@ -7,6 +7,8 @@
         loading = false,
         hasNext = false,
         hasPrev = false,
+        error = "",
+        actionMsg = "",
         onNext = () => {},
         onPrev = () => {},
         onRefresh = () => {},
@@ -25,6 +27,8 @@
         loading?: boolean;
         hasNext?: boolean;
         hasPrev?: boolean;
+        error?: string;
+        actionMsg?: string;
         onNext?: () => void;
         onPrev?: () => void;
         onRefresh?: () => void;
@@ -93,46 +97,58 @@
     }
 </script>
 
-<div class="flex flex-col h-full">
-    <!-- Toolbar -->
-    <div
-        class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 border-b border-gray-800 bg-gray-900/50 shrink-0 gap-3"
-    >
-        <!-- Filter -->
-        <div class="relative w-full sm:w-64 shrink-0">
-            <span
-                class="absolute inset-y-0 left-2.5 flex items-center text-gray-500"
-                >🔍</span
-            >
-            <input
-                type="text"
-                bind:value={filterText}
-                placeholder="Filter currently loaded..."
-                class="w-full bg-gray-950 border border-gray-700 rounded pl-8 pr-3 py-1.5 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors"
-            />
-            {#if filterText}
-                <button
-                    onclick={() => (filterText = "")}
-                    class="absolute inset-y-0 right-2 flex items-center text-gray-500 hover:text-gray-300"
-                    >✕</button
+<div class="h-full relative overflow-hidden flex flex-col">
+    {#if error}
+        <div class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30">
+            {error}
+        </div>
+    {/if}
+    {#if actionMsg}
+        <div class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30">
+            {actionMsg}
+        </div>
+    {/if}
+
+    <div class="flex-1 flex flex-col min-h-0 {error || actionMsg ? 'pt-8' : ''}">
+        <!-- Toolbar -->
+        <div
+            class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 border-b border-gray-800 bg-gray-900/50 shrink-0 gap-3"
+        >
+            <!-- Filter -->
+            <div class="relative w-full sm:w-64 shrink-0">
+                <span
+                    class="absolute inset-y-0 left-2.5 flex items-center text-gray-500"
+                    >🔍</span
                 >
-            {/if}
+                <input
+                    type="text"
+                    bind:value={filterText}
+                    placeholder="Filter currently loaded..."
+                    class="w-full bg-gray-950 border border-gray-700 rounded pl-8 pr-3 py-1.5 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors"
+                />
+                {#if filterText}
+                    <button
+                        onclick={() => (filterText = "")}
+                        class="absolute inset-y-0 right-2 flex items-center text-gray-500 hover:text-gray-300"
+                        >✕</button
+                    >
+                {/if}
+            </div>
+
+            <!-- Right Actions -->
+            <div class="flex items-center gap-2 justify-end">
+                {#if headerActionsSnippet}
+                    {@render headerActionsSnippet()}
+                {/if}
+            </div>
         </div>
 
-        <!-- Right Actions -->
-        <div class="flex items-center gap-2 justify-end">
-            {#if headerActionsSnippet}
-                {@render headerActionsSnippet()}
-            {/if}
-        </div>
-    </div>
-
-    <!-- Table Core -->
-    <div class="flex-1 overflow-auto bg-gray-950">
-        <table class="w-full text-left border-collapse text-sm">
-            <thead class="sticky top-0 bg-gray-900 shadow z-10">
-                <tr>
-                    {#each columns as col}
+        <!-- Table Core -->
+        <div class="flex-1 overflow-auto bg-gray-950">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead class="sticky top-0 bg-gray-900 shadow z-10">
+                    <tr>
+                        {#each columns as col}
                         <th
                             class="border-b border-gray-800 px-4 py-2 font-semibold text-gray-400 {col.sortable !==
                             false
@@ -251,5 +267,6 @@
                 Next ▶
             </button>
         </div>
+    </div>
     </div>
 </div>

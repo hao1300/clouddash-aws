@@ -102,71 +102,58 @@
     }
 </script>
 
-<div class="h-full relative overflow-hidden flex flex-col">
-    {#if error}<div
-            class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
-        >
-            {error}
-        </div>{/if}
-    {#if actionMsg}<div
-            class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30"
-        >
-            {actionMsg}
-        </div>{/if}
-
-    <div class="flex-1 {error || actionMsg ? 'pt-8' : ''}">
-        <PaginatedTable
-            items={alarms}
-            loading={alarmsLoading}
-            hasNext={!!alarmsCurrentToken}
-            hasPrev={alarmsTokenMap.length > 0}
-            onNext={() => loadAlarms(alarmsCurrentToken)}
-            onPrev={() => loadAlarms(popToken(alarmsTokenMap))}
-            onRefresh={() => {
-                alarmsTokenMap = [];
-                loadAlarms();
+<PaginatedTable
+    items={alarms}
+    loading={alarmsLoading}
+    hasNext={!!alarmsCurrentToken}
+    hasPrev={alarmsTokenMap.length > 0}
+    {error}
+    {actionMsg}
+    onNext={() => loadAlarms(alarmsCurrentToken)}
+    onPrev={() => loadAlarms(popToken(alarmsTokenMap))}
+    onRefresh={() => {
+        alarmsTokenMap = [];
+        loadAlarms();
+    }}
+    columns={[
+        {
+            key: "name",
+            label: "Alarm Name",
+            onClick: (item) => {
+                goto(`/cloudwatch/${encodeURIComponent(item.name)}`);
+            },
+        },
+        {
+            key: "state",
+            label: "State",
+            format: (v) =>
+                v === "ALARM"
+                    ? "🔴 ALARM"
+                    : v === "OK"
+                      ? "🟢 OK"
+                      : `⚪ ${v}`,
+        },
+        {
+            key: "metric",
+            label: "Metric",
+            onClick: (item) => navigateToMetric(item),
+        },
+        { key: "condition", label: "Condition" },
+        {
+            key: "updated",
+            label: "Last Updated",
+            format: (v) => (v ? new Date(v).toLocaleString() : "-"),
+        },
+    ]}
+>
+    {#snippet actionsSnippet(item)}
+        <button
+            onclick={(e) => {
+                e.stopPropagation();
+                deleteAlarm(item.name);
             }}
-            columns={[
-                {
-                    key: "name",
-                    label: "Alarm Name",
-                    onClick: (item) => {
-                        goto(`/cloudwatch/${encodeURIComponent(item.name)}`);
-                    },
-                },
-                {
-                    key: "state",
-                    label: "State",
-                    format: (v) =>
-                        v === "ALARM"
-                            ? "🔴 ALARM"
-                            : v === "OK"
-                              ? "🟢 OK"
-                              : `⚪ ${v}`,
-                },
-                {
-                    key: "metric",
-                    label: "Metric",
-                    onClick: (item) => navigateToMetric(item),
-                },
-                { key: "condition", label: "Condition" },
-                {
-                    key: "updated",
-                    label: "Last Updated",
-                    format: (v) => (v ? new Date(v).toLocaleString() : "-"),
-                },
-            ]}
+            class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
+            >Delete</button
         >
-            {#snippet actionsSnippet(item)}
-                <button
-                    onclick={(e) => {
-                        e.stopPropagation();
-                        deleteAlarm(item.name);
-                    }}
-                    class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
-                    >Delete</button
-                >
-            {/snippet}
-        </PaginatedTable>
-    </div>
-</div>
+    {/snippet}
+</PaginatedTable>
