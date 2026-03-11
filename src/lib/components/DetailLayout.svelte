@@ -10,6 +10,7 @@
         actionsSnippet,
         mainSnippet,
         sidebarSnippet,
+        bottomSnippet,
         isSidebarCollapsed = $bindable(false),
     }: {
         title: string;
@@ -20,6 +21,7 @@
         actionsSnippet?: Snippet;
         mainSnippet: Snippet;
         sidebarSnippet?: Snippet;
+        bottomSnippet?: Snippet;
         isSidebarCollapsed?: boolean;
     } = $props();
 </script>
@@ -37,7 +39,7 @@
     {/if}
 
     <div class="flex-1 overflow-auto p-2 transition-all duration-300 ease-in-out {error || actionMsg ? 'pt-8' : ''}">
-        <div class="{fullWidth ? 'w-full' : 'max-w-6xl mx-auto w-full'} flex flex-col gap-4 h-full min-h-0">
+        <div class="{fullWidth ? 'w-full' : 'max-w-6xl mx-auto w-full'} flex flex-col gap-4 {bottomSnippet ? 'min-h-full' : 'h-full min-h-0'}">
             <!-- Header -->
             {#if !hideTitle}
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-2">
@@ -51,7 +53,7 @@
             {/if}
 
             <!-- Content Area -->
-            <div class="flex h-full min-h-0 gap-4">
+            <div class="flex {bottomSnippet ? 'shrink-0' : 'h-full flex-1 min-h-0'} gap-4">
                 <!-- Main Content Section -->
                 <div class="flex-1 min-w-0 transition-all duration-300 h-full">
                     {@render mainSnippet()}
@@ -59,7 +61,7 @@
 
                 <!-- Sidebar Section -->
                 {#if sidebarSnippet}
-                    <div class="{isSidebarCollapsed ? 'w-10' : 'w-80'} shrink-0 transition-all duration-300 flex flex-col relative h-full">
+                    <div class="{isSidebarCollapsed ? 'w-10' : 'w-80'} shrink-0 transition-all duration-300 flex flex-col relative {bottomSnippet ? 'self-stretch' : 'h-full'}">
                         <button
                             onclick={() => isSidebarCollapsed = !isSidebarCollapsed}
                             class="absolute -left-3 top-1/2 -translate-y-1/2 bg-gray-800 border border-gray-700 rounded-full p-1 text-gray-400 hover:text-white hover:bg-gray-700 z-10 hidden lg:block shadow-md focus:outline-none"
@@ -75,6 +77,13 @@
                     </div>
                 {/if}
             </div>
+
+            <!-- Bottom Section -->
+            {#if bottomSnippet}
+                <div class="flex-1 min-w-0 transition-all duration-300 mt-2 flex flex-col">
+                    {@render bottomSnippet()}
+                </div>
+            {/if}
         </div>
     </div>
 </div>

@@ -35,46 +35,7 @@
         }
     }
 
-    function escapeHtmlBlock(str: string) {
-        return str
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
-    }
-
-    function formatMessage(msg: string) {
-        try {
-            const obj = JSON.parse(msg);
-            if (typeof obj === "object" && obj !== null) {
-                const jsonStr = JSON.stringify(obj, null, 2);
-                let highlighted = escapeHtmlBlock(jsonStr);
-                highlighted = highlighted.replace(
-                    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-                    function (match) {
-                        let cls = "text-blue-400";
-                        if (/^"/.test(match)) {
-                            if (/:$/.test(match)) {
-                                cls = "text-blue-300";
-                            } else {
-                                cls = "text-green-400";
-                            }
-                        } else if (/true|false/.test(match)) {
-                            cls = "text-yellow-400";
-                        } else if (/null/.test(match)) {
-                            cls = "text-gray-500";
-                        } else {
-                            cls = "text-orange-400";
-                        }
-                        return '<span class="' + cls + '">' + match + "</span>";
-                    },
-                );
-                return highlighted;
-            }
-        } catch {
-            // Not JSON
-        }
-        return escapeHtmlBlock(msg);
-    }
+    import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
 
     $effect(() => {
         if (aws.cwLogs && logGroupName && logStreamName) {
@@ -285,7 +246,7 @@
             </div>
             <div 
                 bind:this={scrollContainer}
-                class="flex-1 overflow-auto p-4 custom-scrollbar"
+                class="flex-1 overflow-auto p-4"
             >
                 {#if logEventsLoading && loadingDirection === "initial"}
                     <div
@@ -326,11 +287,7 @@
                                 >
                                     {formatTimestamp(event.timestamp)}
                                 </div>
-                                <div
-                                    class="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed flex-1 break-all"
-                                >
-                                    {@html formatMessage(event.message)}
-                                </div>
+                                    <JsonLogViewer message={event.message} class="text-xs text-gray-300 flex-1" />
                             </div>
                         {/each}
 
@@ -355,20 +312,3 @@
         </div>
     </div>
 </div>
-
-<style>
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #1f2937;
-        border-radius: 10px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #374151;
-    }
-</style>

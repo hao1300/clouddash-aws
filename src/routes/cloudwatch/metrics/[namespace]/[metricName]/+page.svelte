@@ -201,7 +201,7 @@
                 <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Statistics List</h3>
             </div>
 
-            <div class="flex-1 overflow-auto bg-gray-950/20 custom-scrollbar">
+            <div class="flex-1 overflow-auto bg-gray-950/20">
                 {#if loading && metricStats.length === 0}
                     <div class="p-8 text-center text-gray-600 animate-pulse text-xs italic">
                         Fetching datapoints...
@@ -241,20 +241,3 @@
         </div>
     {/snippet}
 </DetailLayout>
-
-<style>
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #1f2937;
-        border-radius: 10px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #374151;
-    }
-</style>

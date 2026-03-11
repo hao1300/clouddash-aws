@@ -10,6 +10,7 @@
     import { aws } from "$lib/services/aws.svelte";
     import { goto } from "$app/navigation";
     import DetailLayout from "$lib/components/DetailLayout.svelte";
+    import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
 
     let error = $state("");
     let actionMsg = $state("");
@@ -148,7 +149,9 @@
     }
 
     function navigateToLog(row: any) {
-        let group = row["@logGroup"] || (selectedLogGroups.length === 1 ? selectedLogGroups[0] : null);
+        let group =
+            row["@logGroup"] ||
+            (selectedLogGroups.length === 1 ? selectedLogGroups[0] : null);
         const stream = row["@logStream"];
         const timestamp = row["@timestamp"];
         if (group && stream && timestamp) {
@@ -168,7 +171,8 @@
     }
 
     async function runInsightsQuery() {
-        if (!aws.cwLogs || selectedLogGroups.length === 0 || !logQuery.trim()) return;
+        if (!aws.cwLogs || selectedLogGroups.length === 0 || !logQuery.trim())
+            return;
         try {
             logQueryLoading = true;
             stopQueryFlag = false;
@@ -260,243 +264,419 @@
     let isSidebarCollapsed = $state(false);
 </script>
 
-<DetailLayout title="Insights" hideTitle={true} fullWidth={true} bind:isSidebarCollapsed {error} {actionMsg}>
+<DetailLayout
+    title="Insights"
+    hideTitle={true}
+    fullWidth={true}
+    bind:isSidebarCollapsed
+    {error}
+    {actionMsg}
+>
     {#snippet mainSnippet()}
-        <div class="flex flex-col gap-4 h-full min-h-0">
-            <div class="bg-gray-900 border border-gray-800 p-4 rounded-lg shadow-sm shrink-0">
-                <div class="flex gap-4 mb-4 flex-wrap">
-                    <div class="flex-1 min-w-[300px]">
-                        <label for="log-group-select" class="block text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">Log Groups</label>
-                        <div class="flex flex-col gap-2">
-                            <div class="relative">
-                                <select 
-                                    id="log-group-select" 
-                                    class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 appearance-none shadow-sm"
-                                    value=""
-                                    onchange={(e) => {
-                                        const val = e.currentTarget.value;
-                                        if (val && !selectedLogGroups.includes(val)) {
-                                            selectedLogGroups = [...selectedLogGroups, val];
-                                        }
-                                        e.currentTarget.value = "";
-                                    }}
-                                >
-                                    <option value="" disabled selected>Select log groups to add...</option>
-                                    {#if lgLoading}
-                                        <option value="" disabled>Loading...</option>
-                                    {/if}
-                                    {#each logGroups.filter(g => !selectedLogGroups.includes(g.name)) as lg}
-                                        <option value={lg.name}>{lg.name}</option>
-                                    {/each}
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                                </div>
-                            </div>
-                            {#if selectedLogGroups.length > 0}
-                                <div class="flex flex-wrap gap-2">
-                                    {#each selectedLogGroups as group (group)}
-                                        <div class="inline-flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-full px-3 py-1 text-xs text-gray-300 shadow-sm">
-                                            <span class="truncate max-w-[250px]" title={group}>{group}</span>
-                                            <button 
-                                                class="hover:text-red-400 focus:outline-none ml-1 opacity-70 hover:opacity-100 transition-opacity" 
-                                                onclick={() => selectedLogGroups = selectedLogGroups.filter(g => g !== group)}
-                                                aria-label="Remove {group}"
-                                            >
-                                                <svg class="w-3 h-3 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                            </button>
-                                        </div>
-                                    {/each}
-                                </div>
-                            {/if}
-                        </div>
-                    </div>
-
-                    <div class="w-48">
-                        <label for="time-range-select" class="block text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">Time Range</label>
+        <div
+            class="bg-gray-900 border border-gray-800 p-4 rounded-lg shadow-sm"
+        >
+            <div class="flex gap-4 mb-4 flex-wrap">
+                <div class="flex-1 min-w-[300px]">
+                    <label
+                        for="log-group-select"
+                        class="block text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider"
+                        >Log Groups</label
+                    >
+                    <div class="flex flex-col gap-2">
                         <div class="relative">
-                            <select id="time-range-select" bind:value={timeRange} class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 appearance-none">
-                                <option value={900}>Last 15 minutes</option>
-                                <option value={3600}>Last 1 hour</option>
-                                <option value={10800}>Last 3 hours</option>
-                                <option value={43200}>Last 12 hours</option>
-                                <option value={86400}>Last 24 hours</option>
-                                <option value={604800}>Last 1 week</option>
+                            <select
+                                id="log-group-select"
+                                class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 appearance-none shadow-sm"
+                                value=""
+                                onchange={(e) => {
+                                    const val = e.currentTarget.value;
+                                    if (
+                                        val &&
+                                        !selectedLogGroups.includes(val)
+                                    ) {
+                                        selectedLogGroups = [
+                                            ...selectedLogGroups,
+                                            val,
+                                        ];
+                                    }
+                                    e.currentTarget.value = "";
+                                }}
+                            >
+                                <option value="" disabled selected
+                                    >Select log groups to add...</option
+                                >
+                                {#if lgLoading}
+                                    <option value="" disabled>Loading...</option
+                                    >
+                                {/if}
+                                {#each logGroups.filter((g) => !selectedLogGroups.includes(g.name)) as lg}
+                                    <option value={lg.name}>{lg.name}</option>
+                                {/each}
                             </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                                <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                            <div
+                                class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"
+                            >
+                                <svg
+                                    class="fill-current h-4 w-4"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 20 20"
+                                    ><path
+                                        d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
+                                    /></svg
+                                >
                             </div>
                         </div>
+                        {#if selectedLogGroups.length > 0}
+                            <div class="flex flex-wrap gap-2">
+                                {#each selectedLogGroups as group (group)}
+                                    <div
+                                        class="inline-flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-full px-3 py-1 text-xs text-gray-300 shadow-sm"
+                                    >
+                                        <span
+                                            class="truncate max-w-[250px]"
+                                            title={group}>{group}</span
+                                        >
+                                        <button
+                                            class="hover:text-red-400 focus:outline-none ml-1 opacity-70 hover:opacity-100 transition-opacity"
+                                            onclick={() =>
+                                                (selectedLogGroups =
+                                                    selectedLogGroups.filter(
+                                                        (g) => g !== group,
+                                                    ))}
+                                            aria-label="Remove {group}"
+                                        >
+                                            <svg
+                                                class="w-3 h-3 text-current"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                ><path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12"
+                                                ></path></svg
+                                            >
+                                        </button>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
                     </div>
                 </div>
 
-                <div>
-                    <div class="flex justify-between items-end mb-1">
-                        <div class="flex-1 max-w-sm mr-4">
-                            <label for="saved-query-select" class="block text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">
-                                Saved Queries
-                            </label>
-                            <div class="flex gap-2">
-                                <div class="relative flex-1">
-                                    <select
-                                        id="saved-query-select"
-                                        bind:value={selectedSavedQueryId}
-                                        onchange={(e) => {
-                                            const q = savedQueries.find(sq => sq.queryDefinitionId === selectedSavedQueryId);
-                                            if (q) {
-                                                logQuery = q.queryString || "";
-                                                if (q.logGroupNames && q.logGroupNames.length > 0) {
-                                                    selectedLogGroups = q.logGroupNames;
-                                                }
-                                            }
-                                        }}
-                                        class="w-full bg-gray-950/50 border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 outline-none focus:border-blue-500 appearance-none shadow-sm"
-                                    >
-                                        <option value="">Select a saved query</option>
-                                        {#each savedQueries as sq}
-                                            <option value={sq.queryDefinitionId}>{sq.name}</option>
-                                        {/each}
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                                        <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                                    </div>
-                                </div>
-                                <button onclick={saveQuery} disabled={!logQuery.trim()} class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded transition font-bold uppercase text-xs flex items-center shadow-sm border border-gray-700">
-                                    Save
-                                </button>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            {#if logQueryLoading}
-                                <button onclick={stopQuery} class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded transition font-bold uppercase text-xs flex items-center shadow-sm">
-                                    Stop
-                                </button>
-                            {/if}
-                            <button onclick={runInsightsQuery} disabled={logQueryLoading || selectedLogGroups.length === 0} class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded transition font-bold tracking-normal uppercase disabled:opacity-50 flex items-center gap-2 shadow-sm h-[38px]">
-                                {#if logQueryLoading}
-                                    <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    {queryStatus || "Running..."}
-                                {:else}
-                                    Run Query
-                                {/if}
-                            </button>
+                <div class="w-48">
+                    <label
+                        for="time-range-select"
+                        class="block text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider"
+                        >Time Range</label
+                    >
+                    <div class="relative">
+                        <select
+                            id="time-range-select"
+                            bind:value={timeRange}
+                            class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 appearance-none"
+                        >
+                            <option value={900}>Last 15 minutes</option>
+                            <option value={3600}>Last 1 hour</option>
+                            <option value={10800}>Last 3 hours</option>
+                            <option value={43200}>Last 12 hours</option>
+                            <option value={86400}>Last 24 hours</option>
+                            <option value={604800}>Last 1 week</option>
+                        </select>
+                        <div
+                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"
+                        >
+                            <svg
+                                class="fill-current h-4 w-4"
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 20 20"
+                                ><path
+                                    d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
+                                /></svg
+                            >
                         </div>
                     </div>
-                    <textarea id="query-textarea" bind:value={logQuery} rows="5" class="w-full bg-gray-950/50 border border-gray-700 rounded-lg p-3 text-sm font-mono text-blue-300 outline-none focus:border-blue-500 resize-y shadow-inner mt-2" placeholder="fields @timestamp, @message | sort @timestamp desc | limit 20"></textarea>
                 </div>
             </div>
 
-            <div class="flex-1 bg-gray-900 border border-gray-800 rounded-lg shadow-sm overflow-hidden flex flex-col min-h-0">
-                <div class="px-4 py-3 border-b border-gray-800 bg-gray-900/80 shrink-0 flex justify-between items-center">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                        Query Results
-                        {#if logResults.length > 0}
-                            <span class="text-blue-400 font-bold ml-2">({logResults.length} records)</span>
-                        {/if}
-                    </h3>
-                </div>
-                <div class="flex-1 overflow-auto bg-gray-950/20 custom-scrollbar">
-                    {#if logQueryLoading}
-                        <div class="h-64 flex flex-col items-center justify-center text-gray-400 text-sm">
-                            <div class="animate-spin text-2xl mb-4">⟳</div>
-                            Executing Query... This may take a moment.
-                        </div>
-                    {:else if logResults.length > 0}
-                        <table class="w-full text-left text-sm whitespace-nowrap">
-                            <thead class="sticky top-0 bg-gray-900 border-b border-gray-800 shadow-sm z-10">
-                                <tr>
-                                    {#each logColumns as col}
-                                        <th class="px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider cursor-pointer hover:text-gray-200 transition-colors" onclick={() => sortResults(col)}>
-                                            <div class="flex items-center gap-1">
-                                                {col}
-                                                {#if sortColumn === col}
-                                                    <span class="text-blue-400">{sortDirection === "asc" ? "↑" : "↓"}</span>
-                                                {/if}
-                                            </div>
-                                        </th>
+            <div>
+                <div class="flex justify-between items-end mb-1">
+                    <div class="flex-1 max-w-sm mr-4">
+                        <label
+                            for="saved-query-select"
+                            class="block text-xs text-gray-400 font-bold uppercase tracking-wider mb-1"
+                        >
+                            Saved Queries
+                        </label>
+                        <div class="flex gap-2">
+                            <div class="relative flex-1">
+                                <select
+                                    id="saved-query-select"
+                                    bind:value={selectedSavedQueryId}
+                                    onchange={(e) => {
+                                        const q = savedQueries.find(
+                                            (sq) =>
+                                                sq.queryDefinitionId ===
+                                                selectedSavedQueryId,
+                                        );
+                                        if (q) {
+                                            logQuery = q.queryString || "";
+                                            if (
+                                                q.logGroupNames &&
+                                                q.logGroupNames.length > 0
+                                            ) {
+                                                selectedLogGroups =
+                                                    q.logGroupNames;
+                                            }
+                                        }
+                                    }}
+                                    class="w-full bg-gray-950/50 border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 outline-none focus:border-blue-500 appearance-none shadow-sm"
+                                >
+                                    <option value=""
+                                        >Select a saved query</option
+                                    >
+                                    {#each savedQueries as sq}
+                                        <option value={sq.queryDefinitionId}
+                                            >{sq.name}</option
+                                        >
                                     {/each}
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-800/50">
-                                {#each logResults as row}
-                                    <tr class="hover:bg-gray-800/40 transition-colors group cursor-pointer" onclick={() => navigateToLog(row)} title="Click to view in log stream">
-                                        {#each logColumns as col}
-                                            <td class="px-4 py-2.5 text-gray-300 group-hover:text-blue-300 font-mono text-xs {col === '@message' ? 'whitespace-pre-wrap min-w-[400px]' : ''}">
-                                                {row[col] ?? "-"}
-                                            </td>
-                                        {/each}
-                                    </tr>
-                                {/each}
-                            </tbody>
-                        </table>
-                    {:else if !logQueryLoading && selectedLogGroups.length > 0 && actionMsg.includes("completed")}
-                        <div class="h-64 flex items-center justify-center text-gray-500 text-sm">
-                            No results found for this query in the selected time range.
-                        </div>
-                    {:else}
-                        <div class="h-full flex flex-col items-center justify-center p-12 text-center text-gray-600">
-                            <div class="w-16 h-16 mb-4 bg-gray-900 rounded-full flex items-center justify-center border border-gray-800">
-                                <svg class="w-8 h-8 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                </select>
+                                <div
+                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"
+                                >
+                                    <svg
+                                        class="fill-current h-4 w-4"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        viewBox="0 0 20 20"
+                                        ><path
+                                            d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
+                                        /></svg
+                                    >
+                                </div>
                             </div>
-                            <p class="max-w-xs text-sm">Select a log group and run a query to view results.</p>
+                            <button
+                                onclick={saveQuery}
+                                disabled={!logQuery.trim()}
+                                class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded transition font-bold uppercase text-xs flex items-center shadow-sm border border-gray-700"
+                            >
+                                Save
+                            </button>
                         </div>
-                    {/if}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {#if logQueryLoading}
+                            <button
+                                onclick={stopQuery}
+                                class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded transition font-bold uppercase text-xs flex items-center shadow-sm"
+                            >
+                                Stop
+                            </button>
+                        {/if}
+                        <button
+                            onclick={runInsightsQuery}
+                            disabled={logQueryLoading ||
+                                selectedLogGroups.length === 0}
+                            class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded transition font-bold tracking-normal uppercase disabled:opacity-50 flex items-center gap-2 shadow-sm h-[38px]"
+                        >
+                            {#if logQueryLoading}
+                                <svg
+                                    class="animate-spin h-4 w-4 text-white"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <circle
+                                        class="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        stroke-width="4"
+                                    ></circle>
+                                    <path
+                                        class="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
+                                </svg>
+                                {queryStatus || "Running..."}
+                            {:else}
+                                Run Query
+                            {/if}
+                        </button>
+                    </div>
                 </div>
+                <textarea
+                    id="query-textarea"
+                    bind:value={logQuery}
+                    rows="5"
+                    class="w-full bg-gray-950/50 border border-gray-700 rounded-lg p-3 text-sm font-mono text-blue-300 outline-none focus:border-blue-500 resize-y shadow-inner mt-2"
+                    placeholder="fields @timestamp, @message | sort @timestamp desc | limit 20"
+                ></textarea>
             </div>
         </div>
     {/snippet}
 
     {#snippet sidebarSnippet()}
-        <div class="space-y-4">
-            <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-sm flex flex-col">
-                <div class="px-4 py-3 border-b border-gray-800 bg-gray-900/80">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Log Fields</h3>
-                </div>
-                <div class="p-4">
-                    {#if fieldsLoading}
-                        <div class="text-xs text-gray-500 animate-pulse">Loading fields...</div>
-                    {:else if knownFields.length === 0}
-                        <div class="text-xs text-gray-500 italic">No fields found for this group.</div>
-                    {:else}
-                        <ul class="space-y-2">
-                            {#each knownFields as field}
-                                <li class="group">
-                                    <button
-                                        onclick={() => {
-                                            logQuery += `\n| filter ${field.name} = ""`;
-                                        }}
-                                        class="text-xs text-blue-400 hover:text-blue-300 truncate w-full text-left font-mono"
-                                        title={field.name}
-                                    >
-                                        {field.name}
-                                    </button>
-                                    <div class="text-[10px] text-gray-600">{field.percent}% of events</div>
-                                </li>
-                            {/each}
-                        </ul>
+        <div
+            class="bg-gray-900 border border-gray-800 rounded-lg shadow-sm flex flex-col"
+        >
+            <div class="px-4 py-3 border-b border-gray-800 bg-gray-900/80">
+                <h3
+                    class="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                >
+                    Log Fields
+                </h3>
+            </div>
+            <div class="p-4 overflow-y-auto">
+                {#if fieldsLoading}
+                    <div class="text-xs text-gray-500 animate-pulse">
+                        Loading fields...
+                    </div>
+                {:else if knownFields.length === 0}
+                    <div class="text-xs text-gray-500 italic">
+                        No fields found for this group.
+                    </div>
+                {:else}
+                    <ul class="space-y-2">
+                        {#each knownFields as field}
+                            <li class="group">
+                                <button
+                                    onclick={() => {
+                                        logQuery += `\n| filter ${field.name} = ""`;
+                                    }}
+                                    class="text-xs text-blue-400 hover:text-blue-300 truncate w-full text-left font-mono"
+                                    title={field.name}
+                                >
+                                    {field.name}
+                                </button>
+                                <div class="text-[10px] text-gray-600">
+                                    {field.percent}% of events
+                                </div>
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
+            </div>
+        </div>
+    {/snippet}
+
+    {#snippet bottomSnippet()}
+        <div
+            class="flex-1 bg-gray-900 border border-gray-800 rounded-lg shadow-sm overflow-hidden flex flex-col min-h-0"
+        >
+            <div
+                class="px-4 py-3 border-b border-gray-800 bg-gray-900/80 shrink-0 flex justify-between items-center"
+            >
+                <h3
+                    class="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                >
+                    Query Results
+                    {#if logResults.length > 0}
+                        <span class="text-blue-400 font-bold ml-2"
+                            >({logResults.length} records)</span
+                        >
                     {/if}
-                </div>
+                </h3>
+            </div>
+            <div class="flex-1 overflow-auto bg-gray-950/20">
+                {#if logQueryLoading}
+                    <div
+                        class="h-64 flex flex-col items-center justify-center text-gray-400 text-sm"
+                    >
+                        <div class="animate-spin text-2xl mb-4">⟳</div>
+                        Executing Query... This may take a moment.
+                    </div>
+                {:else if logResults.length > 0}
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead
+                            class="sticky top-0 bg-gray-900 border-b border-gray-800 shadow-sm z-10"
+                        >
+                            <tr>
+                                {#each logColumns as col}
+                                    <th
+                                        class="px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider cursor-pointer hover:text-gray-200 transition-colors"
+                                        onclick={() => sortResults(col)}
+                                    >
+                                        <div class="flex items-center gap-1">
+                                            {col}
+                                            {#if sortColumn === col}
+                                                <span class="text-blue-400"
+                                                    >{sortDirection === "asc"
+                                                        ? "↑"
+                                                        : "↓"}</span
+                                                >
+                                            {/if}
+                                        </div>
+                                    </th>
+                                {/each}
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800/50">
+                            {#each logResults as row}
+                                <tr
+                                    class="hover:bg-gray-800/40 transition-colors group cursor-pointer"
+                                    onclick={() => navigateToLog(row)}
+                                    title="Click to view in log stream"
+                                >
+                                    {#each logColumns as col}
+                                        <td
+                                            class="px-4 py-2.5 text-gray-300 group-hover:text-blue-300 font-mono text-xs {col ===
+                                            '@message'
+                                                ? 'min-w-[400px]'
+                                                : ''}"
+                                        >
+                                            {#if col === "@message"}
+                                                <JsonLogViewer
+                                                    message={row[col] ?? ""}
+                                                    class="whitespace-pre-wrap max-w-full"
+                                                />
+                                            {:else}
+                                                {row[col] ?? "-"}
+                                            {/if}
+                                        </td>
+                                    {/each}
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                {:else if !logQueryLoading && selectedLogGroups.length > 0 && actionMsg.includes("completed")}
+                    <div
+                        class="h-64 flex items-center justify-center text-gray-500 text-sm"
+                    >
+                        No results found for this query in the selected time
+                        range.
+                    </div>
+                {:else}
+                    <div
+                        class="min-h-[256px] flex flex-col items-center justify-center p-12 text-center text-gray-600"
+                    >
+                        <div
+                            class="w-16 h-16 mb-4 bg-gray-900 rounded-full flex items-center justify-center border border-gray-800"
+                        >
+                            <svg
+                                class="w-8 h-8 opacity-50"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg"
+                                ><path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="1.5"
+                                    d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                ></path></svg
+                            >
+                        </div>
+                        <p class="max-w-xs text-sm">
+                            Select a log group and run a query to view results.
+                        </p>
+                    </div>
+                {/if}
             </div>
         </div>
     {/snippet}
 </DetailLayout>
-
-<style>
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #1f2937;
-        border-radius: 10px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #374151;
-    }
-</style>
