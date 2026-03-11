@@ -44,7 +44,7 @@
     });
 
     $effect(() => {
-        titleService.setResource(selectedDistId || "");
+        titleService.setResource(selectedDistId || "", undefined, $page.url.pathname);
     });
 
     async function loadDistributions(token?: string) {

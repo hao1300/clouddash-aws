@@ -14,7 +14,7 @@
 
     $effect(() => {
         const name = stack?.StackName || stackId.split("/")[1] || stackId;
-        titleService.setResource(name);
+        titleService.setResource(name, undefined, $page.url.pathname);
     });
 
     let resources = $state<StackResource[]>([]);

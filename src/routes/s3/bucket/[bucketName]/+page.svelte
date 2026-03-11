@@ -40,7 +40,7 @@
     });
 
     $effect(() => {
-        titleService.setResource(bucket);
+        titleService.setResource(bucket, undefined, $page.url.pathname);
     });
 
     async function loadObjects(token?: string) {

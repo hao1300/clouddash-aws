@@ -56,7 +56,7 @@
     });
 
     $effect(() => {
-        titleService.setResource(tableName);
+        titleService.setResource(tableName, undefined, $page.url.pathname);
     });
 
     async function loadDetails() {

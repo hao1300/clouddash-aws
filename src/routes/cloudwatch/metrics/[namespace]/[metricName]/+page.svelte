@@ -80,6 +80,7 @@
             titleService.setResource(
                 namespace,
                 `/cloudwatch/metrics/${encodeURIComponent(namespace)}`,
+                $page.url.pathname,
             );
         }
     });

@@ -21,7 +21,11 @@
     // Breadcrumb title
     $effect(() => {
         if (namespace) {
-            titleService.setResource(namespace, `/cloudwatch/metrics/${encodeURIComponent(namespace)}`);
+            titleService.setResource(
+                namespace,
+                `/cloudwatch/metrics/${encodeURIComponent(namespace)}`,
+                $page.url.pathname,
+            );
         }
     });
 
@@ -67,6 +71,7 @@
     }
 
     async function handleSelectMetric(m: any) {
+        if (!namespace || !m.metricName) return;
         const dimensions = JSON.stringify(m.rawDimensions);
         const url = `/cloudwatch/metrics/${encodeURIComponent(namespace)}/${encodeURIComponent(m.metricName)}?dimensions=${encodeURIComponent(dimensions)}`;
         goto(url);

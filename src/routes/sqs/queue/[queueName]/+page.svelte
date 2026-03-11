@@ -17,7 +17,7 @@
     let queueUrl = $derived($page.url.searchParams.get("url") || "");
 
     $effect(() => {
-        titleService.setResource(queueName);
+        titleService.setResource(queueName, undefined, $page.url.pathname);
     });
 
     let error = $state("");

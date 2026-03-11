@@ -10,6 +10,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
 
@@ -32,7 +33,7 @@
     });
 
     $effect(() => {
-        titleService.setResource("");
+        titleService.setResource("", undefined, $page.url.pathname);
     });
     async function loadBuckets() {
         if (!aws.s3) return;

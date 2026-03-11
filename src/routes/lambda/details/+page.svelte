@@ -14,7 +14,7 @@
     let fnName = $derived($page.url.searchParams.get("id") || "");
 
     $effect(() => {
-        titleService.setResource(fnName);
+        titleService.setResource(fnName, undefined, $page.url.pathname);
     });
 
     let loading = $state(false);

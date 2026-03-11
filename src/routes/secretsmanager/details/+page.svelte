@@ -12,7 +12,7 @@
 
     $effect(() => {
         const name = secretId.split(":").pop() || secretId;
-        titleService.setResource(name);
+        titleService.setResource(name, undefined, $page.url.pathname);
     });
 
     let loading = $state(false);

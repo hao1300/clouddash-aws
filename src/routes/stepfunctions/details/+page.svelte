@@ -16,7 +16,7 @@
 
     $effect(() => {
         const name = smDetails?.name || smArn.split(":").pop() || smArn;
-        titleService.setResource(name);
+        titleService.setResource(name, undefined, $page.url.pathname);
     });
 
     let loading = $state(false);

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     import {
@@ -25,7 +26,7 @@
     });
 
     $effect(() => {
-        titleService.setResource("");
+        titleService.setResource("", undefined, $page.url.pathname);
     });
 
     async function loadAlarms(token?: string) {

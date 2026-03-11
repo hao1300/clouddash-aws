@@ -11,7 +11,7 @@
         const name = instance?.name && instance.name !== "Unnamed" 
             ? `${instance.name} (${instanceId})` 
             : instanceId;
-        titleService.setResource(name);
+        titleService.setResource(name, undefined, $page.url.pathname);
     });
 
     let instance = $state<any | null>(null);

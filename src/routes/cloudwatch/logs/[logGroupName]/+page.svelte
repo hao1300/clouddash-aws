@@ -37,7 +37,7 @@
 
     $effect(() => {
         if (logGroupName) {
-            titleService.setResource(logGroupName);
+            titleService.setResource(logGroupName, undefined, $page.url.pathname);
         }
     });
 

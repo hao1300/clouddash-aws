@@ -54,11 +54,13 @@
     $effect(() => {
         if (logGroupName && logStreamName) {
             untrack(() => {
+                const path = $page.url.pathname;
                 titleService.setResource(
                     logGroupName,
                     `/cloudwatch/logs/${encodeURIComponent(logGroupName)}`,
+                    path,
                 );
-                titleService.addResource(logStreamName);
+                titleService.addResource(logStreamName, undefined, path);
             });
         }
     });

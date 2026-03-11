@@ -8,6 +8,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     let queues = $state<any[]>([]);
@@ -54,7 +55,7 @@
     });
 
     $effect(() => {
-        titleService.setResource("");
+        titleService.setResource("", undefined, $page.url.pathname);
     });
     async function loadQueues() {
         if (!aws.sqs) return;
