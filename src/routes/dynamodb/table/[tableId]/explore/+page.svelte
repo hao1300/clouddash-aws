@@ -27,15 +27,12 @@
     let exploreMode = $state<"scan" | "query">("scan");
 
     // Scan params
-    let scanFilter = $state("");
-    let scanValues = $state("");
     let scanLimit = $state(25);
     let scanConsistentRead = $state(false);
 
     // Query params
     let queryKeyCond = $state("");
     let queryNames = $state<Record<string, string>>({});
-    let queryFilter = $state("");
     let queryValues = $state("");
     let queryIndex = $state("");
     let queryLimit = $state(25);
@@ -87,6 +84,82 @@
             loadSchema();
         }
     });
+
+    // Filter System
+    interface FilterRow {
+        id: string;
+        attribute: string;
+        condition: string;
+        type: "String" | "Number" | "Boolean" | "Null";
+        value: string;
+    }
+
+    let filters = $state<FilterRow[]>([]);
+
+    function addFilter() {
+        filters.push({
+            id: Math.random().toString(36).slice(2),
+            attribute: "",
+            condition: "Equal to",
+            type: "String",
+            value: "",
+        });
+    }
+
+    function removeFilter(id: string) {
+        filters = filters.filter((f) => f.id !== id);
+    }
+
+    function buildExpressions(rows: FilterRow[]) {
+        const validRows = rows.filter(row => {
+            if (!row.attribute.trim()) return false;
+            if (row.condition === "Exists" || row.condition === "Not exists") return true;
+            return row.value.trim() !== "";
+        });
+
+        if (validRows.length === 0) return { filterExpr: undefined, names: undefined, values: undefined };
+
+        let exprParts: string[] = [];
+        let names: Record<string, string> = {};
+        let values: Record<string, any> = {};
+
+        validRows.forEach((row, i) => {
+            const attrKey = `#a${i}`;
+            const valKey = `:v${i}`;
+            names[attrKey] = row.attribute;
+
+            let val: any = row.value;
+            if (row.type === "Number") val = Number(row.value);
+            else if (row.type === "Boolean") val = row.value.toLowerCase() === "true";
+            else if (row.type === "Null") val = null;
+
+            const marshalledVal = row.type === "Number" ? { N: String(val) } :
+                                 row.type === "Boolean" ? { BOOL: val } :
+                                 row.type === "Null" ? { NULL: true } :
+                                 { S: String(val) };
+            
+            values[valKey] = marshalledVal;
+
+            switch (row.condition) {
+                case "Equal to": exprParts.push(`${attrKey} = ${valKey}`); break;
+                case "Not equal to": exprParts.push(`${attrKey} <> ${valKey}`); break;
+                case "Less than": exprParts.push(`${attrKey} < ${valKey}`); break;
+                case "Less than or equal to": exprParts.push(`${attrKey} <= ${valKey}`); break;
+                case "Greater than": exprParts.push(`${attrKey} > ${valKey}`); break;
+                case "Greater than or equal to": exprParts.push(`${attrKey} >= ${valKey}`); break;
+                case "Begins with": exprParts.push(`begins_with(${attrKey}, ${valKey})`); break;
+                case "Contains": exprParts.push(`contains(${attrKey}, ${valKey})`); break;
+                case "Exists": exprParts.push(`attribute_exists(${attrKey})`); delete values[valKey]; break;
+                case "Not exists": exprParts.push(`attribute_not_exists(${attrKey})`); delete values[valKey]; break;
+            }
+        });
+
+        return {
+            filterExpr: exprParts.join(" AND "),
+            names: Object.keys(names).length ? names : undefined,
+            values: Object.keys(values).length ? values : undefined,
+        };
+    }
 
     // Auto-build query condition
     $effect(() => {
@@ -172,20 +245,17 @@
             loading = true;
             error = "";
             actionMsg = "";
-            let exprVals: Record<string, any> | undefined;
-            if (scanValues.trim()) {
-                const parsed = JSON.parse(scanValues);
-                if (Object.keys(parsed).length)
-                    exprVals = marshalValues(parsed);
-            }
+
+            const { filterExpr, names, values } = buildExpressions(filters);
 
             const resp = await aws.dynamodb.send(
                 new ScanCommand({
                     TableName: tableName,
                     Limit: scanLimit,
                     ConsistentRead: scanConsistentRead,
-                    FilterExpression: scanFilter || undefined,
-                    ExpressionAttributeValues: exprVals,
+                    FilterExpression: filterExpr,
+                    ExpressionAttributeNames: names,
+                    ExpressionAttributeValues: values,
                     ExclusiveStartKey: token,
                 }),
             );
@@ -218,12 +288,16 @@
             loading = true;
             error = "";
             actionMsg = "";
-            let exprVals: Record<string, any> | undefined;
-            if (queryValues.trim()) {
-                const parsed = JSON.parse(queryValues);
-                if (Object.keys(parsed).length)
-                    exprVals = marshalValues(parsed);
-            }
+
+            const { filterExpr, names: fNames, values: fVals } = buildExpressions(filters);
+            
+            // Combine with KeyCondition names/vals
+            let combinedNames = { ...queryNames, ...fNames };
+            
+            let queryValsParsed = {};
+            try { if (queryValues) queryValsParsed = JSON.parse(queryValues); } catch(e) {}
+            let marshalledQueryVals = marshalValues(queryValsParsed);
+            let combinedValues = { ...marshalledQueryVals, ...fVals };
 
             let consistentRead = queryConsistentRead;
             if (queryIndex) {
@@ -237,12 +311,14 @@
                 new QueryCommand({
                     TableName: tableName,
                     KeyConditionExpression: queryKeyCond,
-                    FilterExpression: queryFilter || undefined,
+                    FilterExpression: filterExpr,
                     IndexName: queryIndex || undefined,
-                    ExpressionAttributeNames: Object.keys(queryNames).length
-                        ? queryNames
+                    ExpressionAttributeNames: Object.keys(combinedNames).length
+                        ? combinedNames
                         : undefined,
-                    ExpressionAttributeValues: exprVals,
+                    ExpressionAttributeValues: Object.keys(combinedValues).length 
+                        ? combinedValues 
+                        : undefined,
                     ExclusiveStartKey: token,
                     Limit: queryLimit,
                     ConsistentRead: consistentRead,
@@ -338,16 +414,32 @@
         }
     }
 
-    let allColumns = $derived(
-        [...new Set(results.flatMap((r) => Object.keys(r)))].map((k) => ({
+    let allColumns = $derived.by(() => {
+        const foundKeys = [...new Set(results.flatMap((r) => Object.keys(r)))];
+        let pkName = "", skName = "";
+
+        if (tableSchema) {
+            let schemaRef = tableSchema.KeySchema;
+            if (queryIndex) {
+                const idx = tableSchema.GlobalSecondaryIndexes?.find((i: any) => i.IndexName === queryIndex);
+                if (idx) schemaRef = idx.KeySchema;
+            }
+            pkName = schemaRef?.find((k: any) => k.KeyType === "HASH")?.AttributeName || "";
+            skName = schemaRef?.find((k: any) => k.KeyType === "RANGE")?.AttributeName || "";
+        }
+
+        const primaryKeys = [pkName, skName].filter(Boolean);
+        const otherKeys = foundKeys.filter(k => k !== pkName && k !== skName);
+        
+        return [...primaryKeys, ...otherKeys].map(k => ({
             key: k,
             label: k,
             format: (val: any) =>
                 typeof val === "object"
                     ? JSON.stringify(val)
                     : String(val ?? ""),
-        })),
-    );
+        }));
+    });
 </script>
 
 <div class="h-full flex flex-col p-4 bg-gray-950 overflow-hidden relative">
@@ -363,135 +455,228 @@
         </div>{/if}
 
     <div
-        class="space-y-3 mb-4 shrink-0 bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm {error ||
+        class="space-y-3 mb-4 shrink-0 bg-gray-900 border border-gray-800 shadow-sm rounded-md overflow-hidden {error ||
         actionMsg
             ? 'mt-8'
             : ''}"
     >
-        <div class="flex items-center gap-4 mb-2 pb-2 border-b border-gray-800">
-            <span class="text-sm font-medium text-gray-300">Operation:</span>
-            <label
-                class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer hover:text-gray-200"
-            >
-                <input
-                    type="radio"
-                    value="scan"
-                    bind:group={exploreMode}
-                    class="accent-blue-500"
-                /> Scan
-            </label>
-            <label
-                class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer hover:text-gray-200"
-            >
-                <input
-                    type="radio"
-                    value="query"
-                    bind:group={exploreMode}
-                    class="accent-blue-500"
-                /> Query
-            </label>
+        <!-- Header -->
+        <div class="px-4 py-2 border-b border-gray-800 bg-gray-800/50 flex items-center justify-between">
+            <div class="flex items-center gap-6">
+                <span class="text-sm font-semibold text-gray-200">Scan or query items</span>
+                <div class="flex items-center gap-4">
+                    <label
+                        class="flex items-center gap-2 text-xs text-gray-300 cursor-pointer hover:text-white"
+                    >
+                        <input
+                            type="radio"
+                            value="scan"
+                            bind:group={exploreMode}
+                            class="accent-blue-500 size-3"
+                        /> Scan
+                    </label>
+                    <label
+                        class="flex items-center gap-2 text-xs text-gray-300 cursor-pointer hover:text-white"
+                    >
+                        <input
+                            type="radio"
+                            value="query"
+                            bind:group={exploreMode}
+                            class="accent-blue-500 size-3"
+                        /> Query
+                    </label>
+                </div>
+            </div>
         </div>
 
-        {#if exploreMode === "scan"}
-            <div class="flex gap-2">
-                <div
-                    class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-400 font-mono flex items-center"
-                >
-                    <span
-                        >Table: <strong class="text-blue-300"
-                            >{tableName}</strong
-                        ></span
-                    >
-                </div>
-                <button
-                    onclick={() => runScan()}
-                    disabled={loading}
-                    class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-6 py-2 rounded text-xs font-bold transition flex items-center gap-2"
-                >
-                    {#if loading}<span class="animate-spin">⟳</span>{/if} Run Scan
-                </button>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <input
-                    bind:value={scanFilter}
-                    placeholder="Filter expression"
-                    class="bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-                />
-                <input
-                    bind:value={scanValues}
-                    placeholder={'Expression JSON (e.g. {":status": "active"})'}
-                    class="bg-black font-mono text-xs p-2 rounded border border-gray-700 text-green-400 outline-none focus:border-blue-500"
-                />
-            </div>
-        {:else}
-            <div class="flex gap-2">
-                <div
-                    class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-400 font-mono flex items-center"
-                >
-                    <span
-                        >Table: <strong class="text-blue-300"
-                            >{tableName}</strong
-                        ></span
-                    >
-                </div>
-                <select
-                    bind:value={queryIndex}
-                    class="w-48 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-                >
-                    <option value="">[Base Table]</option>
-                    {#each tableSchema?.GlobalSecondaryIndexes || [] as idx}
-                        <option value={idx.IndexName}>{idx.IndexName}</option>
-                    {/each}
-                </select>
-                <button
-                    onclick={() => runQuery()}
-                    disabled={loading || !queryKeyCond}
-                    class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-6 py-2 rounded text-xs font-bold transition flex items-center gap-2"
-                >
-                    {#if loading}<span class="animate-spin">⟳</span>{/if} Run Query
-                </button>
-            </div>
-            <div
-                class="flex gap-4 items-center bg-gray-950 p-3 rounded border border-gray-800"
-            >
-                <div class="text-xs font-bold text-gray-400 w-24">
-                    Key Values:
-                </div>
-                <div class="flex-1 flex gap-2">
-                    <div class="flex-1">
-                        <input
-                            bind:value={partitionKeyInput}
-                            placeholder="Partition Key Value"
-                            class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-blue-300 outline-none focus:border-blue-500"
-                        />
-                    </div>
-                    <div class="flex-1 flex gap-1">
+        <div class="p-4 space-y-4">
+            <div class="grid grid-cols-1 gap-4">
+                <div class="space-y-1">
+                    <label>
+                        <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Select a table or index</span>
                         <select
-                            bind:value={sortKeyOp}
-                            class="bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
+                            bind:value={queryIndex}
+                            class="w-full bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
                         >
-                            <option value="=">=</option><option value="<"
-                                >&lt;</option
-                            ><option value="<=">&lt;=</option><option value=">"
-                                >&gt;</option
-                            ><option value=">=">&gt;=</option><option
-                                value="between">BETWEEN</option
-                            ><option value="begins_with">BEGINS</option>
+                            <option value="">Table - {tableName}</option>
+                            {#each tableSchema?.GlobalSecondaryIndexes || [] as idx}
+                                <option value={idx.IndexName}>Index - {idx.IndexName}</option>
+                            {/each}
                         </select>
-                        <input
-                            bind:value={sortKeyInput}
-                            placeholder="Sort Key Value"
-                            class="flex-1 bg-black text-xs p-2 rounded border border-gray-700 text-blue-300 outline-none focus:border-blue-500"
-                        />
-                        {#if sortKeyOp === "between"}<input
-                                bind:value={sortKeyInput2}
-                                placeholder="Value 2"
-                                class="flex-1 bg-black text-xs p-2 rounded border border-gray-700 text-blue-300 outline-none focus:border-blue-500"
-                            />{/if}
-                    </div>
+                    </label>
                 </div>
             </div>
-        {/if}
+
+            {#if exploreMode === "query"}
+                {@const schemaRef = queryIndex
+                    ? tableSchema?.GlobalSecondaryIndexes?.find((i: any) => i.IndexName === queryIndex)?.KeySchema || tableSchema?.KeySchema
+                    : tableSchema?.KeySchema}
+                {@const pkAttr = schemaRef?.find((k: any) => k.KeyType === "HASH")?.AttributeName || "pk"}
+                {@const skAttr = schemaRef?.find((k: any) => k.KeyType === "RANGE")?.AttributeName || ""}
+
+                <!-- Partition Key -->
+                <div class="border-t border-gray-800 pt-4">
+                    <h3 class="text-sm font-bold text-gray-200 mb-3">Partition key</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Attribute</span>
+                            <span class="text-xs text-gray-300 block py-1.5">{pkAttr}</span>
+                        </div>
+                        <div>
+                            <label>
+                                <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Value</span>
+                                <input
+                                    bind:value={partitionKeyInput}
+                                    placeholder="Enter attribute value"
+                                    class="w-full bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
+                                />
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sort Key -->
+                {#if skAttr}
+                    <div class="border-t border-gray-800 pt-4">
+                        <h3 class="text-sm font-bold text-gray-200 mb-0.5">Sort key <span class="text-gray-500 italic font-normal">– optional</span></h3>
+                        <div class="grid grid-cols-2 gap-4 mt-3">
+                            <div>
+                                <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Attribute</span>
+                                <span class="text-xs text-gray-300 block py-1.5">{skAttr}</span>
+                            </div>
+                            <div>
+                                <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Value</span>
+                                <div class="flex gap-2">
+                                    <select
+                                        bind:value={sortKeyOp}
+                                        class="bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none w-28"
+                                    >
+                                        <option value="=">Equal to</option>
+                                        <option value="begins_with">Begins with</option>
+                                    </select>
+                                    <input
+                                        bind:value={sortKeyInput}
+                                        placeholder="Enter attribute value"
+                                        class="flex-1 bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <label class="flex items-center gap-2 mt-3 cursor-pointer w-fit">
+                            <input
+                                type="checkbox"
+                                checked={!queryScanIndexForward}
+                                onchange={(e) => queryScanIndexForward = !e.currentTarget.checked}
+                                class="accent-blue-500 size-3.5"
+                            />
+                            <span class="text-xs text-gray-300">Sort descending</span>
+                        </label>
+                    </div>
+                {/if}
+            {/if}
+
+            <!-- Filters Section -->
+            <div class="space-y-3 pt-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-gray-200">Filters</span>
+                    <span class="text-[10px] text-gray-500 italic">- optional</span>
+                </div>
+
+                <div class="space-y-2">
+                    {#each filters as filter (filter.id)}
+                        <div class="flex gap-2 items-center animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div class="w-1/4">
+                                <label>
+                                    <span class="block text-[10px] text-gray-500 mb-1 ml-1">Attribute name</span>
+                                    <input 
+                                        bind:value={filter.attribute}
+                                        placeholder="Enter attribute name"
+                                        class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none" 
+                                    />
+                                </label>
+                            </div>
+                            <div class="w-1/4">
+                                <label>
+                                    <span class="block text-[10px] text-gray-500 mb-1 ml-1">Condition</span>
+                                    <select 
+                                        bind:value={filter.condition}
+                                        class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
+                                    >
+                                        <option>Equal to</option>
+                                        <option>Not equal to</option>
+                                        <option>Less than</option>
+                                        <option>Less than or equal to</option>
+                                        <option>Greater than</option>
+                                        <option>Greater than or equal to</option>
+                                        <option>Begins with</option>
+                                        <option>Contains</option>
+                                        <option>Exists</option>
+                                        <option>Not exists</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="w-48">
+                                <label>
+                                    <span class="block text-[10px] text-gray-500 mb-1 ml-1">Type</span>
+                                    <select 
+                                        bind:value={filter.type}
+                                        class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
+                                    >
+                                        <option>String</option>
+                                        <option>Number</option>
+                                        <option>Boolean</option>
+                                        <option>Null</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="flex-1">
+                                <label>
+                                    <span class="block text-[10px] text-gray-500 mb-1 ml-1">Value</span>
+                                    <input 
+                                        bind:value={filter.value}
+                                        disabled={filter.condition === "Exists" || filter.condition === "Not exists"}
+                                        placeholder="Enter attribute value"
+                                        class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none disabled:bg-gray-900 disabled:text-gray-600" 
+                                    />
+                                </label>
+                            </div>
+                            <div class="pt-5">
+                                <button 
+                                    onclick={() => removeFilter(filter.id)}
+                                    class="px-3 py-1.5 text-xs font-semibold text-blue-400 border border-blue-400/50 rounded-full hover:bg-blue-400/10 transition"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    {/each}
+
+                    <button 
+                        onclick={addFilter}
+                        class="px-3 py-1.5 text-xs font-semibold text-blue-400 border border-blue-400/50 rounded-full hover:bg-blue-400/10 transition mt-2"
+                    >
+                        Add filter
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex gap-4 pt-4 border-t border-gray-800">
+                <button
+                    onclick={() => exploreMode === "scan" ? runScan() : runQuery()}
+                    disabled={loading || (exploreMode === "query" && !partitionKeyInput)}
+                    class="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 px-8 py-2 rounded-full text-xs font-bold text-black transition flex items-center gap-2"
+                >
+                    {#if loading}<span class="animate-spin text-lg">⟳</span>{/if}
+                    Run
+                </button>
+                <button
+                    onclick={() => { filters = []; partitionKeyInput = ""; sortKeyInput = ""; sortKeyInput2 = ""; }}
+                    class="text-xs font-bold text-blue-400 hover:text-blue-300 transition"
+                >
+                    Reset
+                </button>
+            </div>
+        </div>
     </div>
 
     <div
