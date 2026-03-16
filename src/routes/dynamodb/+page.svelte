@@ -55,7 +55,7 @@
     });
 
     $effect(() => {
-        titleService.setResource("", undefined, $page.url.pathname);
+        titleService.setResource("Tables", undefined, $page.url.pathname);
     });
 
     // --- Pagination Helpers ---
@@ -209,7 +209,7 @@
     }
 
     function handleSelectTable(name: string) {
-        goto(`/dynamodb/table/${encodeURIComponent(name)}`);
+        goto(`/dynamodb/table/${encodeURIComponent(name)}/explore`);
     }
 </script>
 

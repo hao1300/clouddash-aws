@@ -33,7 +33,8 @@ export const SERVICE_MANIFEST: Record<string, { label: string; tabs: Record<stri
     dynamodb: {
         label: "DynamoDB",
         tabs: {
-            "": "Tables",
+            "explore": "Explore",
+            "details": "Details",
         }
     },
     sqs: {

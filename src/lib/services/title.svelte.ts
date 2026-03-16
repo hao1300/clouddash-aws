@@ -1,3 +1,4 @@
+import { untrack } from "svelte";
 import { SERVICE_MANIFEST } from "./service-manifest";
 
 /**
@@ -65,10 +66,12 @@ class TitleService {
 
         // Clear resources that don't belong to the current path
         const basePath = `/${serviceId}${subserviceId ? '/' + subserviceId : ''}`;
-        const filtered = this.resources.filter(r => pathname.startsWith(r.path) || r.path.startsWith(basePath));
-        if (filtered.length !== this.resources.length) {
-            this.resources = filtered;
-        }
+        untrack(() => {
+            const filtered = this.resources.filter(r => pathname.startsWith(r.path) || r.path.startsWith(basePath));
+            if (filtered.length !== this.resources.length) {
+                this.resources = filtered;
+            }
+        });
     }
 
     /**
@@ -83,14 +86,27 @@ class TitleService {
     }
 
     /**
+     * Set multiple resources at once.
+     */
+    setResources(resources: { name: string, href?: string, path?: string }[]) {
+        this.resources = resources.map(res => ({
+            name: decodeURIComponent(res.name),
+            href: res.href,
+            path: res.path || this.currentPath
+        }));
+    }
+
+    /**
      * Add a sub-resource to the existing ones.
      */
     addResource(name: string, href?: string, path?: string) {
-        this.resources = [...this.resources, {
-            name: decodeURIComponent(name),
-            href,
-            path: path || this.currentPath
-        }];
+        untrack(() => {
+            this.resources = [...this.resources, {
+                name: decodeURIComponent(name),
+                href,
+                path: path || this.currentPath
+            }];
+        });
     }
 
     /**

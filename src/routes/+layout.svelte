@@ -175,8 +175,8 @@
     }));
 
     // Filter dynamic tabs if needed
-    // For now, only show details if there's a resource (id, name, etc) in searchParams
-    const detailTabs = ["details"];
+    // Only show details/explore if there's a resource selected
+    const detailTabs = ["details", "explore"];
     const hasResource = 
       $page.url.searchParams.get("id") || 
       $page.url.searchParams.get("name") ||
@@ -186,10 +186,26 @@
       $page.url.pathname.includes("/bucket/") ||
       $page.url.pathname.includes("/table/");
 
-    return tabs.filter(t => {
+    const filtered = tabs.filter(t => {
       if (detailTabs.includes(t.id)) return !!hasResource;
       return true;
     });
+
+    // For DynamoDB table views, rewrite tab IDs with full table path
+    // so handleServiceTabChange navigates to the correct route
+    if (activeId === "dynamodb" && $page.url.pathname.includes("/table/")) {
+      const tableMatch = $page.url.pathname.match(/\/dynamodb\/table\/([^/]+)/);
+      if (tableMatch) {
+        const tableName = tableMatch[1];
+        return filtered.map(t => {
+          if (t.id === "explore") return { ...t, id: `table/${tableName}/explore` };
+          if (t.id === "details") return { ...t, id: `table/${tableName}/details` };
+          return t;
+        });
+      }
+    }
+
+    return filtered;
   });
 
   let serviceActiveTab = $derived(
@@ -537,7 +553,7 @@
                           </button>
                         </div>
 
-                        {#if activeId === svc.id && serviceTabs.length > 0}
+                        {#if activeId === svc.id && serviceTabs.length > 1}
                           <div
                             class="ml-4 flex flex-col border-l border-gray-800 bg-gray-900/30 rounded-r"
                           >
@@ -548,7 +564,7 @@
                                   if (window.innerWidth < 640)
                                     sideMenuOpen = false;
                                 }}
-                                class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab === tab.id || (tab.id && serviceActiveTab.startsWith(tab.id + '/'))
+                                class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab === tab.id || (tab.id && !tab.id.includes('/') && serviceActiveTab.startsWith(tab.id + '/'))
                                   ? 'text-blue-400 font-bold bg-blue-500/10'
                                   : 'text-gray-300 hover:text-white hover:bg-gray-800'}"
                               >

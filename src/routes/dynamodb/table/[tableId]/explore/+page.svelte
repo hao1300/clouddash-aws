@@ -11,6 +11,7 @@
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
+    import { titleService } from "$lib/services/title.svelte";
 
     let tableName = $derived($page.params.tableId || "");
 
@@ -68,6 +69,13 @@
 
     $effect(() => {
         if (viewingItem) showViewModal = true;
+    });
+
+    $effect(() => {
+        titleService.setResources([
+            { name: "Tables", href: "/dynamodb", path: "/dynamodb" },
+            { name: tableName, path: $page.url.pathname }
+        ]);
     });
 
     $effect(() => {

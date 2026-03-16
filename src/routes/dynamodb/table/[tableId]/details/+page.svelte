@@ -56,7 +56,10 @@
     });
 
     $effect(() => {
-        titleService.setResource(tableName, undefined, $page.url.pathname);
+        titleService.setResources([
+            { name: "Tables", href: "/dynamodb", path: "/dynamodb" },
+            { name: tableName, path: $page.url.pathname }
+        ]);
     });
 
     async function loadDetails() {
