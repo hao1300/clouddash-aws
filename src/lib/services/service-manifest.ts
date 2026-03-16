@@ -1,7 +1,21 @@
+import type { Page } from "@sveltejs/kit";
+
+export interface ServiceTab {
+    id: string;
+    label: string;
+}
+
+export interface ServiceEntry {
+    label: string;
+    tabs: Record<string, string>;
+    resourcePrefix?: string;
+    contextualTabs?: string[];
+}
+
 /**
  * Centralized manifest mapping routes to service and sub-service labels.
  */
-export const SERVICE_MANIFEST: Record<string, { label: string; tabs: Record<string, string> }> = {
+export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     cloudwatch: {
         label: "CloudWatch",
         tabs: {
@@ -22,20 +36,28 @@ export const SERVICE_MANIFEST: Record<string, { label: string; tabs: Record<stri
             "security-groups": "Security Groups",
             "key-pairs": "Key Pairs",
             "elastic-ips": "Elastic IPs",
-        }
+        },
+        resourcePrefix: "id",
+        contextualTabs: ["details"]
     },
     s3: {
         label: "S3",
         tabs: {
             "": "Buckets",
-        }
+            objects: "Objects",
+            details: "Details",
+        },
+        resourcePrefix: "/bucket",
+        contextualTabs: ["objects", "details"]
     },
     dynamodb: {
         label: "DynamoDB",
         tabs: {
             "explore": "Explore",
             "details": "Details",
-        }
+        },
+        resourcePrefix: "/table",
+        contextualTabs: ["explore", "details"]
     },
     sqs: {
         label: "SQS",
@@ -60,7 +82,9 @@ export const SERVICE_MANIFEST: Record<string, { label: string; tabs: Record<stri
         tabs: {
             "": "Functions",
             details: "Details",
-        }
+        },
+        resourcePrefix: "id",
+        contextualTabs: ["details"]
     },
     sns: {
         label: "SNS",
@@ -84,7 +108,9 @@ export const SERVICE_MANIFEST: Record<string, { label: string; tabs: Record<stri
         tabs: {
             "": "Secrets",
             details: "Details",
-        }
+        },
+        resourcePrefix: "id",
+        contextualTabs: ["details"]
     },
     elasticbeanstalk: {
         label: "Elastic Beanstalk",
@@ -101,7 +127,9 @@ export const SERVICE_MANIFEST: Record<string, { label: string; tabs: Record<stri
             details: "Details",
             exports: "Exports",
             "stack-sets": "StackSets",
-        }
+        },
+        resourcePrefix: "id",
+        contextualTabs: ["details"]
     },
     ses: {
         label: "SES",

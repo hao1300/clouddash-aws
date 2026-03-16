@@ -12,6 +12,7 @@
   import { bookmarks } from "$lib/services/bookmarks.svelte";
   import { titleService } from "$lib/services/title.svelte";
   import { SERVICE_MANIFEST } from "$lib/services/service-manifest";
+  import { transformTabsGeneric } from "$lib/services/tab-utils";
   import ServiceLayout from "$lib/components/ServiceLayout.svelte";
   import BackButton from "$lib/components/BackButton.svelte";
 
@@ -40,28 +41,12 @@
     "af-south-1",
   ];
 
-  // We are stripping the component classes from the registry since components will be
-  // rendered by SvelteKit's route mechanism now. We only need IDs and Labels.
-  const services = [
-    { id: "cloudwatch", label: "CloudWatch", defaultEnabled: true },
-    { id: "ec2", label: "EC2", defaultEnabled: true },
-    { id: "s3", label: "S3", defaultEnabled: true },
-    { id: "dynamodb", label: "DynamoDB", defaultEnabled: true },
-    { id: "sqs", label: "SQS", defaultEnabled: true },
-    { id: "cloudfront", label: "CloudFront", defaultEnabled: true },
-    { id: "stepfunctions", label: "Step Functions", defaultEnabled: true },
-    { id: "lambda", label: "Lambda", defaultEnabled: true },
-    { id: "sns", label: "SNS", defaultEnabled: true },
-    { id: "iam", label: "IAM", defaultEnabled: true },
-    { id: "secretsmanager", label: "Secrets Manager", defaultEnabled: true },
-    {
-      id: "elasticbeanstalk",
-      label: "Elastic Beanstalk",
-      defaultEnabled: true,
-    },
-    { id: "cloudformation", label: "CloudFormation", defaultEnabled: true },
-    { id: "ses", label: "SES", defaultEnabled: true },
-  ];
+  // Derive services list from manifest
+  const services = Object.entries(SERVICE_MANIFEST).map(([id, entry]) => ({
+    id,
+    label: entry.label,
+    defaultEnabled: true,
+  }));
 
   let allProfiles = $state<string[]>([]);
   let selectedProfile = $state("default");
@@ -176,10 +161,8 @@
       label,
     }));
 
-    // Default transformation if not provided by manifest
-    if (manifest.transformTabs) {
-      tabs = manifest.transformTabs(tabs, $page);
-    }
+    // Transform tabs using generic manifest-driven logic
+    tabs = transformTabsGeneric(tabs, $page, manifest);
 
     return tabs;
   });
