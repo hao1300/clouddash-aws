@@ -159,7 +159,9 @@
 
   // To highlight active tab on top
   let activeId = $derived($page.url.pathname.split("/")[1] || "");
-  let serviceTitle = $derived(titleService.parts.map(p => p.label).join(" > ") || "AWS Console");
+  let serviceTitle = $derived(
+    titleService.parts.map((p) => p.label).join(" > ") || "AWS Console",
+  );
 
   $effect(() => {
     titleService.updateFromUrl($page.url.pathname);
@@ -167,45 +169,19 @@
   let serviceTabs = $derived.by(() => {
     const manifest = SERVICE_MANIFEST[activeId];
     if (!manifest) return $page.data.tabs || [];
-    
+
     // Convert Record<id, label> to Array<{id, label}>
-    const tabs = Object.entries(manifest.tabs).map(([id, label]) => ({
+    let tabs = Object.entries(manifest.tabs).map(([id, label]) => ({
       id,
-      label
+      label,
     }));
 
-    // Filter dynamic tabs if needed
-    // Only show details/explore if there's a resource selected
-    const detailTabs = ["details", "explore"];
-    const hasResource = 
-      $page.url.searchParams.get("id") || 
-      $page.url.searchParams.get("name") ||
-      $page.url.searchParams.get("tableName") ||
-      $page.url.searchParams.get("alarmName") ||
-      $page.url.searchParams.get("functionName") ||
-      $page.url.pathname.includes("/bucket/") ||
-      $page.url.pathname.includes("/table/");
-
-    const filtered = tabs.filter(t => {
-      if (detailTabs.includes(t.id)) return !!hasResource;
-      return true;
-    });
-
-    // For DynamoDB table views, rewrite tab IDs with full table path
-    // so handleServiceTabChange navigates to the correct route
-    if (activeId === "dynamodb" && $page.url.pathname.includes("/table/")) {
-      const tableMatch = $page.url.pathname.match(/\/dynamodb\/table\/([^/]+)/);
-      if (tableMatch) {
-        const tableName = tableMatch[1];
-        return filtered.map(t => {
-          if (t.id === "explore") return { ...t, id: `table/${tableName}/explore` };
-          if (t.id === "details") return { ...t, id: `table/${tableName}/details` };
-          return t;
-        });
-      }
+    // Default transformation if not provided by manifest
+    if (manifest.transformTabs) {
+      tabs = manifest.transformTabs(tabs, $page);
     }
 
-    return filtered;
+    return tabs;
   });
 
   let serviceActiveTab = $derived(
@@ -477,7 +453,9 @@
         </div>
 
         <!-- Tab Switcher -->
-        <div class="px-4 pt-4 flex border-b border-gray-800 bg-gray-950 shrink-0">
+        <div
+          class="px-4 pt-4 flex border-b border-gray-800 bg-gray-950 shrink-0"
+        >
           <button
             onclick={() => (activeSidebarTab = "services")}
             class="flex-1 pb-3 text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {activeSidebarTab ===
@@ -516,7 +494,9 @@
                   {#each mobileServices as svc, i (svc.id)}
                     <div animate:flip={{ duration: 300 }}>
                       {#if !searchQuery && !svc.isStarred && svc.prevIsStarred}
-                        <div class="mt-4 mb-2 px-2 pb-1 border-b border-gray-800">
+                        <div
+                          class="mt-4 mb-2 px-2 pb-1 border-b border-gray-800"
+                        >
                           <span
                             class="text-[10px] font-bold text-gray-300 uppercase tracking-widest"
                             >All Services</span
@@ -540,7 +520,9 @@
                           >
                             {svc.label}
                             {#if activeId === svc.id}
-                              <div class="w-1 h-1 rounded-full bg-blue-500"></div>
+                              <div
+                                class="w-1 h-1 rounded-full bg-blue-500"
+                              ></div>
                             {/if}
                           </button>
                           <button
@@ -564,7 +546,11 @@
                                   if (window.innerWidth < 640)
                                     sideMenuOpen = false;
                                 }}
-                                class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab === tab.id || (tab.id && !tab.id.includes('/') && serviceActiveTab.startsWith(tab.id + '/'))
+                                class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
+                                  tab.id ||
+                                (tab.id &&
+                                  !tab.id.includes('/') &&
+                                  serviceActiveTab.startsWith(tab.id + '/'))
                                   ? 'text-blue-400 font-bold bg-blue-500/10'
                                   : 'text-gray-300 hover:text-white hover:bg-gray-800'}"
                               >
@@ -756,11 +742,15 @@
 
           <div class="sm:hidden flex items-center">
             {#if titleService.parts.length > 1}
-              <BackButton href={titleService.parts[titleService.parts.length - 2].href} />
+              <BackButton
+                href={titleService.parts[titleService.parts.length - 2].href}
+              />
             {/if}
           </div>
 
-          <div class="flex items-center gap-1.5 text-sm font-bold truncate flex-1 text-white min-w-0">
+          <div
+            class="flex items-center gap-1.5 text-sm font-bold truncate flex-1 text-white min-w-0"
+          >
             {#if titleService.parts.length === 0}
               <span>AWS Console</span>
             {:else}
@@ -770,7 +760,10 @@
                 {/if}
                 <a
                   href={part.href || "javascript:void(0)"}
-                  class="hover:text-blue-400 transition-colors truncate {i < titleService.parts.length - 1 ? 'hidden sm:inline text-gray-500 font-medium' : ''}"
+                  class="hover:text-blue-400 transition-colors truncate {i <
+                  titleService.parts.length - 1
+                    ? 'hidden sm:inline text-gray-500 font-medium'
+                    : ''}"
                   onclick={(e) => {
                     if (!part.href) e.preventDefault();
                   }}
