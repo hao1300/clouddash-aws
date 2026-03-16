@@ -45,8 +45,48 @@
     let sortColumn = $state("");
     let sortDirection = $state<"asc" | "desc">("desc");
 
+    // Session storage key
+    const STORAGE_KEY = "aws-console:cloudwatch:insights:results";
+
+    function saveResultsToSession() {
+        if (typeof sessionStorage === "undefined") return;
+        const data = {
+            results: logResults,
+            columns: logColumns,
+            params: {
+                groups: selectedLogGroups,
+                query: logQuery,
+                timeRange: timeRange,
+            },
+        };
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function loadResultsFromSession() {
+        if (typeof sessionStorage === "undefined") return;
+        const stored = sessionStorage.getItem(STORAGE_KEY);
+        if (!stored) return;
+
+        try {
+            const data = JSON.parse(stored);
+            // Only restore if the parameters match the current URL state
+            const currentParams = {
+                groups: selectedLogGroups,
+                query: logQuery,
+                timeRange: timeRange,
+            };
+
+            if (JSON.stringify(data.params) === JSON.stringify(currentParams)) {
+                logResults = data.results || [];
+                logColumns = data.columns || [];
+            }
+        } catch (e) {
+            console.error("Failed to load results from session storage", e);
+        }
+    }
+
     // Sync state to URL so back button works
-    import { untrack } from "svelte";
+    import { untrack, onMount } from "svelte";
     $effect(() => {
         const params = new URLSearchParams();
         if (selectedLogGroups.length > 0)
@@ -68,6 +108,10 @@
                 history.replaceState(history.state, "", newUrl);
             }
         });
+    });
+
+    onMount(() => {
+        loadResultsFromSession();
     });
 
     $effect(() => {
@@ -288,6 +332,7 @@
                     });
                     return obj;
                 });
+                saveResultsToSession();
             } else if (status === "Complete") {
                 actionMsg = "Query completed. No results found.";
             }
