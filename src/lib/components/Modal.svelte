@@ -6,11 +6,13 @@
         title = "",
         maxWidth = "max-w-lg",
         children,
+        headerActions,
     }: {
         open?: boolean;
         title?: string;
         maxWidth?: string;
         children: Snippet;
+        headerActions?: Snippet;
     } = $props();
 
     function handleBackdrop(e: MouseEvent) {
@@ -36,7 +38,12 @@
             <div
                 class="flex items-center justify-between px-5 py-3 border-b border-gray-800 shrink-0"
             >
-                <h2 class="text-sm font-bold text-gray-200">{title}</h2>
+                <div class="flex items-center gap-3">
+                    <h2 class="text-sm font-bold text-gray-200">{title}</h2>
+                    {#if headerActions}
+                        {@render headerActions()}
+                    {/if}
+                </div>
                 <button
                     onclick={() => (open = false)}
                     class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition text-lg leading-none"

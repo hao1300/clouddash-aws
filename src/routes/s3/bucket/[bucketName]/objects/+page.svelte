@@ -27,6 +27,7 @@
     let previewKey = $state("");
     let previewContent = $state("");
     let previewHtml = $state("");
+    let previewTruncated = $state(false);
     let previewLoading = $state(false);
     let showPreview = $state(false);
 
@@ -123,20 +124,43 @@
         previewKey = key;
         showPreview = true;
         previewLoading = true;
+        previewTruncated = false;
         try {
             const res = await aws.s3!.send(
-                new GetObjectCommand({ Bucket: bucket, Key: key }),
+                new GetObjectCommand({ 
+                    Bucket: bucket, 
+                    Key: key,
+                    Range: 'bytes=0-1048575' // 1MB
+                }),
             );
             const body = res.Body;
             if (body) {
                 const bytes = await body.transformToByteArray();
-                previewContent = new TextDecoder().decode(bytes);
-                const ext = key.split('.').pop()?.toLowerCase() || '';
                 
-                if (ext && hljs.getLanguage(ext)) {
-                    previewHtml = hljs.highlight(previewContent, { language: ext }).value;
+                // Check if truncated by checking Content-Range or Content-Length
+                // S3 returns 'bytes 0-1048575/总大小'
+                const contentRange = (res as any).ContentRange || "";
+                if (contentRange) {
+                    const totalSize = parseInt(contentRange.split('/')[1]);
+                    if (totalSize > bytes.length) {
+                        previewTruncated = true;
+                    }
+                }
+
+                // naive binary check
+                const first100 = bytes.slice(0, 100);
+                if (first100.some((b: number) => b === 0)) {
+                    previewContent = "<Binary Content>";
+                    previewHtml = '<div class="flex h-full items-center justify-center text-gray-500 italic">Binary content cannot be previewed.</div>';
                 } else {
-                    previewHtml = hljs.highlightAuto(previewContent).value;
+                    previewContent = new TextDecoder().decode(bytes);
+                    const ext = key.split('.').pop()?.toLowerCase() || '';
+                    
+                    if (ext && hljs.getLanguage(ext)) {
+                        previewHtml = hljs.highlight(previewContent, { language: ext }).value;
+                    } else {
+                        previewHtml = hljs.highlightAuto(previewContent).value;
+                    }
                 }
             }
         } catch (e: any) {
@@ -352,6 +376,14 @@
     title="File Preview: {previewKey}"
     maxWidth="max-w-4xl"
 >
+    {#snippet headerActions()}
+        <button
+            onclick={() => handleDownload(previewKey)}
+            class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded text-[10px] font-bold transition flex items-center gap-1 shadow"
+        >
+            ↓ Download
+        </button>
+    {/snippet}
     <div class="h-[70vh] flex flex-col bg-gray-950 rounded-lg overflow-hidden">
         {#if previewLoading}
             <div
@@ -361,6 +393,11 @@
             </div>
         {:else}
             <pre class="flex-1 bg-black border border-gray-800 p-4 rounded text-[10px] font-mono text-gray-300 overflow-auto whitespace-pre-wrap hljs">{@html previewHtml}</pre>
+            {#if previewTruncated}
+                <div class="bg-yellow-500/10 border-t border-yellow-500/20 p-2 text-[10px] text-yellow-500 italic text-center">
+                    Note: Only the first 1MB of the file is being shown. Download the file to view the full content.
+                </div>
+            {/if}
         {/if}
     </div>
 </Modal>
