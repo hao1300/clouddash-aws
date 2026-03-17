@@ -182,6 +182,7 @@
                     data={sizeMetrics} 
                     loading={metricsLoading}
                     formatValue={formatBytes}
+                    yLabel="Bytes"
                 />
                 {#if sizeMetrics.length > 0}
                     <div class="mt-4 text-center">
@@ -197,6 +198,7 @@
                     data={objectMetrics} 
                     loading={metricsLoading}
                     formatValue={v => Math.round(v).toLocaleString()}
+                    yLabel="Count"
                 />
                 {#if objectMetrics.length > 0}
                     <div class="mt-4 text-center">

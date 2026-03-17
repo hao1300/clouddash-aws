@@ -79,6 +79,12 @@
             </div>
             
             <div class="relative">
+                {#if yLabel}
+                    <div class="absolute left-1 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[10px] font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap pointer-events-none">
+                        {yLabel}
+                    </div>
+                {/if}
+                
                 <svg viewBox="0 0 {width} {height}" class="w-full h-auto max-h-[180px]">
                     <!-- Grid lines -->
                     <line x1={padX} y1={padY} x2={width-padX} y2={padY} stroke="#1F2937" stroke-width="1" stroke-dasharray="4" />
