@@ -38,7 +38,7 @@ export function transformTabsGeneric(tabs: ServiceTab[], page: Page, manifest: S
                 let suffix = "";
                 // S3 'objects' is the landing page for a bucket (no suffix)
                 if (prefix === "bucket" && t.id === "objects") {
-                    suffix = "";
+                    suffix = "/objects";
                 } else if (t.id) {
                     suffix = `/${t.id}`;
                 }

@@ -43,7 +43,6 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     s3: {
         label: "S3",
         tabs: {
-            "": "Buckets",
             objects: "Objects",
             details: "Details",
         },

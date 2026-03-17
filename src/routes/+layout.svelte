@@ -15,6 +15,7 @@
   import { transformTabsGeneric } from "$lib/services/tab-utils";
   import ServiceLayout from "$lib/components/ServiceLayout.svelte";
   import BackButton from "$lib/components/BackButton.svelte";
+  import ToastContainer from "$lib/components/ToastContainer.svelte";
 
   let { children }: { children: Snippet } = $props();
 
@@ -795,4 +796,5 @@
       onChange={saveState}
     />
   {/if}
+  <ToastContainer />
 </main>

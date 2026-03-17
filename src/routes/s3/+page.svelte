@@ -42,7 +42,6 @@
             error = "";
             const res = await aws.s3.send(new ListBucketsCommand({}));
             const raw = res.Buckets || [];
-            console.log(raw);
             buckets = raw.map((b: any) => ({
                 name: b.Name,
                 creation: b.CreationDate?.toLocaleString() ?? "-",
@@ -136,6 +135,7 @@
         goto(`/s3/bucket/${encodeURIComponent(name)}/objects`);
     }
 </script>
+
 <svelte:window onclick={() => (openDropdown = null)} />
 
 <div class="h-full relative overflow-hidden flex flex-col">
@@ -177,7 +177,8 @@
                     <button
                         onclick={(e) => {
                             e.stopPropagation();
-                            openDropdown = openDropdown === item.name ? null : item.name;
+                            openDropdown =
+                                openDropdown === item.name ? null : item.name;
                         }}
                         class="text-xs text-gray-400 hover:text-white px-2 py-1 border border-transparent hover:border-gray-700 rounded transition"
                     >
