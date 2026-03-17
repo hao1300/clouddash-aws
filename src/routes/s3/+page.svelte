@@ -5,7 +5,6 @@
         DeleteBucketCommand,
         DeleteObjectsCommand,
         ListObjectsV2Command,
-        GetBucketLocationCommand,
     } from "@aws-sdk/client-s3";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
@@ -18,6 +17,7 @@
     let loading = $state(false);
     let error = $state("");
     let actionMsg = $state("");
+    let openDropdown = $state<string | null>(null);
 
     let showCreateModal = $state(false);
     let newName = $state("");
@@ -42,27 +42,12 @@
             error = "";
             const res = await aws.s3.send(new ListBucketsCommand({}));
             const raw = res.Buckets || [];
-            buckets = raw.map((b) => ({
+            console.log(raw);
+            buckets = raw.map((b: any) => ({
                 name: b.Name,
                 creation: b.CreationDate?.toLocaleString() ?? "-",
-                region: "Loading...",
+                region: b.BucketRegion || "-",
             }));
-
-            // Fetch regions in background
-            (async () => {
-                for (let i = 0; i < buckets.length; i++) {
-                    const b = buckets[i];
-                    try {
-                        const loc = await aws.s3!.send(
-                            new GetBucketLocationCommand({ Bucket: b.name }),
-                        );
-                        b.region = loc.LocationConstraint || "us-east-1";
-                        buckets = [...buckets];
-                    } catch (e) {
-                        b.region = "-";
-                    }
-                }
-            })();
         } catch (e: any) {
             error = e.message || String(e);
         } finally {
@@ -151,6 +136,7 @@
         goto(`/s3/bucket/${encodeURIComponent(name)}`);
     }
 </script>
+<svelte:window onclick={() => (openDropdown = null)} />
 
 <div class="h-full relative overflow-hidden flex flex-col">
     {#if error}<div
@@ -176,7 +162,6 @@
                     onClick: (item) => handleSelectBucket(item.name),
                     format: (v) => "🪣 " + v,
                 },
-                { label: "Region", key: "region" },
                 { label: "Creation Date", key: "creation" },
             ]}
         >
@@ -188,17 +173,39 @@
                 >
             {/snippet}
             {#snippet actionsSnippet(item)}
-                <div class="flex gap-2 justify-end">
+                <div class="flex justify-end relative">
                     <button
-                        onclick={() => handleEmpty(item.name)}
-                        class="text-[10px] bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 px-2 py-1 rounded border border-yellow-500/30 transition shadow"
-                        >Empty</button
+                        onclick={(e) => {
+                            e.stopPropagation();
+                            openDropdown = openDropdown === item.name ? null : item.name;
+                        }}
+                        class="text-xs text-gray-400 hover:text-white px-2 py-1 border border-transparent hover:border-gray-700 rounded transition"
                     >
-                    <button
-                        onclick={() => handleDelete(item.name)}
-                        class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition shadow"
-                        >Delete</button
-                    >
+                        ⋮
+                    </button>
+                    {#if openDropdown === item.name}
+                        <div
+                            onclick={(e) => e.stopPropagation()}
+                            class="absolute right-0 top-[100%] mt-1 w-32 bg-gray-900 border border-gray-700 rounded shadow-lg z-50 overflow-hidden"
+                        >
+                            <button
+                                onclick={() => {
+                                    openDropdown = null;
+                                    handleEmpty(item.name);
+                                }}
+                                class="w-full text-left px-3 py-2 text-[11px] text-yellow-400 hover:bg-gray-800 transition block border-b border-gray-800"
+                                >Empty</button
+                            >
+                            <button
+                                onclick={() => {
+                                    openDropdown = null;
+                                    handleDelete(item.name);
+                                }}
+                                class="w-full text-left px-3 py-2 text-[11px] text-red-400 hover:bg-gray-800 transition block"
+                                >Delete</button
+                            >
+                        </div>
+                    {/if}
                 </div>
             {/snippet}
         </PaginatedTable>
