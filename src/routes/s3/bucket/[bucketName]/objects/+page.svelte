@@ -11,6 +11,8 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
+    import hljs from 'highlight.js';
+    import 'highlight.js/styles/github-dark.css';
 
     let bucket = $derived($page.params.bucketName || "");
     let prefix = $derived($page.url.searchParams.get("prefix") || "");
@@ -20,9 +22,11 @@
     let error = $state("");
     let marker = $state<string | undefined>(undefined);
     let history = $state<string[]>([]);
+    let openDropdown = $state<string | null>(null);
 
     let previewKey = $state("");
     let previewContent = $state("");
+    let previewHtml = $state("");
     let previewLoading = $state(false);
     let showPreview = $state(false);
 
@@ -40,7 +44,21 @@
     });
 
     $effect(() => {
-        titleService.setResource(bucket, undefined, $page.url.pathname);
+        const resources = [
+            { name: bucket, href: `/s3/bucket/${encodeURIComponent(bucket)}/objects` }
+        ];
+        if (prefix) {
+            const parts = prefix.split('/').filter(Boolean);
+            let currentPrefix = '';
+            for (const part of parts) {
+                currentPrefix += part + '/';
+                resources.push({
+                    name: part,
+                    href: `/s3/bucket/${encodeURIComponent(bucket)}/objects?prefix=${encodeURIComponent(currentPrefix)}`
+                });
+            }
+        }
+        titleService.setResources(resources);
     });
 
     async function loadObjects(token?: string) {
@@ -113,10 +131,18 @@
             if (body) {
                 const bytes = await body.transformToByteArray();
                 previewContent = new TextDecoder().decode(bytes);
+                const ext = key.split('.').pop()?.toLowerCase() || '';
+                
+                if (ext && hljs.getLanguage(ext)) {
+                    previewHtml = hljs.highlight(previewContent, { language: ext }).value;
+                } else {
+                    previewHtml = hljs.highlightAuto(previewContent).value;
+                }
             }
         } catch (e: any) {
             previewContent =
                 "Error loading preview: " + (e.message || String(e));
+            previewHtml = previewContent;
         } finally {
             previewLoading = false;
         }
@@ -210,47 +236,16 @@
         goto(url.toString());
     }
 </script>
+<svelte:window onclick={() => (openDropdown = null)} />
 
-<div class="h-full relative overflow-hidden flex flex-col pt-2 bg-gray-950">
+<div class="h-full relative overflow-hidden flex flex-col bg-gray-950">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
             {error}
         </div>{/if}
 
-    <div
-        class="p-2 bg-gray-900 border-b border-gray-800 flex items-center justify-between gap-4"
-    >
-        <div
-            class="hidden md:flex items-center gap-1 text-xs text-gray-400 overflow-hidden"
-        >
-            <span class="text-blue-400 font-bold shrink-0">{bucket}</span>
-            <span class="text-gray-600 shrink-0">/</span>
-            <span class="truncate">{prefix}</span>
-        </div>
-        <div class="flex gap-2">
-            <input
-                type="file"
-                bind:this={uploadInput}
-                onchange={handleUpload}
-                class="hidden"
-            />
-            <button
-                onclick={() => uploadInput?.click()}
-                disabled={uploading}
-                class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-[10px] font-bold transition flex items-center gap-1"
-            >
-                {#if uploading}<span class="animate-spin">⟳</span>{/if} Upload
-            </button>
-            <button
-                onclick={() => (showCreateFolder = true)}
-                class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded text-[10px] font-bold transition"
-                >New Folder</button
-            >
-        </div>
-    </div>
-
-    <div class="flex-1 min-h-0 bg-gray-950">
+    <div class="flex-1 min-h-0 bg-gray-950 {error ? 'pt-8' : ''}">
         <PaginatedTable
             items={objects}
             {loading}
@@ -280,25 +275,72 @@
                 { label: "Last Modified", key: "lastModified" },
             ]}
         >
+            {#snippet headerActionsSnippet()}
+                <input
+                    type="file"
+                    bind:this={uploadInput}
+                    onchange={handleUpload}
+                    class="hidden"
+                />
+                <button
+                    onclick={() => uploadInput?.click()}
+                    disabled={uploading}
+                    class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-[10px] font-bold transition flex items-center gap-1 shadow"
+                >
+                    {#if uploading}<span class="animate-spin">⟳</span>{/if} Upload
+                </button>
+                <button
+                    onclick={() => (showCreateFolder = true)}
+                    class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded text-[10px] font-bold transition shadow"
+                    >New Folder</button
+                >
+            {/snippet}
             {#snippet actionsSnippet(item)}
-                <div class="flex gap-2 justify-end">
-                    {#if item.type === "file"}
-                        <button
-                            onclick={() => handlePreview(item.key)}
-                            class="text-[10px] bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 px-2 py-1 rounded border border-blue-500/30 transition"
-                            >View</button
-                        >
-                        <button
-                            onclick={() => handleDownload(item.key)}
-                            class="text-[10px] bg-green-600/10 hover:bg-green-600/20 text-green-400 px-2 py-1 rounded border border-green-500/30 transition"
-                            >↓</button
-                        >
-                    {/if}
+                <div class="flex justify-end relative">
                     <button
-                        onclick={() => handleDelete(item.key)}
-                        class="text-[10px] bg-red-600/10 hover:bg-red-600/20 text-red-400 px-2 py-1 rounded border border-red-500/30 transition"
-                        >Delete</button
+                        onclick={(e) => {
+                            e.stopPropagation();
+                            openDropdown = openDropdown === item.key ? null : item.key;
+                        }}
+                        class="text-xs text-gray-400 hover:text-white px-2 py-1 border border-transparent hover:border-gray-700 rounded transition"
                     >
+                        ⋮
+                    </button>
+                    {#if openDropdown === item.key}
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <div
+                            onclick={(e) => e.stopPropagation()}
+                            class="absolute right-0 top-[100%] mt-1 w-32 bg-gray-900 border border-gray-700 rounded shadow-lg z-50 overflow-hidden"
+                        >
+                            {#if item.type === "file"}
+                                <button
+                                    onclick={() => {
+                                        openDropdown = null;
+                                        handlePreview(item.key);
+                                    }}
+                                    class="w-full text-left px-3 py-2 text-[11px] text-blue-400 hover:bg-gray-800 transition block border-b border-gray-800"
+                                    >View</button
+                                >
+                                <button
+                                    onclick={() => {
+                                        openDropdown = null;
+                                        handleDownload(item.key);
+                                    }}
+                                    class="w-full text-left px-3 py-2 text-[11px] text-green-400 hover:bg-gray-800 transition block border-b border-gray-800"
+                                    >Download</button
+                                >
+                            {/if}
+                            <button
+                                onclick={() => {
+                                    openDropdown = null;
+                                    handleDelete(item.key);
+                                }}
+                                class="w-full text-left px-3 py-2 text-[11px] text-red-400 hover:bg-gray-800 transition block"
+                                >Delete</button
+                            >
+                        </div>
+                    {/if}
                 </div>
             {/snippet}
         </PaginatedTable>
@@ -318,8 +360,7 @@
                 Loading Content...
             </div>
         {:else}
-            <pre
-                class="flex-1 bg-black border border-gray-800 p-4 rounded text-[10px] font-mono text-gray-300 overflow-auto whitespace-pre-wrap">{previewContent}</pre>
+            <pre class="flex-1 bg-black border border-gray-800 p-4 rounded text-[10px] font-mono text-gray-300 overflow-auto whitespace-pre-wrap hljs">{@html previewHtml}</pre>
         {/if}
     </div>
 </Modal>

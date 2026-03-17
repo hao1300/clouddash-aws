@@ -133,7 +133,7 @@
     }
 
     function handleSelectBucket(name: string) {
-        goto(`/s3/bucket/${encodeURIComponent(name)}`);
+        goto(`/s3/bucket/${encodeURIComponent(name)}/objects`);
     }
 </script>
 <svelte:window onclick={() => (openDropdown = null)} />
@@ -184,6 +184,8 @@
                         ⋮
                     </button>
                     {#if openDropdown === item.name}
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div
                             onclick={(e) => e.stopPropagation()}
                             class="absolute right-0 top-[100%] mt-1 w-32 bg-gray-900 border border-gray-700 rounded shadow-lg z-50 overflow-hidden"
