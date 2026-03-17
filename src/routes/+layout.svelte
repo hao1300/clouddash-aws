@@ -533,7 +533,6 @@
                                 class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
                                   tab.id ||
                                 (tab.id &&
-                                  !tab.id.includes('/') &&
                                   serviceActiveTab.startsWith(tab.id + '/'))
                                   ? 'text-blue-400 font-bold bg-blue-500/10'
                                   : 'text-gray-300 hover:text-white hover:bg-gray-800'}"

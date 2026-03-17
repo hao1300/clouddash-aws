@@ -261,7 +261,7 @@
                 {/if}
 
                 <div class="p-0 overflow-auto max-h-[600px] h-full">
-                    <pre class="m-0 p-6 text-[11px] font-mono leading-relaxed hljs">{@html previewHtml}</pre>
+                    <pre class="m-0 p-6 text-[11px] font-mono leading-relaxed hljs whitespace-pre-wrap break-all">{@html previewHtml}</pre>
                 </div>
             </div>
         </div>
