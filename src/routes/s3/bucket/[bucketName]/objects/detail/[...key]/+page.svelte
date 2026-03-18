@@ -29,7 +29,7 @@
     const arn = $derived(`arn:aws:s3:::${bucket}/${key}`);
 
     $effect(() => {
-        if (aws.s3 && bucket && key) {
+        if (bucket && key) {
             loadObject();
         }
     });
@@ -59,13 +59,15 @@
     });
 
     async function loadObject() {
-        if (!aws.s3 || !bucket || !key) return;
+        if (!bucket || !key) return;
         try {
             loading = true;
             error = "";
+            const s3Client = await aws.getS3ClientForBucket(bucket);
+            if (!s3Client) throw new Error("Could not initialize S3 client");
             
             // Just use GetObject with Range for preview
-            const res = await aws.s3.send(
+            const res = await s3Client.send(
                 new GetObjectCommand({ 
                     Bucket: bucket, 
                     Key: key,
@@ -109,12 +111,15 @@
     }
 
     async function handlePresign() {
-        if (!aws.s3 || !bucket || !key) return;
+        if (!bucket || !key) return;
         try {
             presignedLoading = true;
+            const s3Client = await aws.getS3ClientForBucket(bucket);
+            if (!s3Client) throw new Error("Could not initialize S3 client");
+
             const command = new GetObjectCommand({ Bucket: bucket, Key: key });
             // @ts-ignore
-            presignedUrl = await getSignedUrl(aws.s3, command, { expiresIn: 3600 });
+            presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
         } catch (e: any) {
             error = "Failed to generate presigned URL: " + e.message;
         } finally {
@@ -124,7 +129,10 @@
 
     async function handleDownload() {
         try {
-            const res = await aws.s3!.send(
+            const s3Client = await aws.getS3ClientForBucket(bucket);
+            if (!s3Client) throw new Error("Could not initialize S3 client");
+
+            const res = await s3Client.send(
                 new GetObjectCommand({ Bucket: bucket, Key: key }),
             );
             const body = res.Body;
@@ -144,10 +152,13 @@
     }
 
     async function handleDelete() {
-        if (!aws.s3 || !confirm(`Delete object ${key}?`)) return;
+        if (!bucket || !confirm(`Delete object ${key}?`)) return;
         try {
             loading = true;
-            await aws.s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+            const s3Client = await aws.getS3ClientForBucket(bucket);
+            if (!s3Client) throw new Error("Could not initialize S3 client");
+
+            await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
             // Go back to the folder
             const prefix = key.substring(0, key.lastIndexOf('/') + 1);
             goto(`/s3/bucket/${encodeURIComponent(bucket)}/objects?prefix=${encodeURIComponent(prefix)}`);

@@ -80,7 +80,9 @@
         if (!aws.s3 || !confirm(`Delete bucket ${name}?`)) return;
         try {
             loading = true;
-            await aws.s3.send(new DeleteBucketCommand({ Bucket: name }));
+            const s3Client = await aws.getS3ClientForBucket(name);
+            if (!s3Client) throw new Error("Unable to obtain S3 client for region.");
+            await s3Client.send(new DeleteBucketCommand({ Bucket: name }));
             actionMsg = `Bucket ${name} deleted.`;
             loadBuckets();
         } catch (e: any) {
@@ -99,9 +101,12 @@
         try {
             loading = true;
             actionMsg = `Emptying bucket ${name}...`;
+            const s3Client = await aws.getS3ClientForBucket(name);
+            if (!s3Client) throw new Error("Unable to obtain S3 client for region.");
+            
             let token: string | undefined;
             do {
-                const res: any = await aws.s3.send(
+                const res: any = await s3Client.send(
                     new ListObjectsV2Command({
                         Bucket: name,
                         ContinuationToken: token,
@@ -109,7 +114,7 @@
                 );
                 const objects = res.Contents || [];
                 if (objects.length > 0) {
-                    await aws.s3.send(
+                    await s3Client.send(
                         new DeleteObjectsCommand({
                             Bucket: name,
                             Delete: {

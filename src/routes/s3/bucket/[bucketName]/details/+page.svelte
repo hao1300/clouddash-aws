@@ -34,29 +34,33 @@
     });
 
     $effect(() => {
-        if (aws.s3 && bucket) {
+        if (bucket) { // Changed condition
             loadBucketDetails();
         }
     });
 
     async function loadBucketDetails() {
+        if (!bucket) return; // Added check
         try {
             loading = true;
             error = "";
-            
-            // 1. Get creation date from ListBuckets (unfortunately S3 doesn't have a GetBucketDetails for just metadata)
-            const listResp = await aws.s3!.send(new ListBucketsCommand({}));
+
+            const fetchedRegion = await aws.getBucketRegion(bucket);
+            const s3Client = await aws.getS3ClientForBucket(bucket);
+            if (!s3Client) throw new Error("Could not initialize S3 client");
+
+            const listResp = await s3Client.send(new ListBucketsCommand({}));
             bucketData = listResp.Buckets?.find(b => b.Name === bucket);
+            region = fetchedRegion;
 
-            // 2. Get region
-            const locResp = await aws.s3!.send(new GetBucketLocationCommand({ Bucket: bucket }));
-            region = locResp.LocationConstraint || "us-east-1";
+            try {
+                const metricsResp = await s3Client.send(new ListBucketMetricsConfigurationsCommand({ Bucket: bucket }));
+                metricsConfigs = metricsResp.MetricsConfigurationList ?? [];
+            } catch(e) {
+                console.warn("Could not list metrics configs", e);
+            }
 
-            // 3. Get Metrics configurations
-            const metricsResp = await aws.s3!.send(new ListBucketMetricsConfigurationsCommand({ Bucket: bucket }));
-            metricsConfigs = metricsResp.MetricsConfigurationList || [];
-
-            loadMetrics();
+            loadMetrics(); // Keep this call
         } catch (e) {
             error = String(e);
         } finally {
@@ -65,14 +69,17 @@
     }
 
     async function loadMetrics() {
-        if (!aws.cw) return;
+        if (!bucket) return;
         try {
             metricsLoading = true;
+            const cwClient = await aws.getCWClientForBucket(bucket);
+            if (!cwClient) throw new Error("Could not initialize CloudWatch client");
+
             const endTime = new Date();
             const startTime = new Date(endTime.getTime() - 7 * 24 * 60 * 60 * 1000);
 
             // Fetch Size
-            const sizeResp = await aws.cw.send(new GetMetricStatisticsCommand({
+            const sizeResp = await cwClient.send(new GetMetricStatisticsCommand({
                 Namespace: "AWS/S3",
                 MetricName: "BucketSizeBytes",
                 Dimensions: [
@@ -91,7 +98,7 @@
             })).sort((a, b) => a.rawTimestamp.getTime() - b.rawTimestamp.getTime());
 
             // Fetch Object Count
-            const countResp = await aws.cw.send(new GetMetricStatisticsCommand({
+            const countResp = await cwClient.send(new GetMetricStatisticsCommand({
                 Namespace: "AWS/S3",
                 MetricName: "NumberOfObjects",
                 Dimensions: [

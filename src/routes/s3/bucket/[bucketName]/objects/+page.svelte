@@ -30,7 +30,7 @@
     let uploading = $state(false);
 
     $effect(() => {
-        if (aws.s3 && bucket) {
+        if (bucket) {
             loadObjects();
         }
     });
@@ -54,11 +54,14 @@
     });
 
     async function loadObjects(token?: string) {
-        if (!aws.s3 || !bucket) return;
+        if (!bucket) return;
         try {
             loading = true;
             error = "";
-            const res = await aws.s3.send(
+            const s3Client = await aws.getS3ClientForBucket(bucket);
+            if (!s3Client) throw new Error("Could not initialize S3 client");
+
+            const res = await s3Client.send(
                 new ListObjectsV2Command({
                     Bucket: bucket,
                     Prefix: prefix || undefined,
@@ -118,11 +121,14 @@
     async function handleUpload() {
         if (!uploadInput) return;
         const file = uploadInput.files?.[0];
-        if (!file || !aws.s3) return;
+        if (!file || !bucket) return;
         try {
             uploading = true;
             const buffer = await file.arrayBuffer();
-            await aws.s3.send(
+            const s3Client = await aws.getS3ClientForBucket(bucket);
+            if (!s3Client) throw new Error("Could not initialize S3 client");
+
+            await s3Client.send(
                 new PutObjectCommand({
                     Bucket: bucket,
                     Key: prefix + file.name,
@@ -139,12 +145,15 @@
     }
 
     async function handleCreateFolder() {
-        if (!aws.s3 || !folderName) return;
+        if (!bucket || !folderName) return;
         try {
             creatingFolder = true;
             let key = prefix + folderName;
             if (!key.endsWith("/")) key += "/";
-            await aws.s3.send(
+            const s3Client = await aws.getS3ClientForBucket(bucket);
+            if (!s3Client) throw new Error("Could not initialize S3 client");
+
+            await s3Client.send(
                 new PutObjectCommand({
                     Bucket: bucket,
                     Key: key,
@@ -162,10 +171,13 @@
     }
 
     async function handleDelete(key: string) {
-        if (!aws.s3 || !confirm(`Delete ${key}?`)) return;
+        if (!bucket || !confirm(`Delete ${key}?`)) return;
         try {
             loading = true;
-            await aws.s3.send(
+            const s3Client = await aws.getS3ClientForBucket(bucket);
+            if (!s3Client) throw new Error("Could not initialize S3 client");
+
+            await s3Client.send(
                 new DeleteObjectCommand({ Bucket: bucket, Key: key }),
             );
             loadObjects();
@@ -178,7 +190,10 @@
 
     async function handleDownload(key: string) {
         try {
-            const res = await aws.s3!.send(
+            const s3Client = await aws.getS3ClientForBucket(bucket);
+            if (!s3Client) throw new Error("Could not initialize S3 client");
+
+            const res = await s3Client.send(
                 new GetObjectCommand({ Bucket: bucket, Key: key }),
             );
             const body = res.Body;

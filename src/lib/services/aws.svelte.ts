@@ -120,6 +120,64 @@ class AwsState {
     elasticBeanstalk = $derived(this.#config ? new ElasticBeanstalkClient(this.#config) : null);
     cloudFormation = $derived(this.#config ? new CloudFormationClient(this.#config) : null);
     ses = $derived(this.#config ? new SESClient(this.#config) : null);
+
+    #s3Clients = new Map<string, S3Client>();
+    #cwClients = new Map<string, CloudWatchClient>();
+    #bucketRegions = new Map<string, string>();
+
+    primeBucketRegion(bucketName: string, region: string) {
+        this.#bucketRegions.set(bucketName, region);
+    }
+
+    getS3Client(region?: string): S3Client | null {
+        if (!this.#config) return null;
+        if (!region || region === this.#config.region) return this.s3;
+        
+        if (this.#s3Clients.has(region)) return this.#s3Clients.get(region)!;
+        
+        const client = new S3Client({ ...this.#config, region });
+        this.#s3Clients.set(region, client);
+        return client;
+    }
+
+    getCWClient(region?: string): CloudWatchClient | null {
+        if (!this.#config) return null;
+        if (!region || region === this.#config.region) return this.cw;
+        
+        if (this.#cwClients.has(region)) return this.#cwClients.get(region)!;
+        
+        const client = new CloudWatchClient({ ...this.#config, region });
+        this.#cwClients.set(region, client);
+        return client;
+    }
+
+    async getBucketRegion(bucketName: string): Promise<string> {
+        if (this.#bucketRegions.has(bucketName)) {
+            return this.#bucketRegions.get(bucketName)!;
+        }
+        if (!this.s3) throw new Error("AWS not initialized");
+        try {
+            const { GetBucketLocationCommand } = await import("@aws-sdk/client-s3");
+            const res = await this.s3.send(new GetBucketLocationCommand({ Bucket: bucketName }));
+            let region = res.LocationConstraint || "us-east-1";
+            if (region === "EU") region = "eu-west-1";
+            this.#bucketRegions.set(bucketName, region);
+            return region;
+        } catch(e) {
+            console.warn(`Failed to get bucket location for ${bucketName}`, e);
+            return this.#config?.region || "us-east-1";
+        }
+    }
+
+    async getS3ClientForBucket(bucketName: string): Promise<S3Client | null> {
+        const region = await this.getBucketRegion(bucketName);
+        return this.getS3Client(region);
+    }
+
+    async getCWClientForBucket(bucketName: string): Promise<CloudWatchClient | null> {
+        const region = await this.getBucketRegion(bucketName);
+        return this.getCWClient(region);
+    }
 }
 
 export const aws = new AwsState();
