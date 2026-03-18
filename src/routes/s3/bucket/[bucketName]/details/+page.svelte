@@ -28,7 +28,6 @@
 
     $effect(() => {
         titleService.setResources([
-            { name: "Buckets", href: "/s3", path: "/s3" },
             { name: bucket, path: $page.url.pathname }
         ]);
     });

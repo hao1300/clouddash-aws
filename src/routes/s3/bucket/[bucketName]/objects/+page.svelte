@@ -31,6 +31,8 @@
 
     $effect(() => {
         if (bucket) {
+            // we read prefix here so changes to it trigger the effect
+            const currentPrefix = prefix;
             loadObjects();
         }
     });

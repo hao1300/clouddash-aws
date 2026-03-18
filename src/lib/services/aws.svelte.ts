@@ -163,7 +163,12 @@ class AwsState {
             if (region === "EU") region = "eu-west-1";
             this.#bucketRegions.set(bucketName, region);
             return region;
-        } catch(e) {
+        } catch(e: any) {
+            if (e.$response?.headers?.["x-amz-bucket-region"]) {
+                const headerRegion = e.$response.headers["x-amz-bucket-region"];
+                this.#bucketRegions.set(bucketName, headerRegion);
+                return headerRegion;
+            }
             console.warn(`Failed to get bucket location for ${bucketName}`, e);
             return this.#config?.region || "us-east-1";
         }
