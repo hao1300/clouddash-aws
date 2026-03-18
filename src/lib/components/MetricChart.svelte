@@ -1,112 +1,221 @@
 <script lang="ts">
+    import { onMount, untrack } from "svelte";
+    import Chart from "chart.js/auto";
+
     interface DataPoint {
         rawTimestamp: Date;
         rawAverage: number;
     }
 
-    let { 
-        data = [], 
-        width = 800, 
-        height = 150, 
-        padX = 40, 
-        padY = 20,
+    let {
+        data = [],
         title = "",
         loading = false,
         formatValue = (v: number) => v.toLocaleString(),
-        yLabel = ""
+        yLabel = "",
     }: {
         data: DataPoint[];
-        width?: number;
-        height?: number;
-        padX?: number;
-        padY?: number;
         title?: string;
         loading?: boolean;
         formatValue?: (v: number) => string;
         yLabel?: string;
     } = $props();
 
-    let chartInfo = $derived.by(() => {
-        if (!data || data.length < 2) return null;
+    let canvasRef = $state<HTMLCanvasElement>();
+    let chartInstance: Chart | null = null;
 
-        const chrono = [...data].sort((a, b) => a.rawTimestamp.getTime() - b.rawTimestamp.getTime());
-        const ts = chrono.map((d) => d.rawTimestamp.getTime());
-        const vals = chrono.map((d) => Number(d.rawAverage) || 0);
+    $effect(() => {
+        if (!canvasRef) return;
 
-        const minT = Math.min(...ts);
-        const maxT = Math.max(...ts);
-        const minV = Math.min(0, ...vals);
-        let maxV = Math.max(...vals);
-        if (maxV === minV) maxV = minV + 1;
+        // We only want to rebuild the chart when data changes
+        const currentData = data;
+        const currentTitle = title;
+        const currentYLabel = yLabel;
 
-        const rangeT = maxT - minT || 1;
-        const rangeV = maxV - minV || 1;
+        if (!currentData || currentData.length === 0) {
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
+            return;
+        }
 
-        const points = chrono.map((_, i) => {
-            const x = padX + ((ts[i] - minT) / rangeT) * (width - 2 * padX);
-            const y = height - padY - ((vals[i] - minV) / rangeV) * (height - 2 * padY);
-            return { x, y };
+        untrack(() => {
+            const chrono = [...currentData].sort(
+                (a, b) => a.rawTimestamp.getTime() - b.rawTimestamp.getTime(),
+            );
+
+            const labels = chrono.map((d) => d.rawTimestamp);
+            const values = chrono.map((d) => Number(d.rawAverage) || 0);
+
+            if (chartInstance) {
+                chartInstance.data.labels = labels;
+                chartInstance.data.datasets[0].data = values;
+                chartInstance.data.datasets[0].label = currentTitle;
+                const yScale = chartInstance.options.scales?.y as any;
+                if (yScale && yScale.title) {
+                    yScale.title.text = currentYLabel;
+                }
+                chartInstance.update();
+            } else {
+                Chart.defaults.color = "#9CA3AF";
+                Chart.defaults.font.family =
+                    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+
+                chartInstance = new Chart(canvasRef as HTMLCanvasElement, {
+                    type: "line",
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: currentTitle,
+                                data: values,
+                                borderColor: "#3B82F6",
+                                backgroundColor: "rgba(59, 130, 246, 0.1)",
+                                borderWidth: 2,
+                                pointBackgroundColor: "#60A5FA",
+                                pointBorderColor: "#1E3A8A",
+                                pointRadius: 3,
+                                pointHoverRadius: 5,
+                                fill: true,
+                                tension: 0.1,
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: "index",
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: {
+                                display: false,
+                            },
+                            tooltip: {
+                                backgroundColor: "rgba(17, 24, 39, 0.9)",
+                                titleColor: "#F3F4F6",
+                                bodyColor: "#D1D5DB",
+                                borderColor: "#374151",
+                                borderWidth: 1,
+                                callbacks: {
+                                    title: function (context) {
+                                        const dateLabel =
+                                            labels[context[0].dataIndex];
+                                        if (!dateLabel) return "";
+                                        return new Date(
+                                            dateLabel,
+                                        ).toLocaleString([], {
+                                            month: "short",
+                                            day: "numeric",
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                        });
+                                    },
+                                    label: function (context) {
+                                        let label = context.dataset.label || "";
+                                        if (label) {
+                                            label += ": ";
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += formatValue(
+                                                context.parsed.y,
+                                            );
+                                        }
+                                        return label;
+                                    },
+                                },
+                            },
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    color: "#374151",
+                                    display: false,
+                                },
+                                ticks: {
+                                    color: "#6B7280",
+                                    font: {
+                                        size: 10,
+                                    },
+                                    callback: function (value, index) {
+                                        const d = labels[index] as Date;
+                                        if (!d) return "";
+                                        return d.toLocaleTimeString([], {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                        });
+                                    },
+                                },
+                            },
+                            y: {
+                                title: {
+                                    display: !!currentYLabel,
+                                    text: currentYLabel,
+                                    color: "#6B7280",
+                                    font: {
+                                        size: 10,
+                                        weight: "bold",
+                                    },
+                                },
+                                grid: {
+                                    color: "#1F2937",
+                                    drawTicks: false,
+                                },
+                                border: {
+                                    dash: [4, 4],
+                                },
+                                ticks: {
+                                    color: "#9CA3AF",
+                                    font: {
+                                        size: 10,
+                                    },
+                                    callback: function (value) {
+                                        return formatValue(value as number);
+                                    },
+                                },
+                            },
+                        },
+                    },
+                });
+            }
         });
-
-        const path = `M ${points.map((p) => `${p.x},${p.y}`).join(" L ")}`;
-
-        return { path, points, minT, maxT, minV, maxV };
     });
 </script>
 
 <div class="flex flex-col gap-2">
     {#if title}
-        <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{title}</h4>
+        <h4
+            class="text-[10px] font-bold text-gray-500 uppercase tracking-widest"
+        >
+            {title}
+        </h4>
     {/if}
-    
-{#if loading}
-        <div class="h-40 flex items-center justify-center text-gray-400 text-xs animate-pulse bg-gray-950/20 rounded border border-gray-800/50">
+
+    {#if loading}
+        <div
+            class="h-40 flex items-center justify-center text-gray-400 text-xs animate-pulse bg-gray-950/20 rounded border border-gray-800/50"
+        >
             <span class="animate-spin mr-2">⟳</span> Loading metrics...
         </div>
     {:else if !data || data.length === 0}
-        <div class="h-40 flex items-center justify-center text-gray-600 text-xs italic bg-gray-950/20 rounded border border-gray-800/50">
+        <div
+            class="h-40 flex items-center justify-center text-gray-600 text-xs italic bg-gray-950/20 rounded border border-gray-800/50"
+        >
             No data available
         </div>
     {:else if data.length < 2}
-        <div class="h-40 flex items-center justify-center text-gray-600 text-xs italic bg-gray-950/20 rounded border border-gray-800/50">
+        <div
+            class="h-40 flex items-center justify-center text-gray-600 text-xs italic bg-gray-950/20 rounded border border-gray-800/50"
+        >
             Insufficient data points for visualization
         </div>
-    {:else if chartInfo}
-        <div class="relative w-full bg-gray-950 rounded-lg border border-gray-800/80 p-4 shadow-inner flex flex-col gap-1">
-            <div class="flex justify-between items-end px-10 text-[11px] text-gray-300 font-mono">
-                <span class="bg-gray-900/50 px-1 rounded font-bold">{formatValue(chartInfo.maxV)}</span>
-                <span class="text-[10px] uppercase tracking-tighter text-gray-500 font-bold">Value</span>
-            </div>
-            
-            <div class="relative">
-                {#if yLabel}
-                    <div class="absolute left-1 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-[10px] font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap pointer-events-none">
-                        {yLabel}
-                    </div>
-                {/if}
-                
-                <svg viewBox="0 0 {width} {height}" class="w-full h-auto max-h-[180px]">
-                    <!-- Grid lines -->
-                    <line x1={padX} y1={padY} x2={width-padX} y2={padY} stroke="#1F2937" stroke-width="1" stroke-dasharray="4" />
-                    <line x1={padX} y1={height-padY} x2={width-padX} y2={height-padY} stroke="#374151" stroke-width="1" />
-                    
-                    <path d={chartInfo.path} fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    {#each chartInfo.points as p}
-                        <circle cx={p.x} cy={p.y} r="2.5" fill="#60A5FA" />
-                    {/each}
-                </svg>
-            </div>
-
-            <div class="flex justify-between px-10 text-[11px] text-gray-300 font-mono">
-                <div class="flex flex-col items-start translate-x-[-20%]">
-                    <span class="font-bold">{new Date(chartInfo.minT).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    <span class="text-[10px] text-gray-400">{new Date(chartInfo.minT).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
-                </div>
-                <div class="flex flex-col items-end translate-x-[20%]">
-                    <span class="font-bold">{new Date(chartInfo.maxT).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    <span class="text-[10px] text-gray-400">{new Date(chartInfo.maxT).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
-                </div>
-            </div>
+    {:else}
+        <div
+            class="relative w-full h-40 bg-gray-950 rounded-lg border border-gray-800/80 p-2 shadow-inner"
+        >
+            <canvas bind:this={canvasRef} class="w-full h-full"></canvas>
         </div>
     {/if}
 </div>
