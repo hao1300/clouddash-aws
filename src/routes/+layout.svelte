@@ -83,7 +83,7 @@
 
   // Service Dropdown
   let dropdownOpen = $state(false);
-  let sideMenuOpen = $state(false);
+  let sideMenuOpen = $state(window.innerWidth >= 640);
   let activeSidebarTab = $state<"services" | "bookmarks">("services");
   let searchQuery = $state("");
 
@@ -209,6 +209,7 @@
         saveProfileChecked,
         saveProfileName,
         activeId: activeId, // Save last active route to redirect later
+        sideMenuOpen,
       }),
     );
   }
@@ -277,6 +278,7 @@
     if (saved?.saveProfileChecked)
       saveProfileChecked = saved.saveProfileChecked;
     if (saved?.saveProfileName) saveProfileName = saved.saveProfileName;
+    if (saved?.sideMenuOpen !== undefined) sideMenuOpen = saved.sideMenuOpen;
 
     // Apply initial state from environment variables (forked process)
     if (initialState.profile && allProfiles.includes(initialState.profile)) {
@@ -417,9 +419,9 @@
 
       <!-- Left Sidebar -->
       <div
-        class="fixed sm:static inset-y-0 left-0 z-[160] sm:z-auto w-72 max-w-[85vw] bg-gray-900 shadow-2xl sm:shadow-none flex flex-col border-r border-gray-800 shrink-0 transition-transform duration-300 {sideMenuOpen
-          ? 'translate-x-0'
-          : '-translate-x-full sm:translate-x-0'}"
+        class="fixed sm:static inset-y-0 left-0 z-[160] sm:z-auto w-72 max-w-[85vw] bg-gray-900 shadow-2xl sm:shadow-none flex flex-col border-r border-gray-800 shrink-0 transition-all duration-300 {sideMenuOpen
+          ? 'translate-x-0 sm:ml-0'
+          : '-translate-x-full sm:-ml-72'}"
       >
         <div
           class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950 shrink-0 sm:hidden"
@@ -717,7 +719,7 @@
         >
           <button
             onclick={() => (sideMenuOpen = !sideMenuOpen)}
-            class="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition sm:hidden"
+            class="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition"
             title="Toggle Sidebar"
           >
             <span class="text-xl">☰</span>
