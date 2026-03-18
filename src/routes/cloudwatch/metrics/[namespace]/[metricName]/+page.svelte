@@ -5,6 +5,7 @@
     import { titleService } from "$lib/services/title.svelte";
     import DetailLayout from "$lib/components/DetailLayout.svelte";
     import InfoCard from "$lib/components/InfoCard.svelte";
+    import MetricChart from "$lib/components/MetricChart.svelte";
 
     let namespace = $derived($page.params.namespace || "");
     let metricName = $derived($page.params.metricName || "");
@@ -34,40 +35,6 @@
     let displayDimensions = $derived(
         rawDimensions.map((d: any) => `${d.Name}=${d.Value}`).join(", "),
     );
-
-    let metricChartData = $derived.by(() => {
-        if (!metricStats || metricStats.length < 2) return null;
-        const width = 800;
-        const height = 150;
-        const padX = 40;
-        const padY = 20;
-
-        const chrono = [...metricStats].reverse();
-        const ts = chrono.map((d) => d.rawTimestamp?.getTime() || 0);
-        const vals = chrono.map((d) => Number(d.rawAverage) || 0);
-
-        const minT = Math.min(...ts);
-        const maxT = Math.max(...ts);
-        const minV = Math.min(0, ...vals);
-        let maxV = Math.max(...vals);
-        if (maxV === minV) maxV = minV + 1;
-
-        const rangeT = maxT - minT || 1;
-        const rangeV = maxV - minV || 1;
-
-        const points = chrono.map((_, i) => {
-            const x = padX + ((ts[i] - minT) / rangeT) * (width - 2 * padX);
-            const y =
-                height -
-                padY -
-                ((vals[i] - minV) / rangeV) * (height - 2 * padY);
-            return { x, y };
-        });
-
-        const path = `M ${points.map((p) => `${p.x},${p.y}`).join(" L ")}`;
-
-        return { path, points, width, height, minT, maxT };
-    });
 
     $effect(() => {
         if (aws.cw && namespace && metricName) {
@@ -164,34 +131,12 @@
 
             <!-- Chart Section -->
             <div class="p-6 bg-gray-900 rounded-lg border border-gray-800 shadow-sm overflow-hidden flex flex-col">
-                <h3 class="text-xs font-bold text-gray-300 tracking-wide uppercase mb-4">
-                    Last 24 Hours Metrics
-                </h3>
-
-                {#if loading}
-                    <div class="h-40 flex items-center justify-center text-gray-400 text-sm animate-pulse">
-                        <span class="animate-spin mr-2">⟳</span> Loading visualization...
-                    </div>
-                {:else if metricStats.length === 0}
-                    <div class="h-40 flex items-center justify-center text-gray-500 text-sm italic">
-                        No data points available for the last 24 hours.
-                    </div>
-                {:else}
-                    {#if metricChartData}
-                        <div class="relative w-full bg-gray-950 rounded-lg border border-gray-800/80 p-4 shadow-inner">
-                            <svg viewBox="0 0 {metricChartData.width} {metricChartData.height}" class="w-full h-auto max-h-[180px]">
-                                <path d={metricChartData.path} fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                {#each metricChartData.points as p}
-                                    <circle cx={p.x} cy={p.y} r="2.5" fill="#60A5FA" />
-                                {/each}
-                            </svg>
-                            <div class="flex justify-between mt-2 px-10 text-[10px] text-gray-500 font-mono">
-                                <span>{new Date(metricChartData.minT).toLocaleTimeString()}</span>
-                                <span>{new Date(metricChartData.maxT).toLocaleTimeString()}</span>
-                            </div>
-                        </div>
-                    {/if}
-                {/if}
+                <MetricChart 
+                    title="Last 24 Hours Metrics"
+                    data={metricStats}
+                    loading={loading}
+                    yLabel={metricStats.length > 0 ? metricStats[0].unit : ""}
+                />
             </div>
         </div>
     {/snippet}
