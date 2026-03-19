@@ -108,7 +108,6 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     secretsmanager: {
         label: "Secrets Manager",
         tabs: {
-            "": "Secrets",
             details: "Details",
         },
         resourcePrefix: "id",

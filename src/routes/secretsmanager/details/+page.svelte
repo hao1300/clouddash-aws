@@ -7,12 +7,14 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
+    import { highlightJson } from "$lib/utils/json-highlight";
 
     let secretId = $derived($page.url.searchParams.get("id") || "");
 
     $effect(() => {
         const name = secretId.split(":").pop() || secretId;
         titleService.setResource(name, undefined, $page.url.pathname);
+        titleService.subservice = { label: "", href: "" };
     });
 
     let loading = $state(false);
@@ -20,6 +22,42 @@
     let secretDetails = $state<any>(null);
     let secretValue = $state<string | null>(null);
     let valueLoading = $state(false);
+
+    let activeTab = $state<"json" | "key-value">("json");
+
+    let parsedValue = $derived.by(() => {
+        if (!secretValue) return null;
+        try {
+            return JSON.parse(secretValue);
+        } catch {
+            return null;
+        }
+    });
+
+    let isSimpleKeyValue = $derived.by(() => {
+        if (
+            !parsedValue ||
+            typeof parsedValue !== "object" ||
+            Array.isArray(parsedValue)
+        )
+            return false;
+        return Object.values(parsedValue).every(
+            (v) =>
+                typeof v === "string" ||
+                typeof v === "number" ||
+                typeof v === "boolean" ||
+                v === null,
+        );
+    });
+
+    let highlightedJson = $derived.by(() => {
+        if (!secretValue) return "";
+        if (parsedValue) {
+            const formatted = JSON.stringify(parsedValue, null, 2);
+            return highlightJson(formatted);
+        }
+        return secretValue;
+    });
 
     $effect(() => {
         if (aws.secretsManager && secretId) {
@@ -67,20 +105,8 @@
             {error}
         </div>{/if}
 
-    <div
-        class="px-6 py-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center shrink-0 {error
-            ? 'mt-8'
-            : ''}"
-    >
-        <div class="flex items-center gap-3">
-            <h2 class="text-sm font-bold text-gray-200">
-                {secretId.split(":").pop() || "Secret Details"}
-            </h2>
-        </div>
-    </div>
-
-    <div class="flex-1 overflow-auto p-6 space-y-6">
-        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+    <div class="flex-1 overflow-auto p-2 space-y-2 flex flex-col min-h-0">
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 shrink-0">
             <h3
                 class="text-[10px] font-bold text-gray-500 uppercase mb-4 tracking-widest border-b border-gray-800 pb-1"
             >
@@ -139,26 +165,74 @@
         </div>
 
         <div
-            class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-sm"
+            class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-sm flex flex-col flex-1 min-h-[300px]"
         >
             <div
-                class="bg-gray-800/50 px-4 py-2 border-b border-gray-700 flex justify-between items-center"
+                class="bg-gray-800/50 px-4 py-0 border-b border-gray-700 flex justify-between items-center"
             >
-                <span
-                    class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"
-                    >Secret Value</span
-                >
+                <div class="flex gap-4">
+                    <button
+                        class="text-[10px] font-bold uppercase tracking-widest py-3 border-b-2 {activeTab ===
+                        'json'
+                            ? 'border-blue-500 text-gray-200'
+                            : 'border-transparent text-gray-500 hover:text-gray-300'}"
+                        onclick={() => (activeTab = "json")}
+                    >
+                        JSON
+                    </button>
+                    <button
+                        class="text-[10px] font-bold uppercase tracking-widest py-3 border-b-2 {activeTab ===
+                        'key-value'
+                            ? 'border-blue-500 text-gray-200'
+                            : 'border-transparent text-gray-500 hover:text-gray-300'}"
+                        onclick={() => (activeTab = "key-value")}
+                    >
+                        Key-value
+                    </button>
+                </div>
                 {#if valueLoading}<span
                         class="text-[10px] text-blue-400 animate-pulse font-bold uppercase"
                         >Loading...</span
                     >{/if}
             </div>
-            <div class="p-4 bg-black overflow-x-auto min-h-[100px]">
+            <div class="bg-black overflow-auto flex-1 p-0">
                 {#if secretValue}
-                    <pre
-                        class="text-xs text-green-400 font-mono whitespace-pre-wrap">{secretValue}</pre>
+                    {#if activeTab === "json"}
+                        <pre
+                            class="text-xs font-mono whitespace-pre-wrap break-all p-4 m-0 hljs">{@html highlightedJson}</pre>
+                    {:else if isSimpleKeyValue}
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr
+                                    class="border-b border-gray-800 text-gray-500 text-[10px] uppercase tracking-widest bg-gray-900/50"
+                                >
+                                    <th class="p-3 font-bold w-1/3">Key</th>
+                                    <th class="p-3 font-bold">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each Object.entries(parsedValue) as [key, val]}
+                                    <tr
+                                        class="border-b border-gray-800/50 hover:bg-gray-800/20"
+                                    >
+                                        <td
+                                            class="p-3 text-xs font-mono text-gray-400 break-all align-top"
+                                            >{key}</td
+                                        >
+                                        <td
+                                            class="p-3 text-xs font-mono text-green-400 break-all align-top whitespace-pre-wrap"
+                                            >{val}</td
+                                        >
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    {:else}
+                        <pre
+                            class="text-xs text-green-400 font-mono whitespace-pre-wrap break-all p-4 m-0">{secretValue}</pre>
+                    {/if}
                 {:else if !valueLoading}
-                    <div class="text-xs text-gray-600 italic">
+                    <div class="text-xs text-gray-600 italic p-4">
                         No secret value available.
                     </div>
                 {/if}

@@ -38,9 +38,9 @@
     "@tauri-apps/plugin-http": "^2.5.7",
     "@tauri-apps/plugin-opener": "^2",
     "chart.js": "^4.4.7",
-    "qrcode": "1.5.4",
-    "highlight.js": "^11.9.0",
+    "highlight.js": "^11.11.1",
     "html5-qrcode": "^2.3.8",
+    "qrcode": "1.5.4",
     "svelte-dnd-action": "^0.9.69"
   },
   "devDependencies": {

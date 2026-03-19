@@ -41,3 +41,11 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #374151;
 }
+
+/* JSON syntax highlighting (highlight.js tokens) */
+.hljs { color: #9ca3af; }
+.hljs-attr { color: #7dd3fc; }
+.hljs-string { color: #86efac; }
+.hljs-number { color: #fdba74; }
+.hljs-literal { color: #c4b5fd; }
+.hljs-punctuation { color: #6b7280; }
