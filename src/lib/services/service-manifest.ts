@@ -61,8 +61,11 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     sqs: {
         label: "SQS",
         tabs: {
-            "": "Queues",
-        }
+            messages: "Messages",
+            metrics: "Metrics",
+        },
+        resourcePrefix: "/queue",
+        contextualTabs: ["messages", "metrics"]
     },
     cloudfront: {
         label: "CloudFront",

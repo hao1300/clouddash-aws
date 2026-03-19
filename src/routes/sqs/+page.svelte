@@ -194,7 +194,7 @@
     }
 
     function handleSelectQueue(item: any) {
-        goto(`/sqs/queue/${item.name}?url=${encodeURIComponent(item.url)}`);
+        goto(`/sqs/queue/${encodeURIComponent(item.name)}/messages?url=${encodeURIComponent(item.url)}`);
     }
 </script>
 

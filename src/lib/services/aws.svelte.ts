@@ -117,7 +117,7 @@ class AwsState {
     sns = $derived(this.#config ? new SNSClient(this.#config) : null);
     iam = $derived(this.#config ? new IAMClient(this.#config) : null);
     secretsManager = $derived(this.#config ? new SecretsManagerClient(this.#config) : null);
-    elasticBeanstalk = $derived(this.#config ? new ElasticBeanstalkClient(this.#config) : null);
+    eb = $derived(this.#config ? new ElasticBeanstalkClient(this.#config) : null);
     cloudFormation = $derived(this.#config ? new CloudFormationClient(this.#config) : null);
     ses = $derived(this.#config ? new SESClient(this.#config) : null);
 

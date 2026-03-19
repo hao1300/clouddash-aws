@@ -128,29 +128,25 @@
         >
             {#snippet actionsSnippet(item)}
                 <div class="flex gap-2 justify-end">
-                    {#if item.state === "stopped"}
-                        <button
-                            onclick={() => handleAction("start", item.id)}
-                            class="text-[10px] bg-green-600/20 hover:bg-green-600/40 text-green-400 px-2 py-1 rounded border border-green-500/30 transition shadow"
-                            >Start</button
-                        >
-                    {:else if item.state === "running"}
-                        <button
-                            onclick={() => handleAction("stop", item.id)}
-                            class="text-[10px] bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 px-2 py-1 rounded border border-yellow-500/30 transition shadow"
-                            >Stop</button
-                        >
-                        <button
-                            onclick={() => handleAction("reboot", item.id)}
-                            class="text-[10px] bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 px-2 py-1 rounded border border-blue-500/30 transition shadow"
-                            >Reboot</button
-                        >
-                    {/if}
-                    <button
-                        onclick={() => handleAction("terminate", item.id)}
-                        class="text-[10px] bg-red-600/20 hover:bg-red-600/40 text-red-400 px-2 py-1 rounded border border-red-500/30 transition shadow"
-                        >Terminate</button
+                    <select
+                        class="bg-gray-800 text-xs px-2 py-1 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 shadow cursor-pointer appearance-none text-center"
+                        onchange={(e) => {
+                            const action = e.currentTarget.value;
+                            if (action) {
+                                handleAction(action as any, item.id);
+                                e.currentTarget.value = "";
+                            }
+                        }}
                     >
+                        <option value="" disabled selected>Actions ▾</option>
+                        {#if item.state === "stopped"}
+                            <option value="start">Start</option>
+                        {:else if item.state === "running"}
+                            <option value="stop">Stop</option>
+                            <option value="reboot">Reboot</option>
+                        {/if}
+                        <option value="terminate">Terminate</option>
+                    </select>
                 </div>
             {/snippet}
         </PaginatedTable>
