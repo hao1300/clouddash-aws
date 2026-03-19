@@ -70,7 +70,6 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     cloudfront: {
         label: "CloudFront",
         tabs: {
-            "": "Distributions",
         }
     },
     stepfunctions: {
