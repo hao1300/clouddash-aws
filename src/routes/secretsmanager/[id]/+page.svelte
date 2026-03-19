@@ -150,13 +150,13 @@
                     <h4
                         class="text-[10px] font-bold text-gray-600 uppercase mb-1"
                     >
-                        Last Accessed Date
+                        Last Accessed Date (UTC)
                     </h4>
                     <span class="text-xs text-gray-300"
                         >{secretDetails?.LastAccessedDate
                             ? new Date(
                                   secretDetails.LastAccessedDate,
-                              ).toLocaleDateString()
+                              ).toLocaleDateString(undefined, { timeZone: "UTC" })
                             : "-"}</span
                     >
                 </div>

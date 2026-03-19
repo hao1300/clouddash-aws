@@ -74,9 +74,9 @@
             },
             { label: "Description", key: "Description" },
             {
-                label: "Last Accessed",
+                label: "Last Accessed (UTC)",
                 key: "LastAccessedDate",
-                format: (v) => (v ? new Date(v).toLocaleDateString() : ""),
+                format: (v) => (v ? new Date(v).toLocaleDateString(undefined, { timeZone: "UTC" }) : ""),
             },
         ]}
     />
