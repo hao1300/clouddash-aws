@@ -10,7 +10,7 @@
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
 
-    let stackId = $derived($page.url.searchParams.get("id") || "");
+    let stackId = $derived($page.params.id || "");
 
     $effect(() => {
         const name = stack?.StackName || stackId.split("/")[1] || stackId;

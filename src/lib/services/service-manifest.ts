@@ -121,13 +121,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     cloudformation: {
         label: "CloudFormation",
         tabs: {
-            "": "Stacks",
-            details: "Details",
-            exports: "Exports",
-            "stack-sets": "StackSets",
-        },
-        resourcePrefix: "id",
-        contextualTabs: ["details"]
+        }
     },
     ses: {
         label: "SES",

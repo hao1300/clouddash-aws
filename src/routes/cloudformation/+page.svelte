@@ -38,7 +38,7 @@
     }
 
     function handleSelectStack(stack: Stack) {
-        goto(`/cloudformation/details?id=${stack.StackName}`);
+        goto(`/cloudformation/${stack.StackName}`);
     }
 </script>
 
