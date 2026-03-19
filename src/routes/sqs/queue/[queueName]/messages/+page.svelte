@@ -9,6 +9,7 @@
     } from "@aws-sdk/client-sqs";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
+    import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
@@ -41,6 +42,18 @@
 
     let viewingMessage = $state<any>(null);
     let showModal = $state(false);
+
+    let displayMessage = $derived.by(() => {
+        if (!viewingMessage) return "";
+        try {
+            return JSON.stringify({
+                ...viewingMessage,
+                body: JSON.parse(viewingMessage.body)
+            });
+        } catch {
+            return JSON.stringify(viewingMessage);
+        }
+    });
 
     let queueArn = $state("");
     let redriveLoading = $state(false);
@@ -279,7 +292,11 @@
                 items={messages}
                 loading={msgLoading}
                 columns={[
-                    { key: "id", label: "Message ID" },
+                    {
+                        key: "id",
+                        label: "Message ID",
+                        onClick: (item) => (viewingMessage = item),
+                    },
                     {
                         key: "body",
                         label: "Body",
@@ -297,11 +314,6 @@
                 {#snippet actionsSnippet(item)}
                     <div class="flex gap-1 justify-end">
                         <button
-                            onclick={() => (viewingMessage = item)}
-                            class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition"
-                            >View</button
-                        >
-                        <button
                             onclick={() => deleteMessage(item.receipt)}
                             class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
                             >Delete</button
@@ -314,12 +326,9 @@
 </div>
 
 <Modal bind:open={showModal} title="Message Details" maxWidth="max-w-4xl">
-    <div class="bg-black/50 p-4 rounded min-h-[40vh] overflow-auto">
-        <pre
-            class="text-xs text-green-400 font-mono whitespace-pre-wrap">{JSON.stringify(
-                viewingMessage,
-                null,
-                2,
-            )}</pre>
+    <div class="bg-black/50 p-4 rounded min-h-[40vh] overflow-auto text-xs">
+        {#if displayMessage}
+            <JsonLogViewer message={displayMessage} />
+        {/if}
     </div>
 </Modal>
