@@ -108,10 +108,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     secretsmanager: {
         label: "Secrets Manager",
         tabs: {
-            details: "Details",
-        },
-        resourcePrefix: "id",
-        contextualTabs: ["details"]
+        }
     },
     elasticbeanstalk: {
         label: "Elastic Beanstalk",

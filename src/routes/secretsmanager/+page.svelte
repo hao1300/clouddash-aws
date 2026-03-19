@@ -6,6 +6,8 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { goto } from "$app/navigation";
+    import { page } from "$app/stores";
+    import { titleService } from "$lib/services/title.svelte";
 
     let secrets = $state<SecretListEntry[]>([]);
     let loading = $state(false);
@@ -14,6 +16,7 @@
     let history = $state<string[]>([]);
 
     $effect(() => {
+        titleService.setResource("", undefined, $page.url.pathname);
         if (aws.secretsManager && secrets.length === 0) {
             loadSecrets();
         }
@@ -38,7 +41,7 @@
     }
 
     function handleSelectSecret(secret: SecretListEntry) {
-        goto(`/secretsmanager/details?id=${secret.Name}`);
+        goto(`/secretsmanager/${encodeURIComponent(secret.Name || "")}`);
     }
 </script>
 
@@ -73,7 +76,7 @@
             {
                 label: "Last Accessed",
                 key: "LastAccessedDate",
-                format: (v) => (v ? new Date(v).toLocaleString() : ""),
+                format: (v) => (v ? new Date(v).toLocaleDateString() : ""),
             },
         ]}
     />

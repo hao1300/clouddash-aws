@@ -9,7 +9,7 @@
     import { titleService } from "$lib/services/title.svelte";
     import { highlightJson } from "$lib/utils/json-highlight";
 
-    let secretId = $derived($page.url.searchParams.get("id") || "");
+    let secretId = $derived($page.params.id || "");
 
     $effect(() => {
         const name = secretId.split(":").pop() || secretId;
@@ -156,7 +156,7 @@
                         >{secretDetails?.LastAccessedDate
                             ? new Date(
                                   secretDetails.LastAccessedDate,
-                              ).toLocaleString()
+                              ).toLocaleDateString()
                             : "-"}</span
                     >
                 </div>
