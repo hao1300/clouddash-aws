@@ -1,16 +1,19 @@
 <script lang="ts">
     import { DescribeInstancesCommand } from "@aws-sdk/client-ec2";
+    import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
+    import MetricChart from "$lib/components/MetricChart.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
 
-    let instanceId = $derived($page.url.searchParams.get("id") || "");
+    let instanceId = $derived($page.params.id || "");
 
     $effect(() => {
-        const name = instance?.name && instance.name !== "Unnamed" 
-            ? `${instance.name} (${instanceId})` 
-            : instanceId;
+        const name =
+            instance?.name && instance.name !== "Unnamed"
+                ? `${instance.name} (${instanceId})`
+                : instanceId;
         titleService.setResource(name, undefined, $page.url.pathname);
     });
 
@@ -18,9 +21,23 @@
     let loading = $state(false);
     let error = $state("");
 
+    let metricsLoading = $state(false);
+    let metricPeriod = $state(86400);
+    let metricsData = $state({
+        cpu: [] as any[],
+        networkIn: [] as any[],
+        networkOut: [] as any[],
+    });
+
     $effect(() => {
         if (aws.ec2 && instanceId) {
             loadInstance();
+        }
+    });
+
+    $effect(() => {
+        if (aws.getCWClient() && instanceId) {
+            loadMetrics();
         }
     });
 
@@ -60,21 +77,66 @@
             loading = false;
         }
     }
+
+    async function loadMetrics() {
+        const cwClient = aws.getCWClient();
+        if (!cwClient || !instanceId) return;
+        try {
+            metricsLoading = true;
+            const end = new Date();
+            const start = new Date(end.getTime() - metricPeriod * 1000);
+            const period =
+                metricPeriod <= 3600 ? 60 : metricPeriod <= 86400 ? 300 : 3600;
+
+            const fetchMetric = async (metricName: string, stat: string) => {
+                const resp = await cwClient.send(
+                    new GetMetricStatisticsCommand({
+                        Namespace: "AWS/EC2",
+                        MetricName: metricName,
+                        Dimensions: [
+                            { Name: "InstanceId", Value: instanceId },
+                        ],
+                        StartTime: start,
+                        EndTime: end,
+                        Period: period,
+                        Statistics: [stat as "Average" | "Sum"],
+                    }),
+                );
+                return (resp.Datapoints || []).map((dp) => ({
+                    rawTimestamp: dp.Timestamp!,
+                    rawAverage: (stat === "Average" ? dp.Average : dp.Sum) || 0,
+                }));
+            };
+
+            const [cpu, networkIn, networkOut] = await Promise.all([
+                fetchMetric("CPUUtilization", "Average"),
+                fetchMetric("NetworkIn", "Sum"),
+                fetchMetric("NetworkOut", "Sum"),
+            ]);
+
+            metricsData = { cpu, networkIn, networkOut };
+        } catch (e) {
+            console.error("Failed to load metrics:", e);
+        } finally {
+            metricsLoading = false;
+        }
+    }
+
+    function formatBytes(b: number) {
+        if (b === 0) return "0 B";
+        const k = 1024;
+        const s = ["B", "KB", "MB", "GB", "TB"];
+        const i = Math.floor(Math.log(b) / Math.log(k));
+        return parseFloat((b / Math.pow(k, i)).toFixed(1)) + " " + s[i];
+    }
 </script>
 
-<div class="h-full flex flex-col bg-gray-950 overflow-auto p-6 relative">
+<div class="h-full flex flex-col bg-gray-950 overflow-auto p-2 relative">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
             {error}
         </div>{/if}
-
-    <div class="flex items-center gap-3 mb-8 shrink-0">
-        <h2 class="text-sm font-bold text-gray-200">
-            {instance?.name}
-            <span class="text-gray-500 font-normal ml-2">{instanceId}</span>
-        </h2>
-    </div>
 
     {#if !instanceId}
         <div
@@ -163,6 +225,50 @@
                         {instance.securityGroups}
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="mt-6 bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6 border-b border-gray-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        CloudWatch Metrics
+                    </h3>
+                    {#if metricsLoading}
+                        <span class="animate-spin text-gray-500 text-xs">⟳</span>
+                    {/if}
+                </div>
+                <select
+                    bind:value={metricPeriod}
+                    onchange={() => loadMetrics()}
+                    class="bg-gray-950 text-xs px-3 py-1.5 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 shadow-inner"
+                >
+                    <option value={3600}>Last 1 hour</option>
+                    <option value={86400}>Last 24 hours</option>
+                    <option value={604800}>Last 7 days</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <MetricChart
+                    title="CPU Utilization (Avg)"
+                    data={metricsData.cpu}
+                    formatValue={(v) => v.toFixed(2) + "%"}
+                    yLabel="%"
+                />
+                <MetricChart
+                    title="Network In (Sum)"
+                    data={metricsData.networkIn}
+                    formatValue={formatBytes}
+                    yLabel="Bytes"
+                />
+                <MetricChart
+                    title="Network Out (Sum)"
+                    data={metricsData.networkOut}
+                    formatValue={formatBytes}
+                    yLabel="Bytes"
+                />
             </div>
         </div>
     {/if}

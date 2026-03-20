@@ -87,7 +87,7 @@
     }
 
     function handleSelectInstance(id: string) {
-        goto(`/ec2/details?id=${id}`);
+        goto(`/ec2/instances/${id}`);
     }
 </script>
 

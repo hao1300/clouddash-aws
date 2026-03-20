@@ -28,8 +28,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     ec2: {
         label: "EC2",
         tabs: {
-            "": "Instances",
-            details: "Details",
+            instances: "Instances",
             amis: "AMIs",
             volumes: "Volumes",
             snapshots: "Snapshots",
@@ -37,8 +36,8 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
             "key-pairs": "Key Pairs",
             "elastic-ips": "Elastic IPs",
         },
-        resourcePrefix: "id",
-        contextualTabs: ["details"]
+        resourcePrefix: "/instances",
+        contextualTabs: []
     },
     s3: {
         label: "S3",
