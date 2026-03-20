@@ -12,8 +12,10 @@
     let marker = $state<string | undefined>(undefined);
     let history = $state<string[]>([]);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.eb && versions.length === 0) {
+        if (aws.eb && !__initLoaded) {
+            __initLoaded = true;
             loadVersions();
         }
     });

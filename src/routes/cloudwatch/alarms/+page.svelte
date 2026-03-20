@@ -19,8 +19,10 @@
     let alarmsTokenMap = $state<string[]>([]);
     let alarmsCurrentToken = $state<string | undefined>(undefined);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.cw && alarms.length === 0) {
+        if (aws.cw && !__initLoaded) {
+            __initLoaded = true;
             loadAlarms();
         }
     });

@@ -10,8 +10,10 @@
     let loading = $state(false);
     let error = $state("");
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.eb && applications.length === 0) {
+        if (aws.eb && !__initLoaded) {
+            __initLoaded = true;
             loadApplications();
         }
     });

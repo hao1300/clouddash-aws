@@ -17,8 +17,10 @@
     let newName = $state("");
     let creating = $state(false);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.ses && configSets.length === 0) {
+        if (aws.ses && !__initLoaded) {
+            __initLoaded = true;
             loadConfigSets();
         }
     });

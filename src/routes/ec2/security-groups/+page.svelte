@@ -19,8 +19,10 @@
     let vpcId = $state("");
     let creating = $state(false);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.ec2 && sgs.length === 0) {
+        if (aws.ec2 && !__initLoaded) {
+            __initLoaded = true;
             loadSgs();
         }
     });

@@ -20,8 +20,10 @@
     let htmlBody = $state("");
     let creating = $state(false);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.ses && templates.length === 0) {
+        if (aws.ses && !__initLoaded) {
+            __initLoaded = true;
             loadTemplates();
         }
     });

@@ -27,8 +27,10 @@
     );
     let sending = $state(false);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.ses && identities.length === 0) {
+        if (aws.ses && !__initLoaded) {
+            __initLoaded = true;
             loadIdentities();
         }
     });

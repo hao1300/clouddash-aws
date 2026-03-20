@@ -15,9 +15,11 @@
     let marker = $state<string | undefined>(undefined);
     let history = $state<string[]>([]);
 
+    let __initLoaded = false;
     $effect(() => {
         titleService.setResource("", undefined, $page.url.pathname);
-        if (aws.secretsManager && secrets.length === 0) {
+        if (aws.secretsManager && !__initLoaded) {
+            __initLoaded = true;
             loadSecrets();
         }
     });

@@ -26,8 +26,10 @@
     let endpoint = $state("");
     let creating = $state(false);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.sns && subs.length === 0) {
+        if (aws.sns && !__initLoaded) {
+            __initLoaded = true;
             loadSubs();
             loadTopics();
         }

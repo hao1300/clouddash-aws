@@ -13,8 +13,10 @@
     let marker = $state<string | undefined>(undefined);
     let history = $state<string[]>([]);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.lambda && functions.length === 0) {
+        if (aws.lambda && !__initLoaded) {
+            __initLoaded = true;
             loadFunctions();
         }
     });

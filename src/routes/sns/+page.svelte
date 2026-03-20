@@ -30,8 +30,10 @@
     let publishBody = $state("");
     let publishing = $state(false);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.sns && topics.length === 0) {
+        if (aws.sns && !__initLoaded) {
+            __initLoaded = true;
             loadTopics();
         }
     });

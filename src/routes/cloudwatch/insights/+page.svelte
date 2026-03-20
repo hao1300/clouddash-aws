@@ -114,8 +114,10 @@
         loadResultsFromSession();
     });
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.cwLogs && logGroups.length === 0 && !lgLoading) {
+        if (aws.cwLogs && !__initLoaded && !lgLoading) {
+            __initLoaded = true;
             loadLogGroups();
             fetchSavedQueries();
         }

@@ -18,8 +18,10 @@
     let description = $state("");
     let creating = $state(false);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.ec2 && snapshots.length === 0) {
+        if (aws.ec2 && !__initLoaded) {
+            __initLoaded = true;
             loadSnapshots();
         }
     });

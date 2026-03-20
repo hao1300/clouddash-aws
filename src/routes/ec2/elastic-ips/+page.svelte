@@ -12,8 +12,10 @@
     let error = $state("");
     let actionMsg = $state("");
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.ec2 && eips.length === 0) {
+        if (aws.ec2 && !__initLoaded) {
+            __initLoaded = true;
             loadEips();
         }
     });

@@ -13,8 +13,10 @@
     let marker = $state<string | undefined>(undefined);
     let history = $state<string[]>([]);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.cloudFormation && stacks.length === 0) {
+        if (aws.cloudFormation && !__initLoaded) {
+            __initLoaded = true;
             loadStacks();
         }
     });

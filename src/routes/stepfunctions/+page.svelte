@@ -13,8 +13,10 @@
     let marker = $state<string | undefined>(undefined);
     let history = $state<string[]>([]);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.sfn && stateMachines.length === 0) {
+        if (aws.sfn && !__initLoaded) {
+            __initLoaded = true;
             loadStateMachines();
         }
     });

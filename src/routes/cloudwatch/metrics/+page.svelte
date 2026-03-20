@@ -10,8 +10,10 @@
     let namespaces = $state<{ name: string }[]>([]);
     let metricsLoading = $state(false);
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.cw && namespaces.length === 0) {
+        if (aws.cw && !__initLoaded) {
+            __initLoaded = true;
             loadNamespaces();
         }
     });

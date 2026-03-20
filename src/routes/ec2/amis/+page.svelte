@@ -11,8 +11,10 @@
     let error = $state("");
     let actionMsg = $state("");
 
+    let __initLoaded = false;
     $effect(() => {
-        if (aws.ec2 && amis.length === 0) {
+        if (aws.ec2 && !__initLoaded) {
+            __initLoaded = true;
             loadAmis();
         }
     });
