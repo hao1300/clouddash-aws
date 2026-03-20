@@ -152,15 +152,16 @@
   $effect(() => {
     titleService.updateFromUrl($page.url.pathname);
     bookmarks.currentUrl = $page.url.pathname + $page.url.search;
-    
+
     if (Object.keys($page.params).length === 0) {
-        const manifest = SERVICE_MANIFEST[activeId];
-        if (manifest && serviceActiveTab !== undefined) {
-             const resourceName = manifest.tabs[serviceActiveTab] ?? manifest.tabs[""];
-             if (resourceName) {
-                 titleService.setResource(resourceName, undefined, $page.url.pathname);
-             }
+      const manifest = SERVICE_MANIFEST[activeId];
+      if (manifest && serviceActiveTab !== undefined) {
+        const resourceName =
+          manifest.tabs[serviceActiveTab] ?? manifest.tabs[""];
+        if (resourceName) {
+          titleService.setResource(resourceName, undefined, $page.url.pathname);
         }
+      }
     }
   });
   let serviceTabs = $derived.by(() => {
@@ -742,10 +743,14 @@
                 if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
                 bookmarks.toggle(label);
               }}
-              class="p-1.5 rounded transition {bookmarks.isBookmarked ? 'text-yellow-400 hover:bg-gray-800' : 'text-gray-400 hover:text-white hover:bg-gray-800'}"
-              title={bookmarks.isBookmarked ? 'Remove Bookmark' : 'Bookmark Page'}
+              class="p-1.5 rounded transition {bookmarks.isBookmarked
+                ? 'text-yellow-400 hover:bg-gray-800'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'}"
+              title={bookmarks.isBookmarked
+                ? "Remove Bookmark"
+                : "Bookmark Page"}
             >
-              <span class="text-xl">{bookmarks.isBookmarked ? '★' : '☆'}</span>
+              <span class="text-xl">{bookmarks.isBookmarked ? "★" : "☆"}</span>
             </button>
           </div>
 
