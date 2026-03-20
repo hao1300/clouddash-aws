@@ -65,9 +65,8 @@ class TitleService {
         }
 
         // Clear resources that don't belong to the current path
-        const basePath = `/${serviceId}${subserviceId ? '/' + subserviceId : ''}`;
         untrack(() => {
-            const filtered = this.resources.filter(r => pathname.startsWith(r.path) || r.path.startsWith(basePath));
+            const filtered = this.resources.filter(r => pathname.startsWith(r.path));
             if (filtered.length !== this.resources.length) {
                 this.resources = filtered;
             }

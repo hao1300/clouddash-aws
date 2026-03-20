@@ -11,6 +11,8 @@ class BookmarksService {
     #bookmarks = $state<Bookmark[]>([]);
     #storageKey = "cw_bookmarks";
 
+    currentUrl = $state("");
+
     constructor() {
         if (typeof window !== "undefined") {
             const stored = localStorage.getItem(this.#storageKey);
@@ -34,15 +36,21 @@ class BookmarksService {
     }
 
     get isBookmarked() {
-        const p = get(page);
-        const currentUrl = p.url.pathname + p.url.search;
-        return !!this.#bookmarks.find((b) => b.url === currentUrl);
+        let urlTarget = this.currentUrl;
+        if (!urlTarget) {
+            const p = get(page);
+            urlTarget = p.url.pathname + p.url.search;
+        }
+        return !!this.#bookmarks.find((b) => b.url === urlTarget);
     }
 
     toggle(label?: string) {
-        const p = get(page);
-        const currentUrl = p.url.pathname + p.url.search;
-        const existingIndex = this.#bookmarks.findIndex((b) => b.url === currentUrl);
+        let urlTarget = this.currentUrl;
+        if (!urlTarget) {
+            const p = get(page);
+            urlTarget = p.url.pathname + p.url.search;
+        }
+        const existingIndex = this.#bookmarks.findIndex((b) => b.url === urlTarget);
 
         if (existingIndex >= 0) {
             this.#bookmarks = this.#bookmarks.filter((_, i) => i !== existingIndex);
@@ -51,8 +59,8 @@ class BookmarksService {
                 ...this.#bookmarks,
                 {
                     id: crypto.randomUUID(),
-                    url: currentUrl,
-                    label: label || currentUrl,
+                    url: urlTarget,
+                    label: label || urlTarget,
                 },
             ];
         }

@@ -111,7 +111,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     elasticbeanstalk: {
         label: "Elastic Beanstalk",
         tabs: {
-            "": "Environments",
+            environment: "Environments",
             application: "Application",
             versions: "Application Versions",
         }
