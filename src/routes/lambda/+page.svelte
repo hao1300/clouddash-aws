@@ -40,7 +40,7 @@
     }
 
     function handleSelectFn(fn: FunctionConfiguration) {
-        goto(`/lambda/details?id=${fn.FunctionName}`);
+        goto(`/lambda/function/${fn.FunctionName}`);
     }
 </script>
 

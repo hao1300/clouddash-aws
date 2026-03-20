@@ -11,7 +11,7 @@
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
 
-    let fnName = $derived($page.url.searchParams.get("id") || "");
+    let fnName = $derived($page.params.id || "");
 
     $effect(() => {
         titleService.setResource(fnName, undefined, $page.url.pathname);
@@ -164,23 +164,7 @@
             {actionMsg}
         </div>{/if}
 
-    <div
-        class="px-6 py-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center shrink-0 {error ||
-        actionMsg
-            ? 'mt-8'
-            : ''}"
-    >
-        <div class="flex items-center gap-3">
-            <h2 class="text-sm font-bold text-gray-200">{fnName}</h2>
-        </div>
-        <button
-            onclick={handleDelete}
-            class="text-xs bg-red-600/20 hover:bg-red-600/40 text-red-400 px-3 py-1.5 rounded transition border border-red-500/30"
-            >Delete</button
-        >
-    </div>
-
-    <div class="px-6 border-b border-gray-800 bg-gray-900 shrink-0">
+    <div class="px-6 border-b border-gray-800 bg-gray-900 shrink-0 {error || actionMsg ? 'mt-8' : ''}">
         <nav class="flex gap-4">
             <button
                 onclick={() => (detailTab = "invoke")}
@@ -330,17 +314,24 @@
                         </div>
                     </div>
                     {#if isEditingConfig}
-                        <div class="mt-4 flex justify-end gap-2">
+                        <div class="mt-4 flex justify-between gap-2">
                             <button
-                                onclick={() => (isEditingConfig = false)}
-                                class="text-xs text-gray-500 hover:text-gray-300 px-3 py-1.5"
-                                >Cancel</button
+                                onclick={handleDelete}
+                                class="text-xs bg-red-600/20 hover:bg-red-600/40 text-red-400 px-3 py-1.5 rounded transition border border-red-500/30"
+                                >Delete this function</button
                             >
-                            <button
-                                onclick={handleSaveConfig}
-                                class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow"
-                                >Save</button
-                            >
+                            <div class="flex justify-end gap-2">
+                                <button
+                                    onclick={() => (isEditingConfig = false)}
+                                    class="text-xs text-gray-500 hover:text-gray-300 px-3 py-1.5"
+                                    >Cancel</button
+                                >
+                                <button
+                                    onclick={handleSaveConfig}
+                                    class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow"
+                                    >Save</button
+                                >
+                            </div>
                         </div>
                     {/if}
                 </div>
