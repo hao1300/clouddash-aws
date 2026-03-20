@@ -7,6 +7,7 @@
         type ExecutionListItem,
     } from "@aws-sdk/client-sfn";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
+    import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
@@ -135,25 +136,7 @@
             {actionMsg}
         </div>{/if}
 
-    <div
-        class="px-6 py-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center shrink-0 {error ||
-        actionMsg
-            ? 'mt-8'
-            : ''}"
-    >
-        <div class="flex items-center gap-3">
-            <h2 class="text-sm font-bold text-gray-200">
-                {smDetails?.name || "Loading..."}
-            </h2>
-        </div>
-        <button
-            onclick={handleDelete}
-            class="text-xs bg-red-600/20 hover:bg-red-600/40 text-red-400 px-3 py-1.5 rounded transition border border-red-500/30"
-            >Delete</button
-        >
-    </div>
-
-    <div class="px-6 border-b border-gray-800 bg-gray-900 shrink-0">
+    <div class="px-6 border-b border-gray-800 bg-gray-900 shrink-0 flex justify-between items-center {error || actionMsg ? 'mt-8' : ''}">
         <nav class="flex gap-4">
             <button
                 onclick={() => (detailTab = "executions")}
@@ -178,6 +161,10 @@
                     : 'border-transparent text-gray-400'}">Definition</button
             >
         </nav>
+        <button
+            onclick={handleDelete}
+            class="text-xs bg-red-600/20 hover:bg-red-600/40 text-red-400 px-3 py-1.5 rounded transition border border-red-500/30"
+        >Delete</button>
     </div>
 
     <div class="flex-1 overflow-auto p-6 min-h-0 relative">
@@ -261,14 +248,14 @@
             </div>
         {:else if detailTab === "definition"}
             <div class="bg-gray-900 p-5 rounded-lg border border-gray-800">
-                <pre
-                    class="text-xs text-green-400 font-mono whitespace-pre-wrap">{smDetails?.definition
-                        ? JSON.stringify(
-                              JSON.parse(smDetails.definition),
-                              null,
-                              2,
-                          )
-                        : "Loading..."}</pre>
+                {#if smDetails?.definition}
+                    <JsonLogViewer
+                        message={smDetails.definition}
+                        class="text-xs text-green-400"
+                    />
+                {:else}
+                    <div class="text-xs text-green-400 font-mono">Loading...</div>
+                {/if}
             </div>
         {/if}
     </div>

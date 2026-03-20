@@ -75,7 +75,6 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     stepfunctions: {
         label: "Step Functions",
         tabs: {
-            "": "State Machines",
         }
     },
     lambda: {

@@ -7,9 +7,11 @@
         type HistoryEvent,
     } from "@aws-sdk/client-sfn";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
+    import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
+    import { titleService } from "$lib/services/title.svelte";
 
     let execArn = $derived($page.url.searchParams.get("id") || "");
 
@@ -28,6 +30,36 @@
             loadDetails();
             loadHistory();
         }
+    });
+
+    $effect(() => {
+        const parts = execArn.split(":");
+        const isExecution = parts.length >= 8 && parts[5] === "execution";
+
+        let machineName = "Unknown Machine";
+        let executionName = "Unknown Execution";
+
+        if (details) {
+            machineName =
+                details.stateMachineArn?.split(":").pop() || machineName;
+            executionName = details.name || executionName;
+        } else if (isExecution) {
+            machineName = parts[6];
+            executionName = parts[7];
+        }
+
+        const machineHref = details?.stateMachineArn
+            ? `/stepfunctions/details?id=${details.stateMachineArn}`
+            : undefined;
+
+        titleService.setResources([
+            {
+                name: machineName,
+                href: machineHref,
+                path: "/stepfunctions/details",
+            },
+            { name: executionName, path: $page.url.pathname },
+        ]);
     });
 
     async function loadDetails() {
@@ -108,36 +140,28 @@
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
             {error}
-        </div>{/if}
+        </div>
+    {/if}
 
-    <div
-        class="px-6 py-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center shrink-0 {error
-            ? 'mt-8'
-            : ''}"
-    >
-        <div class="flex items-center gap-3">
-            <h2 class="text-sm font-bold text-gray-200">Execution Detail</h2>
-        </div>
-        <div class="flex gap-2">
-            {#if ["FAILED", "TIMED_OUT", "ABORTED"].includes(details?.status)}
-                <button
-                    onclick={handleRedrive}
-                    disabled={isRedriving}
-                    class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
-                >
-                    {#if isRedriving}<span class="animate-spin">⟳</span>{/if} Redrive
-                </button>
-            {/if}
-            {#if details?.status === "RUNNING"}
-                <button
-                    onclick={handleStop}
-                    disabled={isStopping}
-                    class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
-                >
-                    {#if isStopping}<span class="animate-spin">⟳</span>{/if} Stop
-                </button>
-            {/if}
-        </div>
+    <div class="flex gap-2">
+        {#if ["FAILED", "TIMED_OUT", "ABORTED"].includes(details?.status)}
+            <button
+                onclick={handleRedrive}
+                disabled={isRedriving}
+                class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
+            >
+                {#if isRedriving}<span class="animate-spin">⟳</span>{/if} Redrive
+            </button>
+        {/if}
+        {#if details?.status === "RUNNING"}
+            <button
+                onclick={handleStop}
+                disabled={isStopping}
+                class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
+            >
+                {#if isStopping}<span class="animate-spin">⟳</span>{/if} Stop
+            </button>
+        {/if}
     </div>
 
     <div class="flex-1 overflow-auto p-6 space-y-6">
@@ -150,9 +174,14 @@
                 >
                     Input
                 </h3>
-                <pre
-                    class="bg-black p-3 rounded text-[11px] text-gray-300 font-mono overflow-auto max-h-48 border border-gray-800/50">{details?.input ||
-                        "None"}</pre>
+                <div
+                    class="bg-black p-3 rounded text-[11px] overflow-auto max-h-48 border border-gray-800/50"
+                >
+                    <JsonLogViewer
+                        message={details?.input || "None"}
+                        class="text-gray-300"
+                    />
+                </div>
             </div>
             <div>
                 <h3
@@ -160,9 +189,14 @@
                 >
                     Output
                 </h3>
-                <pre
-                    class="bg-black p-3 rounded text-[11px] text-green-400 font-mono overflow-auto max-h-48 border border-gray-800/50">{details?.output ||
-                        "None"}</pre>
+                <div
+                    class="bg-black p-3 rounded text-[11px] overflow-auto max-h-48 border border-gray-800/50"
+                >
+                    <JsonLogViewer
+                        message={details?.output || "None"}
+                        class="text-green-400"
+                    />
+                </div>
             </div>
         </div>
 
