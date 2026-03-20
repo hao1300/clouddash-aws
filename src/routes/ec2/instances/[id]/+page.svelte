@@ -8,6 +8,7 @@
     } from "@aws-sdk/client-ec2";
     import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
     import MetricChart from "$lib/components/MetricChart.svelte";
+    import CopyButton from "$lib/components/CopyButton.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
@@ -64,6 +65,7 @@
                     state: inst.State?.Name ?? "unknown",
                     type: inst.InstanceType,
                     publicIp: inst.PublicIpAddress ?? "-",
+                    publicDns: inst.PublicDnsName || "-",
                     privateIp: inst.PrivateIpAddress ?? "-",
                     vpcId: inst.VpcId ?? "-",
                     subnetId: inst.SubnetId ?? "-",
@@ -249,6 +251,19 @@
                     Configuration
                 </h3>
                 <div class="space-y-4">
+                    <div
+                        class="flex justify-between items-center text-xs border-b border-gray-800/30 pb-2 gap-4"
+                    >
+                        <span class="text-gray-500 shrink-0">Public DNS</span>
+                        <div class="flex items-center gap-2 overflow-hidden justify-end">
+                            <span class="text-blue-400 font-mono truncate" title={instance.publicDns}
+                                >{instance.publicDns}</span
+                            >
+                            {#if instance.publicDns !== "-"}
+                                <CopyButton text={instance.publicDns} class="shrink-0 text-[10px]" />
+                            {/if}
+                        </div>
+                    </div>
                     <div
                         class="flex justify-between text-xs border-b border-gray-800/30 pb-2"
                     >
