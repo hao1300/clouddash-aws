@@ -5,6 +5,7 @@
     } from "@aws-sdk/client-elastic-beanstalk";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { goto } from "$app/navigation";
 
     let applications = $state<ApplicationDescription[]>([]);
     let loading = $state(false);
@@ -49,7 +50,11 @@
         hasNext={false}
         hasPrev={false}
         columns={[
-            { label: "Application Name", key: "ApplicationName" },
+            {
+                label: "Application Name",
+                key: "ApplicationName",
+                onClick: (item) => goto(`/elasticbeanstalk/application/${encodeURIComponent(item.ApplicationName)}`),
+            },
             { label: "Description", key: "Description" },
             {
                 label: "Date Created",

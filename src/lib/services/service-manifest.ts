@@ -112,7 +112,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
         label: "Elastic Beanstalk",
         tabs: {
             "": "Environments",
-            applications: "Applications",
+            application: "Application",
             versions: "Application Versions",
         }
     },

@@ -5,6 +5,7 @@
     } from "@aws-sdk/client-elastic-beanstalk";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { goto } from "$app/navigation";
 
     let environments = $state<EnvironmentDescription[]>([]);
     let loading = $state(false);
@@ -61,8 +62,22 @@
             loadEnvironments(history[history.length - 1]);
         }}
         columns={[
-            { label: "Environment Name", key: "EnvironmentName" },
-            { label: "Application", key: "ApplicationName" },
+            {
+                label: "Environment Name",
+                key: "EnvironmentName",
+                onClick: (item) =>
+                    goto(
+                        `/elasticbeanstalk/environment/${encodeURIComponent(item.EnvironmentId || item.EnvironmentName)}`,
+                    ),
+            },
+            {
+                label: "Application",
+                key: "ApplicationName",
+                onClick: (item) =>
+                    goto(
+                        `/elasticbeanstalk/application/${encodeURIComponent(item.ApplicationName)}`,
+                    ),
+            },
             {
                 label: "Status",
                 key: "Status",
