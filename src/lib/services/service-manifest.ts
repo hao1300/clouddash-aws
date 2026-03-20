@@ -80,11 +80,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     lambda: {
         label: "Lambda",
         tabs: {
-            "": "Functions",
-            details: "Details",
-        },
-        resourcePrefix: "id",
-        contextualTabs: ["details"]
+        }
     },
     sns: {
         label: "SNS",

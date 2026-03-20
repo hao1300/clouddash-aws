@@ -1,6 +1,7 @@
 <script lang="ts">
     import {
         DescribeExecutionCommand,
+        DescribeStateMachineCommand,
         GetExecutionHistoryCommand,
         RedriveExecutionCommand,
         StopExecutionCommand,
@@ -8,6 +9,7 @@
     } from "@aws-sdk/client-sfn";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
+    import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
@@ -18,12 +20,17 @@
     let loading = $state(false);
     let error = $state("");
     let details = $state<any>(null);
+    let smDetails = $state<any>(null);
+    let logGroupName = $state<string | null>(null);
     let historyEvents = $state<HistoryEvent[]>([]);
     let historyMarker = $state<string | undefined>(undefined);
     let historyTokens = $state<string[]>([]);
 
     let isStopping = $state(false);
     let isRedriving = $state(false);
+    
+    let eventModalOpen = $state(false);
+    let selectedEvent = $state<HistoryEvent | null>(null);
 
     $effect(() => {
         if (aws.sfn && execArn) {
@@ -69,6 +76,25 @@
                 new DescribeExecutionCommand({ executionArn: execArn }),
             );
             details = res;
+
+            if (res.stateMachineArn) {
+                const sm = await aws.sfn.send(
+                    new DescribeStateMachineCommand({
+                        stateMachineArn: res.stateMachineArn,
+                    }),
+                );
+                smDetails = sm;
+
+                const logDest =
+                    sm.loggingConfiguration?.destinations?.[0]
+                        ?.cloudWatchLogsLogGroup?.logGroupArn;
+                if (logDest) {
+                    const parts = logDest.split(":log-group:");
+                    if (parts.length > 1) {
+                        logGroupName = parts[1].replace(/:\*$/, "");
+                    }
+                }
+            }
         } catch (e: any) {
             error = e.message || String(e);
         }
@@ -144,6 +170,15 @@
     {/if}
 
     <div class="flex gap-2">
+        {#if logGroupName}
+            <a
+                href={`/cloudwatch/logs?group=${encodeURIComponent(logGroupName)}`}
+                class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-3 py-1.5 rounded text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
+                title="View CloudWatch Logs"
+            >
+                ▤ Logs
+            </a>
+        {/if}
         {#if ["FAILED", "TIMED_OUT", "ABORTED"].includes(details?.status)}
             <button
                 onclick={handleRedrive}
@@ -164,7 +199,7 @@
         {/if}
     </div>
 
-    <div class="flex-1 overflow-auto p-6 space-y-6">
+    <div class="flex-1 overflow-auto p-2 space-y-2">
         <div
             class="bg-gray-900 border border-gray-800 rounded-lg p-5 grid grid-cols-1 md:grid-cols-2 gap-6 shadow-sm"
         >
@@ -203,9 +238,6 @@
         <div
             class="flex-1 bg-gray-900 border border-gray-800 rounded-lg flex flex-col overflow-hidden min-h-[300px] shadow-sm"
         >
-            <div class="px-4 py-3 border-b border-gray-800 bg-gray-900/50">
-                <h3 class="text-xs font-bold text-gray-300">Event History</h3>
-            </div>
             <div class="flex-1 relative">
                 <PaginatedTable
                     items={historyEvents}
@@ -223,7 +255,14 @@
                     }}
                     columns={[
                         { label: "ID", key: "id" },
-                        { label: "Type", key: "type" },
+                        { 
+                            label: "Type", 
+                            key: "type",
+                            onClick: (item) => {
+                                selectedEvent = item;
+                                eventModalOpen = true;
+                            }
+                        },
                         {
                             label: "Timestamp",
                             key: "timestamp",
@@ -236,3 +275,11 @@
         </div>
     </div>
 </div>
+
+<Modal bind:open={eventModalOpen} title={`Event Detail: ${selectedEvent?.type || ""}`} maxWidth="max-w-4xl">
+    <div class="bg-black border border-gray-800 rounded-lg p-4 max-h-[75vh] min-h-[30vh] overflow-auto shadow-inner">
+        {#if selectedEvent}
+            <JsonLogViewer message={JSON.stringify(selectedEvent, null, 2)} class="text-[11px] text-green-400" />
+        {/if}
+    </div>
+</Modal>
