@@ -124,9 +124,6 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     ses: {
         label: "SES",
         tabs: {
-            "": "Identities",
-            "configuration-sets": "Configuration Sets",
-            templates: "Templates",
         }
     }
 };
