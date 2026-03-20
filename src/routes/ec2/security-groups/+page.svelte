@@ -7,6 +7,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { goto } from "$app/navigation";
 
     let sgs = $state<any[]>([]);
     let loading = $state(false);
@@ -102,7 +103,11 @@
         {loading}
         onRefresh={loadSgs}
         columns={[
-            { label: "Name", key: "name" },
+            {
+                label: "Name",
+                key: "name",
+                onClick: (item) => goto(`/ec2/security-groups/${item.id}`),
+            },
             { label: "Security Group ID", key: "id" },
             { label: "Description", key: "description" },
             { label: "VPC ID", key: "vpc" },
