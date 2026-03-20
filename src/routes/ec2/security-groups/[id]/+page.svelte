@@ -18,7 +18,7 @@
         const name =
             sg?.name && sg.name !== "Unnamed"
                 ? `${sg.name} (${sgId})`
-                : sgId;
+                : (sgId || "Security Group");
         titleService.setResource(name, undefined, $page.url.pathname);
     });
 
@@ -323,8 +323,9 @@
 <Modal bind:open={showAddModal} title={isIngress ? "Add Inbound Rule" : "Add Outbound Rule"}>
     <div class="space-y-4 p-4 text-gray-300">
         <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Protocol</label>
+            <label for="rule-protocol" class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Protocol</label>
             <select
+                id="rule-protocol"
                 bind:value={formProtocol}
                 class="w-full bg-black border border-gray-700 rounded p-2 text-xs text-white uppercase tracking-wider focus:border-blue-500 focus:outline-none"
             >
@@ -336,8 +337,9 @@
         </div>
         {#if formProtocol !== "-1"}
             <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Port Range</label>
+                <label for="rule-port" class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Port Range</label>
                 <input
+                    id="rule-port"
                     type="text"
                     bind:value={formPortRange}
                     placeholder="e.g. 80, or 80-8080"
@@ -346,8 +348,9 @@
             </div>
         {/if}
         <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">{isIngress ? "Source" : "Destination"}</label>
+            <label for="rule-source" class="block text-[10px] font-bold text-gray-500 uppercase mb-1">{isIngress ? "Source" : "Destination"}</label>
             <input
+                id="rule-source"
                 type="text"
                 bind:value={formSourceDest}
                 placeholder="CIDR (0.0.0.0/0) or SG ID (sg-1234)"
@@ -355,8 +358,9 @@
             />
         </div>
         <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Description (Optional)</label>
+            <label for="rule-desc" class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Description (Optional)</label>
             <input
+                id="rule-desc"
                 type="text"
                 bind:value={formDescription}
                 placeholder="Rule description"

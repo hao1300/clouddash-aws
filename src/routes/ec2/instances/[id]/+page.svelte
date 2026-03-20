@@ -72,10 +72,10 @@
                     arch: inst.Architecture ?? "-",
                     platform: inst.PlatformDetails ?? "-",
                     monitoring: inst.Monitoring?.State ?? "-",
-                    securityGroups:
-                        inst.SecurityGroups?.map((sg) => sg.GroupName).join(
-                            ", ",
-                        ) ?? "-",
+                    securityGroups: inst.SecurityGroups?.map((sg) => ({
+                        id: sg.GroupId || "",
+                        name: sg.GroupName || "Unnamed",
+                    })) ?? [],
                 };
             }
         } catch (e: any) {
@@ -284,15 +284,25 @@
                 </h3>
                 <div class="space-y-4">
                     <div
-                        class="text-[10px] font-bold text-gray-600 uppercase mb-1"
+                        class="text-[10px] font-bold text-gray-600 uppercase mb-2"
                     >
                         Security Groups
                     </div>
-                    <div
-                        class="text-xs text-blue-400 font-medium bg-blue-400/5 p-3 rounded border border-blue-400/10"
-                    >
-                        {instance.securityGroups}
-                    </div>
+                    {#if instance.securityGroups && instance.securityGroups.length > 0}
+                        <div class="flex flex-wrap gap-2">
+                            {#each instance.securityGroups as sg}
+                                <a
+                                    href={`/ec2/security-groups/${sg.id}`}
+                                    class="text-xs text-blue-400 font-medium bg-blue-400/5 px-3 py-1.5 rounded border border-blue-400/10 hover:bg-blue-400/20 hover:border-blue-400/40 transition-colors block"
+                                    title={sg.id}
+                                >
+                                    {sg.name}
+                                </a>
+                            {/each}
+                        </div>
+                    {:else}
+                        <div class="text-xs text-gray-500">-</div>
+                    {/if}
                 </div>
             </div>
         </div>
