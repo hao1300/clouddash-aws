@@ -45,7 +45,7 @@
     $effect(() => {
         if (namespace && metricName) {
             titleService.setResource(
-                namespace,
+                metricName,
                 `/cloudwatch/metrics/${encodeURIComponent(namespace)}`,
                 $page.url.pathname,
             );
@@ -103,7 +103,7 @@
     }
 </script>
 
-<DetailLayout title={metricName} {error}>
+<DetailLayout title="" {error}>
     {#snippet mainSnippet()}
         <div class="flex flex-col gap-6">
             <!-- Namespace and Dimensions Header -->
