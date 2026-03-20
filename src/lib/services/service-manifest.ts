@@ -91,7 +91,6 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
         label: "SNS",
         tabs: {
             "": "Topics",
-            "platform-apps": "Platform Applications",
             subscriptions: "Subscriptions",
         }
     },
