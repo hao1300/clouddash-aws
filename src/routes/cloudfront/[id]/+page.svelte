@@ -88,7 +88,7 @@
                         StartTime: start,
                         EndTime: end,
                         Period: period,
-                        Statistics: [stat],
+                        Statistics: [stat as "Average" | "Sum"],
                     }),
                 );
                 return (resp.Datapoints || []).map((dp) => ({
@@ -227,11 +227,16 @@
             <div
                 class="flex items-center justify-between mb-4 border-b border-gray-800 pb-3"
             >
-                <h3
-                    class="text-xs text-gray-400 uppercase tracking-widest font-bold"
-                >
-                    Metrics Dashboard
-                </h3>
+                <div class="flex items-center gap-2">
+                    <h3
+                        class="text-xs text-gray-400 uppercase tracking-widest font-bold"
+                    >
+                        Metrics Dashboard
+                    </h3>
+                    {#if metricsLoading}
+                        <span class="animate-spin text-gray-500 text-xs">⟳</span>
+                    {/if}
+                </div>
                 <select
                     bind:value={metricPeriod}
                     onchange={() => loadMetrics()}
@@ -247,28 +252,24 @@
                 <MetricChart
                     title="Requests (Sum)"
                     data={metricsData.requests}
-                    loading={metricsLoading}
                     formatValue={(v) => v.toLocaleString()}
                     yLabel="Requests"
                 />
                 <MetricChart
                     title="Bytes Downloaded (Sum)"
                     data={metricsData.bytesDownloaded}
-                    loading={metricsLoading}
                     formatValue={formatBytes}
                     yLabel="Bytes"
                 />
                 <MetricChart
                     title="4xx Error Rate (Avg)"
                     data={metricsData.errorRate4xx}
-                    loading={metricsLoading}
                     formatValue={(v) => v.toFixed(2) + "%"}
                     yLabel="%"
                 />
                 <MetricChart
                     title="5xx Error Rate (Avg)"
                     data={metricsData.errorRate5xx}
-                    loading={metricsLoading}
                     formatValue={(v) => v.toFixed(2) + "%"}
                     yLabel="%"
                 />
