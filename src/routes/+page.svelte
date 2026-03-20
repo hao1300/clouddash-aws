@@ -3,5 +3,5 @@
 </script>
 
 <div class="h-full flex items-center justify-center text-gray-500">
-  <div class="animate-pulse">Loading AWS Console...</div>
+  <div class="animate-pulse">Loading CloudDash for AWS...</div>
 </div>

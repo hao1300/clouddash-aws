@@ -4,10 +4,10 @@ const file = 'c:\\CS\\aws-console\\src\\routes\\+layout.svelte';
 let content = fs.readFileSync(file, 'utf8');
 
 content = content.replace(
-`  let dropdownOpen = $state(false);
+  `  let dropdownOpen = $state(false);
   let sideMenuOpen = $state(false);
   let searchQuery = $state("");`,
-`  let dropdownOpen = $state(false);
+  `  let dropdownOpen = $state(false);
   let sideMenuOpen = $state(typeof window !== "undefined" ? window.innerWidth >= 640 : true);
   let rightSidebarOpen = $state(false);
   let searchQuery = $state("");`
@@ -17,7 +17,7 @@ const elseMatch = content.match(/\{\:else\}/);
 const lastIfMatch = content.match(/\{\/if\}\s*<\/main>/);
 
 if (!elseMatch || !lastIfMatch) {
-    throw new Error("Could not find boundaries");
+  throw new Error("Could not find boundaries");
 }
 
 const beforeElse = content.slice(0, elseMatch.index + 7);
@@ -42,7 +42,7 @@ const newContent = `    <div class="flex h-full w-full overflow-hidden">
           >
             <div class="flex items-center gap-2">
               <span class="text-blue-500 text-xl">☁</span>
-              <span class="font-bold text-gray-100">AWS Console</span>
+              <span class="font-bold text-gray-100">CloudDash for AWS</span>
             </div>
             <button
               onclick={() => (sideMenuOpen = false)}
@@ -262,7 +262,7 @@ const newContent = `    <div class="flex h-full w-full overflow-hidden">
           <BackButton />
           
           <span class="text-sm font-bold truncate flex-1 text-white"
-            >{serviceTitle || "AWS Console"}</span
+            >{serviceTitle || "CloudDash for AWS"}</span
           >
           
           <button

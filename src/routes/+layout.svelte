@@ -146,7 +146,7 @@
   // To highlight active tab on top
   let activeId = $derived($page.url.pathname.split("/")[1] || "");
   let serviceTitle = $derived(
-    titleService.parts.map((p) => p.label).join(" > ") || "AWS Console",
+    titleService.parts.map((p) => p.label).join(" > ") || "CloudDash for AWS",
   );
 
   $effect(() => {
@@ -340,15 +340,42 @@
       loading = true;
       error = "";
 
+      if (authType === "manual") {
+        if (!saveProfileName.trim()) {
+          throw "Profile Name is required.";
+        }
+        if (!accessKeyId.trim() || !secretAccessKey.trim()) {
+          throw "Access Key ID and Secret Access Key are required.";
+        }
+        await invoke("save_profile", {
+          name: saveProfileName.trim(),
+          accessKey: accessKeyId.trim(),
+          secretKey: secretAccessKey.trim(),
+          sessionToken: sessionToken.trim() || null,
+          region: region || null,
+        });
+
+        selectedProfile = saveProfileName.trim();
+        authType = "profile";
+
+        try {
+          allProfiles = await invoke("list_profiles");
+        } catch {
+          allProfiles = [selectedProfile];
+        }
+
+        if (!profileOrder.includes(selectedProfile)) {
+          profileOrder = [...profileOrder, selectedProfile];
+        }
+        profileVisible.add(selectedProfile);
+        profileVisible = profileVisible; // Force reactivity
+      }
+
       await invoke("authenticate", {
         payload: {
           auth_type: authType,
           profile: authType === "profile" ? selectedProfile : undefined,
           region,
-          access_key_id: authType === "manual" ? accessKeyId : undefined,
-          secret_access_key:
-            authType === "manual" ? secretAccessKey : undefined,
-          session_token: authType === "manual" ? sessionToken : undefined,
         },
       });
 
@@ -403,7 +430,6 @@
       bind:accessKeyId
       bind:secretAccessKey
       bind:sessionToken
-      bind:saveProfileChecked
       bind:saveProfileName
       bind:region
       visibleProfiles={allProfiles
@@ -648,6 +674,12 @@
                   <select
                     bind:value={selectedProfile}
                     onchange={() => {
+                      if (selectedProfile === "__add_profile__") {
+                        selectedProfile = visibleProfiles[0] || "default";
+                        isAuthenticated = false;
+                        if (window.innerWidth < 640) sideMenuOpen = false;
+                        return;
+                      }
                       login();
                       if (window.innerWidth < 640) sideMenuOpen = false;
                     }}
@@ -655,6 +687,10 @@
                   >
                     {#each visibleProfiles as p}<option value={p}>{p}</option
                       >{/each}
+                    <option
+                      value="__add_profile__"
+                      class="font-bold text-green-400">+ Add Profile...</option
+                    >
                   </select>
                 {:else}
                   <div
@@ -766,7 +802,7 @@
             class="flex items-center gap-1.5 text-sm font-bold truncate flex-1 text-white min-w-0"
           >
             {#if titleService.parts.length === 0}
-              <span>AWS Console</span>
+              <span>CloudDash for AWS</span>
             {:else}
               {#each titleService.parts as part, i}
                 {#if i > 0}

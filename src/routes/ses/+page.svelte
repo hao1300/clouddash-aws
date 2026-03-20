@@ -23,7 +23,7 @@
     let testTo = $state("");
     let testSubject = $state("SES Test Email");
     let testBody = $state(
-        "This is a test email sent from the AWS Console application.",
+        "This is a test email sent from the CloudDash for AWS application.",
     );
     let sending = $state(false);
 

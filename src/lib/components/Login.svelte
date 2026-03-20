@@ -7,7 +7,6 @@
         accessKeyId = $bindable(""),
         secretAccessKey = $bindable(""),
         sessionToken = $bindable(""),
-        saveProfileChecked = $bindable(false),
         saveProfileName = $bindable(""),
         region = $bindable("us-east-1"),
         visibleProfiles = [],
@@ -22,7 +21,6 @@
         accessKeyId: string;
         secretAccessKey: string;
         sessionToken: string;
-        saveProfileChecked: boolean;
         saveProfileName: string;
         region: string;
         visibleProfiles: string[];
@@ -71,7 +69,6 @@
                     scanner.clear().catch(console.error);
                     scanner = null;
                 }
-                onLogin();
             }
         } catch (e) {
             console.error("Failed to parse QR code", e);
@@ -81,13 +78,35 @@
     function onScanFailure(error: any) {
         // ignore scan failures
     }
+
+    let isConnectDisabled = $derived.by(() => {
+        if (loading) return true;
+
+        if (authType === "profile") {
+            return !selectedProfile || selectedProfile.trim() === "";
+        }
+
+        if (authType === "manual") {
+            return (
+                !accessKeyId.trim() ||
+                !secretAccessKey.trim() ||
+                !saveProfileName.trim()
+            );
+        }
+
+        if (authType === "qr") {
+            return true; // Must scan to switch authType
+        }
+
+        return false;
+    });
 </script>
 
 <div class="flex items-center justify-center flex-1 p-4">
     <div
         class="w-full max-w-sm bg-gray-900 p-6 rounded-xl shadow-2xl border border-gray-800"
     >
-        <h1 class="text-xl font-bold mb-4 text-blue-400">AWS Console</h1>
+        <h1 class="text-xl font-bold mb-4 text-blue-400">CloudDash for AWS</h1>
         {#if error}
             <div class="bg-red-500/20 text-red-300 p-2 rounded mb-3 text-xs">
                 {error}
@@ -174,27 +193,19 @@
                         class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
                     />
                 </div>
-                <div>
+                <div class="mt-2">
                     <label
-                        class="flex items-center gap-2 cursor-pointer mt-2 mb-1"
+                        for="profileNameInput"
+                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                        >Profile Name</label
                     >
-                        <input
-                            type="checkbox"
-                            bind:checked={saveProfileChecked}
-                            class="accent-blue-500 rounded bg-gray-900 border-gray-700"
-                        />
-                        <span class="text-xs text-gray-300"
-                            >Save as Profile in ~/.aws</span
-                        >
-                    </label>
-                    {#if saveProfileChecked}
-                        <input
-                            type="text"
-                            bind:value={saveProfileName}
-                            placeholder="Profile name (e.g. prod-admin)"
-                            class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                        />
-                    {/if}
+                    <input
+                        id="profileNameInput"
+                        type="text"
+                        bind:value={saveProfileName}
+                        placeholder="e.g. prod-admin"
+                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                    />
                 </div>
                 <div class="mt-2">
                     <label
@@ -225,24 +236,12 @@
                     class="w-full bg-white text-black min-h-[300px] rounded overflow-hidden"
                 ></div>
             {/if}
-            <div>
-                <label
-                    for="regionSelect"
-                    class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                    >Region</label
-                >
-                <select
-                    id="regionSelect"
-                    bind:value={region}
-                    class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500"
-                >
-                    {#each visibleRegions as r}<option value={r}>{r}</option
-                        >{/each}
-                </select>
-            </div>
             <button
                 onclick={onLogin}
-                class="w-full bg-blue-600 hover:bg-blue-500 p-2.5 rounded font-bold text-sm shadow-lg transition"
+                disabled={isConnectDisabled}
+                class="w-full {isConnectDisabled
+                    ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white'} p-2.5 rounded font-bold text-sm shadow-lg transition"
             >
                 {loading ? "Connecting..." : "Connect"}
             </button>
