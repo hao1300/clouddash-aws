@@ -1,5 +1,11 @@
 <script lang="ts">
-    import { DescribeInstancesCommand } from "@aws-sdk/client-ec2";
+    import {
+        DescribeInstancesCommand,
+        StartInstancesCommand,
+        StopInstancesCommand,
+        RebootInstancesCommand,
+        TerminateInstancesCommand,
+    } from "@aws-sdk/client-ec2";
     import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
     import MetricChart from "$lib/components/MetricChart.svelte";
     import { aws } from "$lib/services/aws.svelte";
@@ -20,6 +26,7 @@
     let instance = $state<any | null>(null);
     let loading = $state(false);
     let error = $state("");
+    let actionMsg = $state("");
 
     let metricsLoading = $state(false);
     let metricPeriod = $state(86400);
@@ -71,6 +78,41 @@
                         ) ?? "-",
                 };
             }
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            loading = false;
+        }
+    }
+
+    async function handleAction(
+        action: "start" | "stop" | "reboot" | "terminate",
+    ) {
+        if (!aws.ec2 || !instanceId) return;
+        try {
+            loading = true;
+            if (action === "start")
+                await aws.ec2.send(
+                    new StartInstancesCommand({ InstanceIds: [instanceId] }),
+                );
+            if (action === "stop")
+                await aws.ec2.send(
+                    new StopInstancesCommand({ InstanceIds: [instanceId] }),
+                );
+            if (action === "reboot")
+                await aws.ec2.send(
+                    new RebootInstancesCommand({ InstanceIds: [instanceId] }),
+                );
+            if (action === "terminate") {
+                if (!confirm(`Terminate instance ${instanceId}?`)) return;
+                await aws.ec2.send(
+                    new TerminateInstancesCommand({ InstanceIds: [instanceId] }),
+                );
+            }
+            actionMsg = `Instance ${instanceId} ${action}ed.`;
+            setTimeout(() => {
+                loadInstance();
+            }, 1000);
         } catch (e: any) {
             error = e.message || String(e);
         } finally {
@@ -137,6 +179,11 @@
         >
             {error}
         </div>{/if}
+    {#if actionMsg}<div
+            class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30"
+        >
+            {actionMsg}
+        </div>{/if}
 
     {#if !instanceId}
         <div
@@ -151,6 +198,28 @@
             Loading Instance Details...
         </div>
     {:else if instance}
+        <div class="flex justify-end mb-4">
+            <select
+                class="bg-gray-800 text-xs px-3 py-1.5 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 shadow cursor-pointer appearance-none text-center font-bold uppercase tracking-wider"
+                onchange={(e) => {
+                    const action = e.currentTarget.value;
+                    if (action) {
+                        handleAction(action as any);
+                        e.currentTarget.value = "";
+                    }
+                }}
+            >
+                <option value="" disabled selected>Actions ▾</option>
+                {#if instance.state === "stopped"}
+                    <option value="start">Start</option>
+                {:else if instance.state === "running"}
+                    <option value="stop">Stop</option>
+                    <option value="reboot">Reboot</option>
+                {/if}
+                <option value="terminate">Terminate</option>
+            </select>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {#each [{ label: "Instance State", value: instance.state, color: instance.state === "running" ? "text-green-400" : "text-red-400" }, { label: "Instance Type", value: instance.type }, { label: "Public IP", value: instance.publicIp }, { label: "Private IP", value: instance.privateIp }, { label: "VPC ID", value: instance.vpcId }, { label: "Subnet ID", value: instance.subnetId }, { label: "Key Pair", value: instance.keyName }, { label: "Launch Time", value: instance.launchTime }] as item}
                 <div
