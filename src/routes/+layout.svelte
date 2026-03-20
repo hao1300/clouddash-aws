@@ -151,6 +151,16 @@
 
   $effect(() => {
     titleService.updateFromUrl($page.url.pathname);
+    
+    if (Object.keys($page.params).length === 0) {
+        const manifest = SERVICE_MANIFEST[activeId];
+        if (manifest && serviceActiveTab !== undefined) {
+             const resourceName = manifest.tabs[serviceActiveTab] ?? manifest.tabs[""];
+             if (resourceName) {
+                 titleService.setResource(resourceName, undefined, $page.url.pathname);
+             }
+        }
+    }
   });
   let serviceTabs = $derived.by(() => {
     const manifest = SERVICE_MANIFEST[activeId];

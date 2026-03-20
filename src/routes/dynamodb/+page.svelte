@@ -54,9 +54,7 @@
         }
     });
 
-    $effect(() => {
-        titleService.setResource("Tables", undefined, $page.url.pathname);
-    });
+
 
     // --- Pagination Helpers ---
     function pushToken(history: any[], currentNextToken?: any) {
