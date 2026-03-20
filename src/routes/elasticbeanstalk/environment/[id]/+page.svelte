@@ -11,6 +11,7 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
+    import { goto } from "$app/navigation";
 
     let rawEnvId = $derived($page.params.id || "");
     let envId = $derived(decodeURIComponent(rawEnvId));
@@ -263,9 +264,24 @@
                 >
                     Version Label
                 </div>
-                <div class="text-base font-bold text-gray-200 truncate" title={env.VersionLabel || ""}>
-                    {env.VersionLabel || "-"}
-                </div>
+                {#if env.VersionLabel && env.ApplicationName}
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div
+                        class="text-base font-bold text-blue-400 hover:text-blue-300 cursor-pointer truncate transition-colors"
+                        title={env.VersionLabel}
+                        onclick={() =>
+                            goto(
+                                `/elasticbeanstalk/versions/${encodeURIComponent(env!.ApplicationName + "::" + env!.VersionLabel)}`,
+                            )}
+                    >
+                        {env.VersionLabel}
+                    </div>
+                {:else}
+                    <div class="text-base font-bold text-gray-200 truncate" title={env.VersionLabel || ""}>
+                        {env.VersionLabel || "-"}
+                    </div>
+                {/if}
             </div>
             <div
                 class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm overflow-hidden"

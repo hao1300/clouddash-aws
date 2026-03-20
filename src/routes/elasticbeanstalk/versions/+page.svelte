@@ -5,6 +5,7 @@
     } from "@aws-sdk/client-elastic-beanstalk";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { goto } from "$app/navigation";
 
     let versions = $state<ApplicationVersionDescription[]>([]);
     let loading = $state(false);
@@ -61,13 +62,24 @@
             loadVersions(history[history.length - 1]);
         }}
         columns={[
-            { label: "Version Label", key: "VersionLabel" },
-            { label: "Application", key: "ApplicationName" },
+            {
+                label: "Version Label",
+                key: "VersionLabel",
+                onClick: (item) =>
+                    goto(
+                        `/elasticbeanstalk/versions/${encodeURIComponent(item.ApplicationName + "::" + item.VersionLabel)}`,
+                    ),
+            },
+            {
+                label: "Application",
+                key: "ApplicationName",
+                onClick: (item) => goto(`/elasticbeanstalk/application/${encodeURIComponent(item.ApplicationName || '')}`)
+            },
             { label: "Description", key: "Description" },
             {
                 label: "Status",
                 key: "Status",
-                format: (v) => (v === "PROCESSED" ? "🟢 " + v : "🟠 " + v),
+                format: (v) => (v === "Processed" ? "🟢 " + v : "🟠 " + v),
             },
             {
                 label: "Date Created",
