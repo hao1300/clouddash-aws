@@ -51,21 +51,12 @@
     }
 </script>
 
-<div class="h-full flex flex-col bg-gray-950 overflow-auto p-6 relative">
+<div class="h-full flex flex-col bg-gray-950 overflow-auto p-2 relative">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
             {error}
         </div>{/if}
-
-    <div class="flex items-center gap-3 mb-8 shrink-0">
-        <h2 class="text-sm font-bold text-gray-200">
-            {stackId}
-            <span class="text-gray-500 font-normal ml-2"
-                >{stack?.StackStatus}</span
-            >
-        </h2>
-    </div>
 
     {#if !stackId}
         <div
