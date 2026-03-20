@@ -95,6 +95,42 @@
             sortAsc = true;
         }
     }
+
+    // Resizing logic
+    let columnWidths = $state<Record<string, number>>({});
+    let draggingCol = $state<string | null>(null);
+    let startX = $state(0);
+    let startWidth = $state(0);
+
+    function startResize(e: MouseEvent, key: string) {
+        e.stopPropagation();
+        e.preventDefault();
+        draggingCol = key;
+        startX = e.clientX;
+        const th = (e.currentTarget as HTMLElement).closest("th");
+        startWidth = columnWidths[key] || th?.getBoundingClientRect().width || 100;
+        
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+        
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+    }
+    
+    function onMouseMove(e: MouseEvent) {
+        if (!draggingCol) return;
+        const diff = e.clientX - startX;
+        columnWidths[draggingCol] = Math.max(50, startWidth + diff); 
+    }
+    
+    function onMouseUp() {
+        draggingCol = null;
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+    }
 </script>
 
 <div class="h-full relative overflow-hidden flex flex-col">
@@ -150,25 +186,34 @@
                     <tr>
                         {#each columns as col}
                         <th
-                            class="border-b border-gray-800 px-4 py-2 font-semibold text-gray-300 {col.sortable !==
+                            class="relative border-b border-gray-800 px-4 py-2 font-semibold text-gray-300 group {col.sortable !==
                             false
                                 ? 'cursor-pointer hover:text-gray-200'
-                                : ''} transition-colors whitespace-nowrap"
+                                : ''} transition-colors whitespace-nowrap {columnWidths[col.key] ? '' : 'max-w-xs'}"
+                            style={columnWidths[col.key] ? `width: ${columnWidths[col.key]}px; min-width: ${columnWidths[col.key]}px; max-width: ${columnWidths[col.key]}px; overflow: hidden; text-overflow: ellipsis;` : ''}
                             onclick={() => handleSort(col.key, col.sortable)}
                         >
                             <div class="flex items-center gap-1">
-                                {col.label}
+                                <span class="truncate">{col.label}</span>
                                 {#if sortKey === col.key}
-                                    <span class="text-blue-400 text-xs"
+                                    <span class="text-blue-400 text-xs shrink-0"
                                         >{sortAsc ? "▲" : "▼"}</span
                                     >
                                 {/if}
                             </div>
+                            
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <div
+                                class="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize opacity-0 group-hover:opacity-100 transition-opacity z-20 hover:bg-blue-500 {draggingCol === col.key ? 'bg-blue-500 opacity-100' : ''}"
+                                onmousedown={(e) => startResize(e, col.key)}
+                                onclick={(e) => e.stopPropagation()}
+                            ></div>
                         </th>
                     {/each}
                     {#if actionsSnippet}
                         <th
-                            class="border-b border-gray-800 px-4 py-2 font-semibold text-gray-300 text-right"
+                            class="border-b border-gray-800 px-4 py-2 font-semibold text-gray-300 text-right w-24"
                             >Actions</th
                         >
                     {/if}
@@ -200,12 +245,13 @@
                         >
                             {#each columns as col}
                                 <td
-                                    class="px-4 py-2 text-gray-300 truncate max-w-xs"
+                                    class="px-4 py-2 text-gray-300 truncate {columnWidths[col.key] ? '' : 'max-w-xs'}"
+                                    style={columnWidths[col.key] ? `width: ${columnWidths[col.key]}px; min-width: ${columnWidths[col.key]}px; max-width: ${columnWidths[col.key]}px;` : ''}
                                 >
                                     {#if col.onClick}
                                         <button
                                             onclick={() => col.onClick!(item)}
-                                            class="text-blue-400 hover:text-blue-300 hover:underline text-left font-medium transition-colors"
+                                            class="text-blue-400 hover:text-blue-300 hover:underline text-left font-medium transition-colors truncate max-w-full inline-block align-bottom"
                                         >
                                             {col.format
                                                 ? col.format(
