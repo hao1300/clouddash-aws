@@ -13,6 +13,8 @@
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     import JsonEditor from "$lib/components/JsonEditor.svelte";
+    import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
+    import MetricChart from "$lib/components/MetricChart.svelte";
 
     let fnName = $derived($page.params.id || "");
 
