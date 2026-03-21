@@ -4,6 +4,8 @@
         InvokeCommand,
         UpdateFunctionConfigurationCommand,
         DeleteFunctionCommand,
+        ListEventSourceMappingsCommand,
+        GetPolicyCommand,
         type FunctionConfiguration,
     } from "@aws-sdk/client-lambda";
     import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
@@ -23,7 +25,7 @@
     let error = $state("");
     let actionMsg = $state("");
     let fnDetails = $state<FunctionConfiguration | null>(null);
-    let detailTab = $state<"invoke" | "configuration" | "metrics">("invoke");
+    let detailTab = $state<"invoke" | "configuration" | "metrics" | "connections">("invoke");
 
     let metricPeriod = $state(86400);
     let metricsLoading = $state(false);
@@ -42,6 +44,111 @@
             loadMetrics();
         }
     });
+
+    let connectionsLoading = $state(false);
+    let connectionsLoadedFn = $state("");
+    interface ConnectionInfo {
+        type: string;
+        arn: string;
+        description?: string;
+        link?: string;
+    }
+    let connections = $state<ConnectionInfo[]>([]);
+
+    $effect(() => {
+        if (aws.lambda && fnName && detailTab === "connections" && connectionsLoadedFn !== fnName && !connectionsLoading) {
+            connectionsLoadedFn = fnName;
+            loadConnections();
+        }
+    });
+
+    async function loadConnections() {
+        if (!aws.lambda || !fnName) return;
+        connectionsLoading = true;
+        connections = [];
+        try {
+            let conns: ConnectionInfo[] = [];
+
+            // 1. Event Source Mappings
+            try {
+                const esmRes = await aws.lambda.send(new ListEventSourceMappingsCommand({ FunctionName: fnName }));
+                for (const mapping of (esmRes.EventSourceMappings || [])) {
+                    let type = "Event Source Mapping";
+                    let link = "";
+                    let arn = mapping.EventSourceArn || "";
+                    let sqsMatch = arn.match(/arn:aws:sqs:(.*?):(\d+):(.*)/);
+                    if (sqsMatch) {
+                        type = "SQS Queue";
+                        link = `/sqs/queue/${sqsMatch[3]}/messages`;
+                    }
+                    let ddbMatch = arn.match(/arn:aws:dynamodb:.*?:.*?:table\/(.*?)\/stream/);
+                    if (ddbMatch) {
+                        type = "DynamoDB Stream";
+                        link = `/dynamodb/${ddbMatch[1]}`;
+                    }
+                    conns.push({
+                        type,
+                        arn,
+                        description: `State: ${mapping.State}`,
+                        link
+                    });
+                }
+            } catch (e: any) {
+                console.error("Error fetching event source mappings", e);
+            }
+
+            // 2. Resource-based policy
+            try {
+                const policyRes = await aws.lambda.send(new GetPolicyCommand({ FunctionName: fnName }));
+                const policyDoc = JSON.parse(policyRes.Policy || "{}");
+                for (const stmt of (policyDoc.Statement || [])) {
+                    if (stmt.Effect === "Allow" && stmt.Action?.includes("lambda:InvokeFunction")) {
+                        const principal = typeof stmt.Principal === 'string' ? stmt.Principal : stmt.Principal?.Service;
+                        let sourceArn = stmt.Condition?.ArnLike?.["aws:SourceArn"] || stmt.Condition?.ArnEquals?.["aws:SourceArn"] || stmt.Condition?.StringEquals?.["AWS:SourceArn"];
+                        
+                        let type = principal || "Unknown";
+                        let link = "";
+                        let arn = sourceArn || "Account/Any";
+
+                        if (principal === "apigateway.amazonaws.com") {
+                            type = "API Gateway";
+                        } else if (principal === "s3.amazonaws.com") {
+                            type = "S3 Bucket";
+                            let bMatch = sourceArn?.match(/arn:aws:s3:::(.*)/);
+                            if (bMatch) {
+                                link = `/s3/${bMatch[1]}`;
+                            }
+                        } else if (principal === "sns.amazonaws.com") {
+                            type = "SNS Topic";
+                            let snsMatch = sourceArn?.match(/arn:aws:sns:(.*?):(\d+):(.*)/);
+                            if (snsMatch) {
+                                link = `/sns`; 
+                            }
+                        } else if (principal === "events.amazonaws.com") {
+                            type = "CloudWatch Events";
+                        }
+
+                        conns.push({
+                            type,
+                            arn,
+                            description: `Statement ID: ${stmt.Sid}`,
+                            link
+                        });
+                    }
+                }
+            } catch(e: any) {
+                if (e.name !== 'ResourceNotFoundException') {
+                    console.error("Error fetching policy", e);
+                }
+            }
+
+            connections = conns;
+        } catch(e) {
+            console.error(e);
+        } finally {
+            connectionsLoading = false;
+        }
+    }
 
     async function loadMetrics() {
         if (!aws.cw || !fnName) return;
@@ -250,6 +357,13 @@
                 'metrics'
                     ? 'border-blue-500 text-blue-400'
                     : 'border-transparent text-gray-400'}">Metrics</button
+            >
+            <button
+                onclick={() => (detailTab = "connections")}
+                class="py-3 text-xs font-bold uppercase transition border-b-2 {detailTab ===
+                'connections'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-gray-400'}">Connections</button
             >
         </nav>
         <a 
@@ -529,6 +643,47 @@
                 <div class="bg-gray-900 p-4 rounded-lg border border-gray-800">
                     <MetricChart title="Throttles (Sum)" data={metricsData.throttles} loading={metricsLoading} />
                 </div>
+            </div>
+        {:else if detailTab === "connections"}
+            <div class="max-w-4xl">
+                <div class="flex items-center justify-between mb-4 border-b border-gray-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-xs text-gray-400 uppercase tracking-widest font-bold">Service Connections</h3>
+                        {#if connectionsLoading}
+                            <span class="animate-spin text-gray-500 text-xs">⟳</span>
+                        {/if}
+                    </div>
+                </div>
+                {#if !connectionsLoading && connections.length === 0}
+                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-8 text-center text-gray-500 text-sm">
+                        No service connections or triggers found for this function.
+                    </div>
+                {:else}
+                    <div class="grid grid-cols-1 gap-4">
+                        {#each connections as conn}
+                            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm hover:border-gray-700 transition">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="text-xs font-bold px-2 py-0.5 rounded bg-blue-900/30 text-blue-400 border border-blue-800/50">
+                                            {conn.type}
+                                        </span>
+                                        {#if conn.description}
+                                            <span class="text-[10px] text-gray-500 uppercase tracking-wider">{conn.description}</span>
+                                        {/if}
+                                    </div>
+                                    <div class="text-sm text-gray-300 font-mono truncate" title={conn.arn}>
+                                        {conn.arn}
+                                    </div>
+                                </div>
+                                {#if conn.link}
+                                    <a href={conn.link} class="shrink-0 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded transition border border-gray-700 shadow-sm whitespace-nowrap inline-flex items-center">
+                                        View Resource
+                                    </a>
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
             </div>
         {/if}
     </div>
