@@ -13,6 +13,7 @@
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
+    import InlinePolicyModal from "$lib/components/InlinePolicyModal.svelte";
 
     let userName = $derived($page.params.id || "");
 
@@ -27,6 +28,9 @@
     let attachedPolicies = $state<AttachedPolicy[]>([]);
     let inlinePolicies = $state<string[]>([]);
     let detailTab = $state<"overview" | "groups" | "policies">("overview");
+
+    let showInlineModal = $state(false);
+    let editInlineName = $state<string | null>(null);
 
     $effect(() => {
         if (aws.iam && userName) {
@@ -169,22 +173,29 @@
 
                 <!-- Inline Policies -->
                 <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
-                    <div class="p-4 border-b border-gray-800 bg-gray-900/50">
+                    <div class="p-4 border-b border-gray-800 bg-gray-900/50 flex justify-between items-center">
                         <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Inline Policies</h3>
+                        <button onclick={() => { editInlineName = null; showInlineModal = true; }} class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded shadow-sm transition">
+                            Create Inline Policy
+                        </button>
                     </div>
                     <div class="flex-1 overflow-auto p-4">
                         {#if inlinePolicies.length === 0}
-                            <div class="text-center text-gray-500 text-xs italic py-4">No inline policies</div>
+                            <div class="text-center text-gray-500 text-xs italic py-4 border border-gray-800 border-dashed rounded bg-gray-900/50">No inline policies</div>
                         {:else}
-                            <ul class="space-y-2">
+                            <div class="grid grid-cols-1 gap-2">
                                 {#each inlinePolicies as p}
-                                    <li class="bg-gray-950 p-2 rounded border border-gray-800 text-sm text-gray-300">{p}</li>
+                                    <button onclick={() => { editInlineName = p; showInlineModal = true; }} class="text-left bg-gray-950/50 hover:bg-gray-800 border border-gray-800 hover:border-blue-500/50 p-3 rounded group transition flex justify-between items-center">
+                                        <span class="text-sm text-blue-400 group-hover:text-blue-300 transition-colors font-medium">{p}</span>
+                                        <span class="text-xs text-gray-500 group-hover:text-gray-300">Edit ▸</span>
+                                    </button>
                                 {/each}
-                            </ul>
+                            </div>
                         {/if}
                     </div>
                 </div>
             </div>
+            <InlinePolicyModal bind:show={showInlineModal} type="User" entityName={userName} policyName={editInlineName} onSaved={loadDetails} />
         {/if}
     </div>
 </div>

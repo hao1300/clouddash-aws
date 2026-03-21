@@ -7,13 +7,11 @@
         ListEventSourceMappingsCommand,
         GetPolicyCommand,
         type FunctionConfiguration,
-    } from "@aws-sdk/client-lambda";
-    import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
-    import MetricChart from "$lib/components/MetricChart.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
+    import JsonEditor from "$lib/components/JsonEditor.svelte";
 
     let fnName = $derived($page.params.id || "");
 
@@ -443,10 +441,9 @@
                                 class="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest"
                                 >Event JSON</label
                             >
-                            <textarea
-                                bind:value={invokeInput}
-                                class="w-full h-48 bg-black border border-gray-700 rounded p-3 text-xs font-mono text-gray-300 outline-none focus:border-blue-500"
-                            ></textarea>
+                            <div class="h-48 rounded overflow-hidden">
+                                <JsonEditor bind:value={invokeInput} />
+                            </div>
                             <div class="mt-4 flex justify-between items-center">
                                 <a 
                                     href={`/cloudwatch/logs/${encodeURIComponent('/aws/lambda/' + fnName)}`}

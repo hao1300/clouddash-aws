@@ -9,6 +9,7 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
+    import JsonEditor from "$lib/components/JsonEditor.svelte";
 
     let policyArn = $derived(decodeURIComponent($page.params.id || ""));
 
@@ -174,11 +175,7 @@
                     </button>
                 </div>
                 <div class="flex-1 min-h-0 bg-gray-900 border border-gray-800 rounded overflow-hidden">
-                    <textarea
-                        bind:value={policyJsonStr}
-                        class="w-full h-full bg-black p-4 text-xs font-mono text-gray-300 outline-none focus:border focus:border-blue-500/50 resize-none leading-relaxed"
-                        spellcheck="false"
-                    ></textarea>
+                    <JsonEditor bind:value={policyJsonStr} />
                 </div>
             </div>
         {/if}
