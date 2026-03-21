@@ -6,6 +6,8 @@
         DeleteFunctionCommand,
         type FunctionConfiguration,
     } from "@aws-sdk/client-lambda";
+    import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
+    import MetricChart from "$lib/components/MetricChart.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
@@ -21,7 +23,69 @@
     let error = $state("");
     let actionMsg = $state("");
     let fnDetails = $state<FunctionConfiguration | null>(null);
-    let detailTab = $state<"invoke" | "configuration">("invoke");
+    let detailTab = $state<"invoke" | "configuration" | "metrics">("invoke");
+
+    let metricPeriod = $state(86400);
+    let metricsLoading = $state(false);
+    let metricsData = $state({
+        invocations: [] as any[],
+        errors: [] as any[],
+        duration: [] as any[],
+        throttles: [] as any[],
+    });
+
+    let currentFetchedPeriod = $state(0);
+
+    $effect(() => {
+        if (aws.cw && fnName && detailTab === "metrics" && currentFetchedPeriod !== metricPeriod) {
+            currentFetchedPeriod = metricPeriod;
+            loadMetrics();
+        }
+    });
+
+    async function loadMetrics() {
+        if (!aws.cw || !fnName) return;
+        metricsLoading = true;
+        try {
+            const periodVal = Number(metricPeriod);
+            const end = new Date();
+            const start = new Date(end.getTime() - periodVal * 1000);
+            const period =
+                periodVal <= 3600 ? 60 : periodVal <= 86400 ? 300 : 3600;
+
+            const fetchMetric = async (metricName: string, stat: "Sum" | "Average" = "Sum") => {
+                const resp = await aws.cw!.send(
+                    new GetMetricStatisticsCommand({
+                        Namespace: "AWS/Lambda",
+                        MetricName: metricName,
+                        Dimensions: [{ Name: "FunctionName", Value: fnName }],
+                        StartTime: start,
+                        EndTime: end,
+                        Period: period,
+                        Statistics: [stat],
+                    }),
+                );
+
+                return (resp.Datapoints || []).map((dp) => ({
+                    rawTimestamp: dp.Timestamp!,
+                    rawAverage: stat === 'Average' ? (dp.Average || 0) : (dp.Sum || 0),
+                }));
+            };
+
+            const [invocations, errors, duration, throttles] = await Promise.all([
+                fetchMetric("Invocations", "Sum"),
+                fetchMetric("Errors", "Sum"),
+                fetchMetric("Duration", "Average"),
+                fetchMetric("Throttles", "Sum"),
+            ]);
+
+            metricsData = { invocations, errors, duration, throttles };
+        } catch (e) {
+            console.error(e);
+        } finally {
+            metricsLoading = false;
+        }
+    }
 
     // Invoke state
     let invokeInput = $state("{}");
@@ -164,7 +228,7 @@
             {actionMsg}
         </div>{/if}
 
-    <div class="px-6 border-b border-gray-800 bg-gray-900 shrink-0 {error || actionMsg ? 'mt-8' : ''}">
+    <div class="px-6 border-b border-gray-800 bg-gray-900 shrink-0 {error || actionMsg ? 'mt-8' : ''} flex justify-between items-center">
         <nav class="flex gap-4">
             <button
                 onclick={() => (detailTab = "invoke")}
@@ -180,7 +244,20 @@
                     ? 'border-blue-500 text-blue-400'
                     : 'border-transparent text-gray-400'}">Configuration</button
             >
+            <button
+                onclick={() => (detailTab = "metrics")}
+                class="py-3 text-xs font-bold uppercase transition border-b-2 {detailTab ===
+                'metrics'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-gray-400'}">Metrics</button
+            >
         </nav>
+        <a 
+            href={`/cloudwatch/logs/${encodeURIComponent('/aws/lambda/' + fnName)}`}
+            class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded transition border border-gray-700 flex items-center gap-2"
+        >
+            View Logs
+        </a>
     </div>
 
     <div class="flex-1 overflow-auto p-6 min-h-0 relative">
@@ -240,7 +317,7 @@
                     </div>
                 {/if}
             </div>
-        {:else}
+        {:else if detailTab === "configuration"}
             <div class="max-w-4xl space-y-6">
                 <!-- General Config -->
                 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
@@ -420,6 +497,37 @@
                             {/each}
                         </div>
                     {/if}
+                </div>
+            </div>
+        {:else if detailTab === "metrics"}
+            <div class="flex items-center justify-between mb-4 border-b border-gray-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-xs text-gray-400 uppercase tracking-widest font-bold">Metrics Dashboard</h3>
+                    {#if metricsLoading}
+                        <span class="animate-spin text-gray-500 text-xs">⟳</span>
+                    {/if}
+                </div>
+                <select
+                    bind:value={metricPeriod}
+                    class="bg-gray-950 text-xs px-3 py-1.5 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 shadow-inner"
+                >
+                    <option value={3600}>Last 1 hour</option>
+                    <option value={86400}>Last 24 hours</option>
+                    <option value={604800}>Last 7 days</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-gray-900 p-4 rounded-lg border border-gray-800">
+                    <MetricChart title="Invocations (Sum)" data={metricsData.invocations} loading={metricsLoading} />
+                </div>
+                <div class="bg-gray-900 p-4 rounded-lg border border-gray-800">
+                    <MetricChart title="Errors (Sum)" data={metricsData.errors} loading={metricsLoading} />
+                </div>
+                <div class="bg-gray-900 p-4 rounded-lg border border-gray-800">
+                    <MetricChart title="Duration (Avg ms)" data={metricsData.duration} loading={metricsLoading} />
+                </div>
+                <div class="bg-gray-900 p-4 rounded-lg border border-gray-800">
+                    <MetricChart title="Throttles (Sum)" data={metricsData.throttles} loading={metricsLoading} />
                 </div>
             </div>
         {/if}

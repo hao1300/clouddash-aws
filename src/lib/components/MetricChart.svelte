@@ -25,7 +25,13 @@
     let chartInstance: Chart | null = null;
 
     $effect(() => {
-        if (!canvasRef) return;
+        if (!canvasRef) {
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
+            return;
+        }
 
         // We only want to rebuild the chart when data changes
         const currentData = data;
@@ -204,12 +210,6 @@
             class="h-40 flex items-center justify-center text-gray-600 text-xs italic bg-gray-950/20 rounded border border-gray-800/50"
         >
             No data available
-        </div>
-    {:else if data.length < 2}
-        <div
-            class="h-40 flex items-center justify-center text-gray-600 text-xs italic bg-gray-950/20 rounded border border-gray-800/50"
-        >
-            Insufficient data points for visualization
         </div>
     {:else}
         <div
