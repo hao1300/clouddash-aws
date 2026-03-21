@@ -1,6 +1,7 @@
-/src/main/java/com/hao13/tpl/generated
+/src/main/java/com/clouddash/aws/generated
 /src/main/jniLibs/**/*.so
 /src/main/assets/tauri.conf.json
 /tauri.build.gradle.kts
 /proguard-tauri.pro
 /tauri.properties
+/keystore.properties

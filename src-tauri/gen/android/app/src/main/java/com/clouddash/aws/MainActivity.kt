@@ -1,4 +1,4 @@
-package com.hao13.tpl
+package com.clouddash.aws
 
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
