@@ -3,6 +3,18 @@ use aws_config::Region;
 use serde::Deserialize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tauri::Manager;
+
+fn get_aws_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        Ok(app_handle.path().app_data_dir().map_err(|e| e.to_string())?.join(".aws"))
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        Ok(dirs::home_dir().ok_or("Could not find home directory")?.join(".aws"))
+    }
+}
 
 /// Shared AWS configuration — each service creates its own client from this.
 pub struct SharedConfig(pub Arc<RwLock<Option<aws_config::SdkConfig>>>);
@@ -24,11 +36,11 @@ pub struct AuthPayload {
 }
 
 #[tauri::command]
-pub fn list_profiles() -> Result<Vec<String>, String> {
+pub fn list_profiles(app_handle: tauri::AppHandle) -> Result<Vec<String>, String> {
     let mut profiles = Vec::new();
-    let home = dirs::home_dir().ok_or("Could not find home directory")?;
+    let aws_dir = get_aws_dir(&app_handle)?;
 
-    let cred_path = home.join(".aws").join("credentials");
+    let cred_path = aws_dir.join("credentials");
     if cred_path.exists() {
         if let Ok(content) = std::fs::read_to_string(&cred_path) {
             for line in content.lines() {
@@ -43,7 +55,7 @@ pub fn list_profiles() -> Result<Vec<String>, String> {
         }
     }
 
-    let cfg_path = home.join(".aws").join("config");
+    let cfg_path = aws_dir.join("config");
     if cfg_path.exists() {
         if let Ok(content) = std::fs::read_to_string(&cfg_path) {
             for line in content.lines() {
@@ -71,7 +83,15 @@ pub fn list_profiles() -> Result<Vec<String>, String> {
 pub async fn authenticate(
     payload: AuthPayload,
     state: tauri::State<'_, SharedConfig>,
+    app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        if let Ok(aws_dir) = get_aws_dir(&app_handle) {
+            std::env::set_var("AWS_SHARED_CREDENTIALS_FILE", aws_dir.join("credentials"));
+            std::env::set_var("AWS_CONFIG_FILE", aws_dir.join("config"));
+        }
+    }
     let region_provider = RegionProviderChain::first_try(Region::new(payload.region))
         .or_default_provider()
         .or_else(Region::new("us-east-1"));
@@ -130,12 +150,11 @@ pub async fn get_credentials(
 }
 
 #[tauri::command]
-pub fn save_profile(name: String, access_key: String, secret_key: String, session_token: Option<String>, region: Option<String>) -> Result<(), String> {
+pub fn save_profile(app_handle: tauri::AppHandle, name: String, access_key: String, secret_key: String, session_token: Option<String>, region: Option<String>) -> Result<(), String> {
     use std::fs::OpenOptions;
     use std::io::Write;
 
-    let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    let aws_dir = home.join(".aws");
+    let aws_dir = get_aws_dir(&app_handle)?;
 
     if !aws_dir.exists() {
         std::fs::create_dir_all(&aws_dir).map_err(|e| e.to_string())?;
@@ -228,5 +247,80 @@ pub fn get_initial_state() -> InitialState {
         region: std::env::var("CLOUDDASH_INITIAL_REGION").ok(),
         profile: std::env::var("CLOUDDASH_INITIAL_PROFILE").ok(),
     }
+}
+
+fn parse_ini(path: &std::path::Path) -> std::collections::HashMap<String, std::collections::HashMap<String, String>> {
+    let mut map = std::collections::HashMap::new();
+    let mut current_section = String::new();
+    if let Ok(content) = std::fs::read_to_string(path) {
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('[') && line.ends_with(']') {
+                let name = &line[1..line.len()-1];
+                let mut name_clean = name.trim();
+                if name_clean.starts_with("profile ") {
+                    name_clean = name_clean["profile ".len()..].trim();
+                }
+                current_section = name_clean.to_string();
+                map.entry(current_section.clone()).or_insert_with(std::collections::HashMap::new);
+            } else if !line.is_empty() && !line.starts_with('#') {
+                if let Some((k, v)) = line.split_once('=') {
+                    if !current_section.is_empty() {
+                        if let Some(section_map) = map.get_mut(&current_section) {
+                            section_map.insert(k.trim().to_string(), v.trim().to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    map
+}
+
+#[tauri::command]
+pub fn get_all_profiles(app_handle: tauri::AppHandle) -> Result<Vec<serde_json::Value>, String> {
+    let aws_dir = get_aws_dir(&app_handle)?;
+    let creds_map = parse_ini(&aws_dir.join("credentials"));
+    let cfg_map = parse_ini(&aws_dir.join("config"));
+
+    let mut all_profile_names: Vec<String> = creds_map.keys().cloned().collect();
+    for k in cfg_map.keys() {
+        if !all_profile_names.contains(k) {
+            all_profile_names.push(k.clone());
+        }
+    }
+
+    let mut profiles = Vec::new();
+    for name in all_profile_names {
+        let mut ak = String::new();
+        let mut sk = String::new();
+        let mut token = None;
+        let mut region = None;
+
+        if let Some(m) = creds_map.get(&name) {
+            ak = m.get("aws_access_key_id").cloned().unwrap_or_default();
+            sk = m.get("aws_secret_access_key").cloned().unwrap_or_default();
+            token = m.get("aws_session_token").cloned();
+        }
+        if let Some(m) = cfg_map.get(&name) {
+            region = m.get("region").cloned();
+        }
+
+        if !ak.is_empty() && !sk.is_empty() {
+            profiles.push(serde_json::json!({
+                "profile": name,
+                "access_key_id": ak,
+                "secret_access_key": sk,
+                "session_token": token,
+                "region": region,
+            }));
+        }
+    }
+    Ok(profiles)
+}
+
+#[tauri::command]
+pub fn get_os() -> String {
+    std::env::consts::OS.to_string()
 }
 

@@ -55,6 +55,7 @@
   let authType = $state<"profile" | "manual" | "qr">("profile");
 
   // Custom API Keys
+  let os = $state("");
   let accessKeyId = $state("");
   let secretAccessKey = $state("");
   let sessionToken = $state("");
@@ -227,6 +228,12 @@
   }
 
   onMount(async () => {
+    try {
+      os = await invoke("get_os");
+    } catch {
+      os = "windows";
+    }
+
     const initialState = await invoke<{
       path: string | null;
       region: string | null;
@@ -283,7 +290,15 @@
     else serviceVisible = new Set(["cloudwatch", "s3", "dynamodb"]);
 
     // Restore profile/region and auto-login
-    if (saved?.authType) authType = saved.authType;
+    let isMobile = os === "android" || os === "ios";
+    let noRealProfiles = allProfiles.length === 0 || (allProfiles.length === 1 && allProfiles[0] === "default");
+
+    if (saved?.authType) {
+      authType = saved.authType;
+    } else if (isMobile && noRealProfiles) {
+      authType = "qr";
+    }
+
     if (saved?.accessKeyId) accessKeyId = saved.accessKeyId;
     if (saved?.secretAccessKey) secretAccessKey = saved.secretAccessKey;
     if (saved?.sessionToken) sessionToken = saved.sessionToken;
@@ -425,6 +440,7 @@
 >
   {#if !isAuthenticated}
     <Login
+      {os}
       bind:authType
       bind:selectedProfile
       bind:accessKeyId
@@ -442,6 +458,21 @@
       {error}
       onLogin={() => login()}
       onSwitchAuthType={switchAuthType}
+      onProfilesSaved={async () => {
+        try {
+          allProfiles = await invoke("list_profiles");
+        } catch {
+          if (!allProfiles.includes("default")) allProfiles = ["default"];
+        }
+        let newOrder = [...profileOrder];
+        for (let p of allProfiles) {
+          if (!newOrder.includes(p)) newOrder.push(p);
+          profileVisible.add(p);
+        }
+        profileOrder = newOrder;
+        profileVisible = new Set(profileVisible);
+        saveState();
+      }}
     />
   {:else}
     <div class="flex h-full w-full overflow-hidden">

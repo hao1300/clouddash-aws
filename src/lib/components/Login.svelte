@@ -1,7 +1,9 @@
 <script lang="ts">
     import { Html5QrcodeScanner } from "html5-qrcode";
+    import { invoke } from "@tauri-apps/api/core";
 
     let {
+        os = "",
         authType = $bindable("profile"),
         selectedProfile = $bindable(""),
         accessKeyId = $bindable(""),
@@ -15,7 +17,9 @@
         error = "",
         onLogin,
         onSwitchAuthType,
+        onProfilesSaved,
     }: {
+        os?: string;
         authType: "profile" | "manual" | "qr";
         selectedProfile: string;
         accessKeyId: string;
@@ -29,6 +33,7 @@
         error: string;
         onLogin: () => void;
         onSwitchAuthType: (type: "profile" | "manual" | "qr") => void;
+        onProfilesSaved?: () => void;
     } = $props();
 
     let scanner: Html5QrcodeScanner | null = null;
@@ -58,7 +63,34 @@
     function onScanSuccess(decodedText: string, decodedResult: any) {
         try {
             const data = JSON.parse(decodedText);
-            if (data.access_key_id && data.secret_access_key) {
+            if (Array.isArray(data)) {
+                Promise.all(
+                    data.map(async (p) => {
+                        if (p.access_key_id && p.secret_access_key) {
+                            try {
+                                await invoke("save_profile", {
+                                    name: p.profile || "default",
+                                    accessKey: p.access_key_id,
+                                    secretKey: p.secret_access_key,
+                                    sessionToken: p.session_token || null,
+                                    region: p.region || null,
+                                });
+                            } catch (e) {
+                                console.error(e);
+                            }
+                        }
+                    })
+                ).then(() => {
+                    const first = data.find((p) => p.access_key_id) || {};
+                    if (first.profile) selectedProfile = first.profile;
+                    if (onProfilesSaved) onProfilesSaved();
+                    onSwitchAuthType("profile");
+                    if (scanner) {
+                        scanner.clear().catch(console.error);
+                        scanner = null;
+                    }
+                });
+            } else if (data.access_key_id && data.secret_access_key) {
                 accessKeyId = data.access_key_id;
                 secretAccessKey = data.secret_access_key;
                 if (data.session_token) sessionToken = data.session_token;
@@ -100,6 +132,12 @@
 
         return false;
     });
+
+    let isMobileAndEmpty = $derived(
+        (os === "android" || os === "ios") &&
+        visibleProfiles.length <= 1 &&
+        (visibleProfiles.length === 0 || visibleProfiles[0] === "default")
+    );
 </script>
 
 <div class="flex items-center justify-center flex-1 p-4">
@@ -120,14 +158,16 @@
                     Login Method
                 </div>
                 <div class="flex gap-2" role="group" aria-label="Login Method">
-                    <button
-                        onclick={() => onSwitchAuthType("profile")}
-                        class="flex-1 py-1.5 rounded text-xs font-semibold transition {authType ===
-                        'profile'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
-                        >Profile</button
-                    >
+                    {#if !isMobileAndEmpty}
+                        <button
+                            onclick={() => onSwitchAuthType("profile")}
+                            class="flex-1 py-1.5 rounded text-xs font-semibold transition {authType ===
+                            'profile'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'}"
+                            >Profile</button
+                        >
+                    {/if}
                     <button
                         onclick={() => onSwitchAuthType("manual")}
                         class="flex-1 py-1.5 rounded text-xs font-semibold transition {authType ===

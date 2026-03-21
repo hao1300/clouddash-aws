@@ -41,26 +41,36 @@
     let loadingQr = $state(false);
 
     $effect(() => {
-        if (settingsTab === "qrcode" && !qrCodeDataUrl && !loadingQr) {
+        if (settingsTab === "qrcode" && !qrCodeDataUrl && !loadingQr && !qrError) {
             loadingQr = true;
             qrError = "";
-            invoke("get_credentials")
-                .then((creds) => {
-                    const jsonStr = JSON.stringify(creds);
+            invoke("get_all_profiles")
+                .then((creds: any) => {
+                    creds.sort((a: any, b: any) => {
+                        let idxA = profileOrder.indexOf(a.profile);
+                        let idxB = profileOrder.indexOf(b.profile);
+                        if (idxA === -1) idxA = 99999;
+                        if (idxB === -1) idxB = 99999;
+                        if (idxA !== idxB) return idxA - idxB;
+                        return a.profile.localeCompare(b.profile);
+                    });
+                    const toExport = creds.filter((c: any) => profileVisible.has(c.profile));
+                    if (toExport.length === 0) {
+                        qrCodeDataUrl = "";
+                        return;
+                    }
+                    const jsonStr = JSON.stringify(toExport);
                     return QRCode.toDataURL(jsonStr, {
                         width: 300,
                         margin: 2,
                         scale: 4,
                     });
                 })
-                .then((url) => {
-                    qrCodeDataUrl = typeof url === "string" ? url : "";
+                .then((url: any) => {
+                    if (url) qrCodeDataUrl = typeof url === "string" ? url : "";
                 })
-                .catch((err) => {
-                    qrError =
-                        typeof err === "string"
-                            ? err
-                            : err.message || "Failed to generate QR code";
+                .catch((err: any) => {
+                    qrError = typeof err === "string" ? err : err.message || "Failed to generate QR code";
                 })
                 .finally(() => {
                     loadingQr = false;
@@ -113,7 +123,7 @@
         <div
             class="w-32 bg-gray-950 border-r border-gray-800 flex flex-col py-2 shrink-0"
         >
-            {#each [["profiles", "Profiles"], ["regions", "Regions"], ["services", "Services"], ["qrcode", "Export Keys"]] as const as [key, label]}
+            {#each [["profiles", "Profiles"], ["regions", "Regions"], ["qrcode", "Export Keys"]] as const as [key, label]}
                 <button
                     onclick={() => (settingsTab = key)}
                     class="px-4 py-2.5 text-left text-xs font-semibold transition whitespace-nowrap {settingsTab ===
