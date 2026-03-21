@@ -243,14 +243,14 @@
                 {:else}
                     {#each processedItems as item}
                         <tr
-                            class="border-b border-gray-800/50 hover:bg-gray-900/30 transition-colors {onRowClick ? 'cursor-pointer' : ''}"
+                            class="border-b border-gray-800/50 hover:bg-gray-900/30 transition-colors {onRowClick ? 'cursor-pointer text-blue-400 hover:text-blue-300' : 'text-gray-300'}"
                             onclick={() => onRowClick && onRowClick(item)}
                             onkeydown={(e) => { if (e.key === 'Enter' && onRowClick) onRowClick(item); }}
                             tabindex={onRowClick ? 0 : undefined}
                         >
                             {#each columns as col}
                                 <td
-                                    class="px-4 py-2 text-gray-300 truncate {columnWidths[col.key] ? '' : 'max-w-xs'}"
+                                    class="px-4 py-2 truncate text-inherit {columnWidths[col.key] ? '' : 'max-w-xs'}"
                                     style={columnWidths[col.key] ? `width: ${columnWidths[col.key]}px; min-width: ${columnWidths[col.key]}px; max-width: ${columnWidths[col.key]}px;` : ''}
                                 >
                                     {#if col.onClick}
