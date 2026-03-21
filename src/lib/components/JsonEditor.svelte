@@ -12,16 +12,17 @@
     }>();
 
     let editorContainer: HTMLDivElement;
-    let view: EditorView;
+    let view = $state<EditorView | null>(null);
 
     let internalChange = false;
 
     $effect(() => {
+        const _val = value !== undefined ? value : "";
         if (view && !internalChange) {
             const currentDoc = view.state.doc.toString();
-            if (currentDoc !== value) {
+            if (currentDoc !== _val) {
                 view.dispatch({
-                    changes: { from: 0, to: currentDoc.length, insert: value }
+                    changes: { from: 0, to: currentDoc.length, insert: _val }
                 });
             }
         }
@@ -60,7 +61,7 @@
         });
 
         return () => {
-            view.destroy();
+            if (view) view.destroy();
         };
     });
 </script>

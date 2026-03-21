@@ -170,7 +170,7 @@
                         Period: period,
                         Statistics: [stat],
                     }),
-                );
+                ) as any;
 
                 return (resp.Datapoints || []).map((dp) => ({
                     rawTimestamp: dp.Timestamp!,
@@ -438,9 +438,9 @@
                 <div class="flex-1 min-w-0 w-full">
                     <div class="max-w-3xl space-y-4">
                         <div class="bg-gray-900 p-5 rounded-lg border border-gray-800">
-                            <label
+                            <span
                                 class="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest"
-                                >Event JSON</label
+                                >Event JSON</span
                             >
                             <div class="h-48 rounded overflow-hidden">
                                 <JsonEditor bind:value={invokeInput} />
@@ -566,23 +566,23 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Runtime</label>
+                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Memory (MB)</span>
                             <div class="text-sm text-gray-300">{fnDetails?.Runtime || 'N/A'}</div>
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Architecture</label>
+                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Timeout (Seconds)</span>
                             <div class="text-sm text-gray-300">{(fnDetails?.Architectures || []).join(', ') || 'N/A'}</div>
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Package Type</label>
+                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Package Type</span>
                             <div class="text-sm text-gray-300">{fnDetails?.PackageType || 'N/A'}</div>
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Last Modified</label>
+                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Last Modified</span>
                             <div class="text-sm text-gray-300">{fnDetails?.LastModified ? new Date(fnDetails.LastModified).toLocaleString() : 'N/A'}</div>
                         </div>
                         <div class="md:col-span-2">
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Role</label>
+                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Handler</span>
                             <div class="text-sm text-blue-400 truncate" title={fnDetails?.Role || ''}>
                                 {fnDetails?.Role || 'N/A'}
                             </div>
