@@ -7,6 +7,7 @@
         ListEventSourceMappingsCommand,
         GetPolicyCommand,
         type FunctionConfiguration,
+    } from "@aws-sdk/client-lambda";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
