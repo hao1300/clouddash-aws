@@ -2,6 +2,7 @@
     import { ListPoliciesCommand, type Policy } from "@aws-sdk/client-iam";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { goto } from "$app/navigation";
 
     let policies = $state<Policy[]>([]);
     let loading = $state(false);
@@ -58,7 +59,11 @@
             loadPolicies(history[history.length - 1]);
         }}
         columns={[
-            { label: "Policy Name", key: "PolicyName" },
+            {
+                label: "Policy Name",
+                key: "PolicyName",
+                onClick: (item) => goto(`/iam/policies/${encodeURIComponent(item.Arn || "")}`)
+            },
             { label: "Policy ID", key: "PolicyId" },
             { label: "ARN", key: "Arn" },
             {

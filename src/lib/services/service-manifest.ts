@@ -91,7 +91,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     iam: {
         label: "IAM",
         tabs: {
-            "": "Users",
+            users: "Users",
             groups: "Groups",
             roles: "Roles",
             policies: "Policies",

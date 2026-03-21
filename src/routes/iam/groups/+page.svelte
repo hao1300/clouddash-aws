@@ -2,6 +2,7 @@
     import { ListGroupsCommand, type Group } from "@aws-sdk/client-iam";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { goto } from "$app/navigation";
 
     let groups = $state<Group[]>([]);
     let loading = $state(false);
@@ -58,7 +59,11 @@
             loadGroups(history[history.length - 1]);
         }}
         columns={[
-            { label: "Group Name", key: "GroupName" },
+            {
+                label: "Group Name",
+                key: "GroupName",
+                onClick: (item) => goto(`/iam/groups/${item.GroupName}`)
+            },
             { label: "Group ID", key: "GroupId" },
             { label: "ARN", key: "Arn" },
             {

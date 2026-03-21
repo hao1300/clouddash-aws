@@ -1,10 +1,10 @@
 <script lang="ts">
-    import { ListRolesCommand, type Role } from "@aws-sdk/client-iam";
+    import { ListUsersCommand, type User } from "@aws-sdk/client-iam";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { goto } from "$app/navigation";
 
-    let roles = $state<Role[]>([]);
+    let users = $state<User[]>([]);
     let loading = $state(false);
     let error = $state("");
     let marker = $state<string | undefined>(undefined);
@@ -14,19 +14,19 @@
     $effect(() => {
         if (aws.iam && !__initLoaded) {
             __initLoaded = true;
-            loadRoles();
+            loadUsers();
         }
     });
 
-    async function loadRoles(token?: string) {
+    async function loadUsers(token?: string) {
         if (!aws.iam) return;
         try {
             loading = true;
             error = "";
             const res = await aws.iam.send(
-                new ListRolesCommand({ MaxItems: 50, Marker: token }),
+                new ListUsersCommand({ MaxItems: 50, Marker: token }),
             );
-            roles = res.Roles || [];
+            users = res.Users || [];
             if (token) history.push(token);
             marker = res.Marker;
         } catch (e: any) {
@@ -45,26 +45,26 @@
         </div>{/if}
 
     <PaginatedTable
-        items={roles}
+        items={users}
         {loading}
         onRefresh={() => {
             history = [];
-            loadRoles();
+            loadUsers();
         }}
         hasNext={!!marker}
         hasPrev={history.length > 0}
-        onNext={() => loadRoles(marker)}
+        onNext={() => loadUsers(marker)}
         onPrev={() => {
             history.pop();
-            loadRoles(history[history.length - 1]);
+            loadUsers(history[history.length - 1]);
         }}
         columns={[
             {
-                label: "Role Name",
-                key: "RoleName",
-                onClick: (item) => goto(`/iam/roles/${item.RoleName}`)
+                label: "User Name",
+                key: "UserName",
+                onClick: (item) => goto(`/iam/users/${item.UserName}`)
             },
-            { label: "Role ID", key: "RoleId" },
+            { label: "User ID", key: "UserId" },
             { label: "ARN", key: "Arn" },
             {
                 label: "Creation Date",
