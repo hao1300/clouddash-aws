@@ -25,7 +25,7 @@
     let error = $state("");
     let actionMsg = $state("");
     let fnDetails = $state<FunctionConfiguration | null>(null);
-    let detailTab = $state<"invoke" | "configuration" | "metrics" | "connections">("invoke");
+    let detailTab = $state<"invoke" | "configuration" | "metrics">("invoke");
 
     let metricPeriod = $state(86400);
     let metricsLoading = $state(false);
@@ -56,7 +56,7 @@
     let connections = $state<ConnectionInfo[]>([]);
 
     $effect(() => {
-        if (aws.lambda && fnName && detailTab === "connections" && connectionsLoadedFn !== fnName && !connectionsLoading) {
+        if (aws.lambda && fnName && detailTab === "configuration" && connectionsLoadedFn !== fnName && !connectionsLoading) {
             connectionsLoadedFn = fnName;
             loadConnections();
         }
@@ -430,20 +430,7 @@
                     ? 'border-blue-500 text-blue-400'
                     : 'border-transparent text-gray-400'}">Metrics</button
             >
-            <button
-                onclick={() => (detailTab = "connections")}
-                class="py-3 text-xs font-bold uppercase transition border-b-2 {detailTab ===
-                'connections'
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400'}">Connections</button
-            >
         </nav>
-        <a 
-            href={`/cloudwatch/logs/${encodeURIComponent('/aws/lambda/' + fnName)}`}
-            class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded transition border border-gray-700 flex items-center gap-2"
-        >
-            View Logs
-        </a>
     </div>
 
     <div class="flex-1 overflow-auto p-6 min-h-0 relative">
@@ -460,7 +447,14 @@
                                 bind:value={invokeInput}
                                 class="w-full h-48 bg-black border border-gray-700 rounded p-3 text-xs font-mono text-gray-300 outline-none focus:border-blue-500"
                             ></textarea>
-                            <div class="mt-4 flex justify-end">
+                            <div class="mt-4 flex justify-between items-center">
+                                <a 
+                                    href={`/cloudwatch/logs/${encodeURIComponent('/aws/lambda/' + fnName)}`}
+                                    class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded transition border border-gray-700 flex items-center gap-2 shadow-sm"
+                                >
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    View Logs
+                                </a>
                                 <button
                                     onclick={handleInvoke}
                                     disabled={invokeLoading}
@@ -567,6 +561,37 @@
             </div>
         {:else if detailTab === "configuration"}
             <div class="max-w-4xl space-y-6">
+                <!-- Function Overview -->
+                <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                    <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
+                        <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Function Overview</h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Runtime</label>
+                            <div class="text-sm text-gray-300">{fnDetails?.Runtime || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Architecture</label>
+                            <div class="text-sm text-gray-300">{(fnDetails?.Architectures || []).join(', ') || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Package Type</label>
+                            <div class="text-sm text-gray-300">{fnDetails?.PackageType || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Last Modified</label>
+                            <div class="text-sm text-gray-300">{fnDetails?.LastModified ? new Date(fnDetails.LastModified).toLocaleString() : 'N/A'}</div>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Role</label>
+                            <div class="text-sm text-blue-400 truncate" title={fnDetails?.Role || ''}>
+                                {fnDetails?.Role || 'N/A'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- General Config -->
                 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
                     <div
@@ -657,6 +682,48 @@
                                     >Save</button
                                 >
                             </div>
+                        </div>
+                    {/if}
+                </div>
+
+                <!-- Service Connections -->
+                <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                    <div class="flex items-center justify-between mb-4 border-b border-gray-800 pb-2">
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Service Connections</h3>
+                            {#if connectionsLoading}
+                                <span class="animate-spin text-gray-500 text-xs">⟳</span>
+                            {/if}
+                        </div>
+                    </div>
+                    {#if !connectionsLoading && connections.length === 0}
+                        <div class="text-center text-gray-500 text-[10px] italic py-4 border border-gray-800 border-dashed rounded bg-gray-900/50">
+                            No service connections or triggers found for this function.
+                        </div>
+                    {:else}
+                        <div class="grid grid-cols-1 gap-3">
+                            {#each connections as conn}
+                                <div class="bg-gray-950/50 border border-gray-800 rounded p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm hover:border-gray-700 transition">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-900/30 text-blue-400 border border-blue-800/50 uppercase tracking-wider">
+                                                {conn.type}
+                                            </span>
+                                            {#if conn.description}
+                                                <span class="text-[10px] text-gray-500 uppercase tracking-wider">{conn.description}</span>
+                                            {/if}
+                                        </div>
+                                        <div class="text-xs text-gray-300 font-mono truncate" title={conn.arn}>
+                                            {conn.arn}
+                                        </div>
+                                    </div>
+                                    {#if conn.link}
+                                        <a href={conn.link} class="shrink-0 text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded transition border border-gray-700 shadow-sm whitespace-nowrap inline-flex items-center">
+                                            View Resource
+                                        </a>
+                                    {/if}
+                                </div>
+                            {/each}
                         </div>
                     {/if}
                 </div>
@@ -777,47 +844,6 @@
                 <div class="bg-gray-900 p-4 rounded-lg border border-gray-800">
                     <MetricChart title="Throttles (Sum)" data={metricsData.throttles} loading={metricsLoading} />
                 </div>
-            </div>
-        {:else if detailTab === "connections"}
-            <div class="max-w-4xl">
-                <div class="flex items-center justify-between mb-4 border-b border-gray-800 pb-3">
-                    <div class="flex items-center gap-2">
-                        <h3 class="text-xs text-gray-400 uppercase tracking-widest font-bold">Service Connections</h3>
-                        {#if connectionsLoading}
-                            <span class="animate-spin text-gray-500 text-xs">⟳</span>
-                        {/if}
-                    </div>
-                </div>
-                {#if !connectionsLoading && connections.length === 0}
-                    <div class="bg-gray-900 border border-gray-800 rounded-lg p-8 text-center text-gray-500 text-sm">
-                        No service connections or triggers found for this function.
-                    </div>
-                {:else}
-                    <div class="grid grid-cols-1 gap-4">
-                        {#each connections as conn}
-                            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm hover:border-gray-700 transition">
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <span class="text-xs font-bold px-2 py-0.5 rounded bg-blue-900/30 text-blue-400 border border-blue-800/50">
-                                            {conn.type}
-                                        </span>
-                                        {#if conn.description}
-                                            <span class="text-[10px] text-gray-500 uppercase tracking-wider">{conn.description}</span>
-                                        {/if}
-                                    </div>
-                                    <div class="text-sm text-gray-300 font-mono truncate" title={conn.arn}>
-                                        {conn.arn}
-                                    </div>
-                                </div>
-                                {#if conn.link}
-                                    <a href={conn.link} class="shrink-0 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded transition border border-gray-700 shadow-sm whitespace-nowrap inline-flex items-center">
-                                        View Resource
-                                    </a>
-                                {/if}
-                            </div>
-                        {/each}
-                    </div>
-                {/if}
             </div>
         {/if}
     </div>
