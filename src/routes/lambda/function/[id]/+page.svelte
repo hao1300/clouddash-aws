@@ -612,9 +612,9 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label
+                            <div
                                 class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
-                                >Memory (MB)</label
+                                >Memory (MB)</div
                             >
                             {#if isEditingConfig}
                                 <input
@@ -629,9 +629,9 @@
                             {/if}
                         </div>
                         <div>
-                            <label
+                            <div
                                 class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
-                                >Timeout (s)</label
+                                >Timeout (s)</div
                             >
                             {#if isEditingConfig}
                                 <input
@@ -646,9 +646,9 @@
                             {/if}
                         </div>
                         <div class="md:col-span-2">
-                            <label
+                            <div
                                 class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
-                                >Handler</label
+                                >Handler</div
                             >
                             {#if isEditingConfig}
                                 <input

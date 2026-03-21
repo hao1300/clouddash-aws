@@ -2,12 +2,13 @@
     import {
         GetSecretValueCommand,
         DescribeSecretCommand,
+        UpdateSecretCommand
     } from "@aws-sdk/client-secrets-manager";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
-    import { highlightJson } from "$lib/utils/json-highlight";
+    import JsonEditor from "$lib/components/JsonEditor.svelte";
 
     let secretId = $derived($page.params.id || "");
 
@@ -20,7 +21,10 @@
     let error = $state("");
     let secretDetails = $state<any>(null);
     let secretValue = $state<string | null>(null);
+    let originalSecretValue = $state<string | null>(null);
     let valueLoading = $state(false);
+    let saveLoading = $state(false);
+    let actionMsg = $state("");
 
     let activeTab = $state<"json" | "key-value">("json");
 
@@ -49,14 +53,7 @@
         );
     });
 
-    let highlightedJson = $derived.by(() => {
-        if (!secretValue) return "";
-        if (parsedValue) {
-            const formatted = JSON.stringify(parsedValue, null, 2);
-            return highlightJson(formatted);
-        }
-        return secretValue;
-    });
+    let hasUnsavedChanges = $derived(secretValue !== null && originalSecretValue !== null && secretValue !== originalSecretValue);
 
     $effect(() => {
         if (aws.secretsManager && secretId) {
@@ -85,14 +82,49 @@
                 new GetSecretValueCommand({ SecretId: secretId }),
             );
             if (res.SecretString) {
-                secretValue = res.SecretString;
+                let formatted = res.SecretString;
+                try {
+                    formatted = JSON.stringify(JSON.parse(res.SecretString), null, 2);
+                } catch(e) {}
+                secretValue = formatted;
+                originalSecretValue = formatted;
             } else if (res.SecretBinary) {
-                secretValue = new TextDecoder().decode(res.SecretBinary);
+                const dec = new TextDecoder().decode(res.SecretBinary);
+                let formatted = dec;
+                try {
+                    formatted = JSON.stringify(JSON.parse(dec), null, 2);
+                } catch(e) {}
+                secretValue = formatted;
+                originalSecretValue = formatted;
             }
         } catch (e: any) {
             error = e.message || String(e);
         } finally {
             valueLoading = false;
+        }
+    }
+
+    async function handleSaveSecret() {
+        if (!aws.secretsManager || !secretId || !secretValue) return;
+        try {
+            saveLoading = true;
+            error = "";
+            actionMsg = "";
+            
+            let toSave = secretValue;
+            try {
+                toSave = JSON.stringify(JSON.parse(secretValue));
+            } catch (e) {}
+            
+            await aws.secretsManager.send(
+                new UpdateSecretCommand({ SecretId: secretId, SecretString: toSave })
+            );
+            originalSecretValue = secretValue;
+            actionMsg = "Secret updated successfully.";
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            saveLoading = false;
         }
     }
 </script>
@@ -102,6 +134,11 @@
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
             {error}
+        </div>{/if}
+    {#if actionMsg}<div
+            class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30"
+        >
+            {actionMsg}
         </div>{/if}
 
     <div class="flex-1 overflow-auto p-2 space-y-2 flex flex-col min-h-0">
@@ -194,11 +231,29 @@
                         >Loading...</span
                     >{/if}
             </div>
-            <div class="bg-black overflow-auto flex-1 p-0">
-                {#if secretValue}
+            <div class="bg-black overflow-hidden flex-1 p-0 flex flex-col relative">
+                {#if secretValue !== null}
                     {#if activeTab === "json"}
-                        <pre
-                            class="text-xs font-mono whitespace-pre-wrap break-all p-4 m-0 hljs">{@html highlightedJson}</pre>
+                        <div class="flex-1 w-full min-h-0 relative">
+                            <JsonEditor bind:value={secretValue} />
+                            {#if hasUnsavedChanges}
+                                <div class="absolute bottom-4 right-4 z-10 flex gap-2">
+                                    <button 
+                                        onclick={() => { secretValue = originalSecretValue; error = ""; actionMsg = ""; }}
+                                        class="bg-gray-700 hover:bg-gray-600 shadow border border-gray-600 text-white px-4 py-2 rounded text-xs transition"
+                                    >
+                                        Discard
+                                    </button>
+                                    <button 
+                                        onclick={handleSaveSecret}
+                                        disabled={saveLoading}
+                                        class="bg-blue-600 hover:bg-blue-500 shadow border border-blue-500 text-white px-4 py-2 rounded text-xs font-bold transition flex items-center gap-2"
+                                    >
+                                        {#if saveLoading}<span class="animate-spin">⟳</span>{/if} Save Changes
+                                    </button>
+                                </div>
+                            {/if}
+                        </div>
                     {:else if isSimpleKeyValue}
                         <table class="w-full text-left border-collapse">
                             <thead>

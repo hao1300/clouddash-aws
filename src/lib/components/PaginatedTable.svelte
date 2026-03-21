@@ -12,6 +12,7 @@
         onNext = () => {},
         onPrev = () => {},
         onRefresh = () => {},
+        onRowClick = undefined,
         actionsSnippet = undefined,
         headerActionsSnippet = undefined,
         children = undefined,
@@ -32,6 +33,7 @@
         onNext?: () => void;
         onPrev?: () => void;
         onRefresh?: () => void;
+        onRowClick?: (item: T) => void;
         actionsSnippet?: Snippet<[T]>;
         headerActionsSnippet?: Snippet;
         children?: Snippet<[T]>;
@@ -241,7 +243,10 @@
                 {:else}
                     {#each processedItems as item}
                         <tr
-                            class="border-b border-gray-800/50 hover:bg-gray-900/30 transition-colors"
+                            class="border-b border-gray-800/50 hover:bg-gray-900/30 transition-colors {onRowClick ? 'cursor-pointer' : ''}"
+                            onclick={() => onRowClick && onRowClick(item)}
+                            onkeydown={(e) => { if (e.key === 'Enter' && onRowClick) onRowClick(item); }}
+                            tabindex={onRowClick ? 0 : undefined}
                         >
                             {#each columns as col}
                                 <td

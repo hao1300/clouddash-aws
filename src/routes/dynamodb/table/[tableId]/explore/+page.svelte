@@ -12,6 +12,7 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
+    import JsonEditor from "$lib/components/JsonEditor.svelte";
 
     let tableName = $derived($page.params.tableId || "");
 
@@ -702,6 +703,11 @@
                 resultTokenMap = [];
                 exploreMode === "scan" ? runScan() : runQuery();
             }}
+            onRowClick={(item) => {
+                itemEditorJson = JSON.stringify(item, null, 2);
+                itemEditorMode = "edit";
+                showItemEditor = true;
+            }}
             columns={allColumns}
         >
             {#snippet headerActionsSnippet()}
@@ -714,21 +720,7 @@
             {#snippet actionsSnippet(item)}
                 <div class="flex gap-1 justify-end">
                     <button
-                        onclick={() => (viewingItem = item)}
-                        class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition"
-                        >View</button
-                    >
-                    <button
-                        onclick={() => {
-                            itemEditorJson = JSON.stringify(item, null, 2);
-                            itemEditorMode = "edit";
-                            showItemEditor = true;
-                        }}
-                        class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 rounded transition"
-                        >Edit</button
-                    >
-                    <button
-                        onclick={() => (itemToDelete = item)}
+                        onclick={(e) => { e.stopPropagation(); itemToDelete = item; }}
                         class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
                         >Delete</button
                     >
@@ -747,10 +739,9 @@
         <p class="text-xs text-gray-400 mb-2">
             Edit item JSON. Types are auto-inferred.
         </p>
-        <textarea
-            bind:value={itemEditorJson}
-            class="flex-1 w-full bg-black font-mono text-xs p-3 rounded border border-gray-700 text-green-400 outline-none focus:border-blue-500 resize-none"
-        ></textarea>
+        <div class="flex-1 w-full rounded border border-gray-700 outline-none focus-within:border-blue-500 overflow-hidden min-h-0">
+            <JsonEditor bind:value={itemEditorJson} />
+        </div>
         <div class="flex justify-end gap-2 mt-4 shrink-0">
             <button
                 onclick={() => (showItemEditor = false)}
