@@ -198,6 +198,77 @@
     let invokeInput = $state("{}");
     let invokeResult = $state<any>(null);
     let invokeLoading = $state(false);
+    
+    interface InvokeHistoryEntry {
+        id: string;
+        payload: string;
+        timestamp: number;
+        functionName: string;
+    }
+    let invokeHistory = $state<InvokeHistoryEntry[]>([]);
+    let isInvokeSidebarCollapsed = $state(false);
+    let historyLoaded = false;
+
+    $effect(() => {
+        if (!historyLoaded) {
+            historyLoaded = true;
+            try {
+                const stored = localStorage.getItem(`aws-lambda-invoke-history-global`);
+                if (stored) {
+                    invokeHistory = JSON.parse(stored);
+                }
+            } catch(e) {}
+        }
+    });
+
+    function saveInvokeHistory(payload: string) {
+        if (!payload.trim() || payload === "{}") return;
+        let hist = [...invokeHistory];
+        
+        hist = hist.filter(item => item.payload !== payload);
+        
+        hist.unshift({
+            id: Date.now().toString() + Math.random().toString(36).substring(2),
+            payload,
+            timestamp: Date.now(),
+            functionName: fnName
+        });
+        
+        if (hist.length > 50) hist = hist.slice(0, 50);
+        invokeHistory = hist;
+        try {
+            localStorage.setItem(`aws-lambda-invoke-history-global`, JSON.stringify(invokeHistory));
+        } catch(e) {}
+    }
+
+    function deleteHistoryEntry(e: Event, id: string) {
+        e.stopPropagation();
+        invokeHistory = invokeHistory.filter(h => h.id !== id);
+        try {
+            localStorage.setItem(`aws-lambda-invoke-history-global`, JSON.stringify(invokeHistory));
+        } catch(e) {}
+    }
+
+    function formatTime(ts: number) {
+        const now = Date.now();
+        const diff = Math.max(0, now - ts);
+        const seconds = Math.floor(diff / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+        
+        if (days >= 30) {
+            return new Date(ts).toLocaleDateString() + " " + new Date(ts).toLocaleTimeString();
+        } else if (days > 0) {
+            return `${days} day${days > 1 ? 's' : ''} ago`;
+        } else if (hours > 0) {
+            return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+        } else if (minutes > 0) {
+            return `${minutes} min${minutes > 1 ? 's' : ''} ago`;
+        } else {
+            return `Just now`;
+        }
+    }
 
     // Config state
     let isEditingConfig = $state(false);
@@ -237,6 +308,7 @@
 
     async function handleInvoke() {
         if (!aws.lambda || !fnName) return;
+        saveInvokeHistory(invokeInput);
         try {
             invokeLoading = true;
             invokeResult = null;
@@ -376,60 +448,122 @@
 
     <div class="flex-1 overflow-auto p-6 min-h-0 relative">
         {#if detailTab === "invoke"}
-            <div class="max-w-3xl space-y-4">
-                <div class="bg-gray-900 p-5 rounded-lg border border-gray-800">
-                    <label
-                        class="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest"
-                        >Event JSON</label
-                    >
-                    <textarea
-                        bind:value={invokeInput}
-                        class="w-full h-48 bg-black border border-gray-700 rounded p-3 text-xs font-mono text-gray-300 outline-none focus:border-blue-500"
-                    ></textarea>
-                    <div class="mt-4 flex justify-end">
-                        <button
-                            onclick={handleInvoke}
-                            disabled={invokeLoading}
-                            class="bg-orange-600 hover:bg-orange-500 text-white px-6 py-2 rounded text-xs font-bold transition shadow flex items-center gap-2"
-                        >
-                            {#if invokeLoading}<span class="animate-spin"
-                                    >⟳</span
-                                >{/if} Invoke
-                        </button>
+            <div class="flex flex-col lg:flex-row items-start gap-6 h-full min-h-0">
+                <div class="flex-1 min-w-0 w-full">
+                    <div class="max-w-3xl space-y-4">
+                        <div class="bg-gray-900 p-5 rounded-lg border border-gray-800">
+                            <label
+                                class="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest"
+                                >Event JSON</label
+                            >
+                            <textarea
+                                bind:value={invokeInput}
+                                class="w-full h-48 bg-black border border-gray-700 rounded p-3 text-xs font-mono text-gray-300 outline-none focus:border-blue-500"
+                            ></textarea>
+                            <div class="mt-4 flex justify-end">
+                                <button
+                                    onclick={handleInvoke}
+                                    disabled={invokeLoading}
+                                    class="bg-orange-600 hover:bg-orange-500 text-white px-6 py-2 rounded text-xs font-bold transition shadow flex items-center gap-2"
+                                >
+                                    {#if invokeLoading}<span class="animate-spin"
+                                            >⟳</span
+                                        >{/if} Invoke
+                                </button>
+                            </div>
+                        </div>
+
+                        {#if invokeResult}
+                            <div
+                                class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-sm"
+                            >
+                                <div
+                                    class="bg-gray-800/50 px-4 py-2 border-b border-gray-700 flex justify-between items-center"
+                                >
+                                    <span
+                                        class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"
+                                        >Response</span
+                                    >
+                                    <div class="flex gap-2 text-[10px] font-bold">
+                                        <span
+                                            class={invokeResult.statusCode >= 200 &&
+                                            invokeResult.statusCode < 300
+                                                ? "text-green-400"
+                                                : "text-red-400"}
+                                            >Status: {invokeResult.statusCode}</span
+                                        >
+                                        {#if invokeResult.error}<span
+                                                class="text-red-400 underline decoration-red-400/30"
+                                                >Error: {invokeResult.error}</span
+                                            >{/if}
+                                    </div>
+                                </div>
+                                <div class="p-4 bg-black overflow-x-auto max-h-96">
+                                    <pre
+                                        class="text-xs text-green-400 font-mono whitespace-pre-wrap">{invokeResult.payload}</pre>
+                                </div>
+                            </div>
+                        {/if}
                     </div>
                 </div>
 
-                {#if invokeResult}
-                    <div
-                        class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-sm"
+                <!-- History Sidebar Section -->
+                <div class="{isInvokeSidebarCollapsed ? 'w-10' : 'w-80'} shrink-0 transition-all duration-300 flex flex-col relative sticky top-0 h-[calc(100vh-16rem)]">
+                    <button
+                        onclick={() => isInvokeSidebarCollapsed = !isInvokeSidebarCollapsed}
+                        class="absolute -left-3 top-1/2 -translate-y-1/2 bg-gray-800 border border-gray-700 rounded-full p-1 text-gray-400 hover:text-white hover:bg-gray-700 z-10 hidden lg:block shadow-md focus:outline-none"
+                        title={isInvokeSidebarCollapsed ? "Expand history" : "Collapse history"}
                     >
-                        <div
-                            class="bg-gray-800/50 px-4 py-2 border-b border-gray-700 flex justify-between items-center"
-                        >
-                            <span
-                                class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"
-                                >Response</span
-                            >
-                            <div class="flex gap-2 text-[10px] font-bold">
-                                <span
-                                    class={invokeResult.statusCode >= 200 &&
-                                    invokeResult.statusCode < 300
-                                        ? "text-green-400"
-                                        : "text-red-400"}
-                                    >Status: {invokeResult.statusCode}</span
-                                >
-                                {#if invokeResult.error}<span
-                                        class="text-red-400 underline decoration-red-400/30"
-                                        >Error: {invokeResult.error}</span
-                                    >{/if}
+                        <svg class="w-4 h-4 transition-transform duration-300 {isInvokeSidebarCollapsed ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+                    <div class="{isInvokeSidebarCollapsed ? 'opacity-0 invisible' : 'opacity-100 visible'} transition-all duration-300 h-full flex flex-col w-80">
+                        <div class="bg-gray-900 rounded-xl border border-gray-800 flex flex-col overflow-hidden h-full shadow-sm">
+                            <div class="p-4 border-b border-gray-800 bg-gray-900/50">
+                                <h3 class="text-xs font-bold text-gray-100 uppercase tracking-widest">
+                                    Recent Payloads
+                                </h3>
+                            </div>
+                            <div class="flex-1 overflow-auto p-4 space-y-3 bg-gray-950/50">
+                                {#if invokeHistory.length === 0}
+                                    <div class="text-[10px] text-gray-600 italic text-center py-4 border border-gray-800 border-dashed rounded bg-gray-900/50">
+                                        No recent history.
+                                        Invoke to save payloads.
+                                    </div>
+                                {:else}
+                                    {#each invokeHistory as hist (hist.id)}
+                                        <div class="relative group">
+                                            <button
+                                                type="button"
+                                                onclick={() => invokeInput = hist.payload}
+                                                class="w-full text-left bg-gray-900 p-3 rounded border border-gray-800 hover:border-gray-700 transition-colors shadow-sm"
+                                            >
+                                                <div class="flex items-center justify-between mb-2 gap-2">
+                                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-900/30 text-blue-400 border border-blue-800/50 uppercase tracking-wider truncate min-w-0" title={hist.functionName}>
+                                                        {hist.functionName}
+                                                    </span>
+                                                    <span class="text-[9px] text-gray-500 shrink-0 pr-6">{formatTime(hist.timestamp)}</span>
+                                                </div>
+                                                <p class="text-[10px] text-gray-400 font-mono leading-relaxed line-clamp-3 group-hover:line-clamp-none transition-all break-all overflow-hidden">
+                                                    {hist.payload}
+                                                </p>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick={(e) => deleteHistoryEntry(e, hist.id)}
+                                                class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-gray-500 hover:text-red-400 bg-gray-900 hover:bg-gray-800 rounded z-10 border border-transparent hover:border-gray-700 shadow-sm"
+                                                title="Delete from history"
+                                            >
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                            </button>
+                                        </div>
+                                    {/each}
+                                {/if}
                             </div>
                         </div>
-                        <div class="p-4 bg-black overflow-x-auto max-h-96">
-                            <pre
-                                class="text-xs text-green-400 font-mono whitespace-pre-wrap">{invokeResult.payload}</pre>
-                        </div>
                     </div>
-                {/if}
+                </div>
             </div>
         {:else if detailTab === "configuration"}
             <div class="max-w-4xl space-y-6">
