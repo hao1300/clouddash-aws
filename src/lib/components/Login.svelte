@@ -65,15 +65,12 @@
             const data = JSON.parse(decodedText);
             if (Array.isArray(data)) {
                 Promise.all(
-                    data.map(async (p) => {
-                        if (p.access_key_id && p.secret_access_key) {
+                    data.map(async (p: any) => {
+                        if (Object.keys(p).length > 1) {
                             try {
                                 await invoke("save_profile", {
                                     name: p.profile || "default",
-                                    accessKey: p.access_key_id,
-                                    secretKey: p.secret_access_key,
-                                    sessionToken: p.session_token || null,
-                                    region: p.region || null,
+                                    properties: p,
                                 });
                             } catch (e) {
                                 console.error(e);
@@ -81,7 +78,7 @@
                         }
                     })
                 ).then(() => {
-                    const first = data.find((p) => p.access_key_id) || {};
+                    const first = data.find((p: any) => Object.keys(p).length > 1) || {};
                     if (first.profile) selectedProfile = first.profile;
                     if (onProfilesSaved) onProfilesSaved();
                     onSwitchAuthType("profile");
@@ -90,11 +87,13 @@
                         scanner = null;
                     }
                 });
-            } else if (data.access_key_id && data.secret_access_key) {
-                accessKeyId = data.access_key_id;
-                secretAccessKey = data.secret_access_key;
-                if (data.session_token) sessionToken = data.session_token;
-                if (data.region) region = data.region;
+            } else if (data.aws_access_key_id || data.access_key_id) {
+                accessKeyId = data.aws_access_key_id || data.access_key_id;
+                secretAccessKey = data.aws_secret_access_key || data.secret_access_key;
+                const token = data.aws_session_token || data.session_token;
+                if (token) sessionToken = token;
+                const reg = data.region;
+                if (reg) region = reg;
 
                 onSwitchAuthType("manual");
                 if (scanner) {

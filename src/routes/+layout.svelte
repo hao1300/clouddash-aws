@@ -364,10 +364,12 @@
         }
         await invoke("save_profile", {
           name: saveProfileName.trim(),
-          accessKey: accessKeyId.trim(),
-          secretKey: secretAccessKey.trim(),
-          sessionToken: sessionToken.trim() || null,
-          region: region || null,
+          properties: {
+            "aws_access_key_id": accessKeyId.trim(),
+            "aws_secret_access_key": secretAccessKey.trim(),
+            "aws_session_token": sessionToken.trim(),
+            "region": region || "",
+          }
         });
 
         selectedProfile = saveProfileName.trim();

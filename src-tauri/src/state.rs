@@ -150,7 +150,7 @@ pub async fn get_credentials(
 }
 
 #[tauri::command]
-pub fn save_profile(app_handle: tauri::AppHandle, name: String, access_key: String, secret_key: String, session_token: Option<String>, region: Option<String>) -> Result<(), String> {
+pub fn save_profile(app_handle: tauri::AppHandle, name: String, properties: std::collections::HashMap<String, String>) -> Result<(), String> {
     use std::fs::OpenOptions;
     use std::io::Write;
 
@@ -161,54 +161,61 @@ pub fn save_profile(app_handle: tauri::AppHandle, name: String, access_key: Stri
     }
 
     let cred_path = aws_dir.join("credentials");
+    let cfg_path = aws_dir.join("config");
     
-    let profile_header = if name == "default" {
+    let cred_header = if name == "default" {
         "[default]".to_string()
     } else {
         format!("[{}]", name)
     };
-
-    let mut buf = String::new();
-    buf.push_str(&format!("\n{}\n", profile_header));
-    buf.push_str(&format!("aws_access_key_id = {}\n", access_key));
-    buf.push_str(&format!("aws_secret_access_key = {}\n", secret_key));
     
-    if let Some(token) = session_token {
-        if !token.is_empty() {
-            buf.push_str(&format!("aws_session_token = {}\n", token));
+    let cfg_header = if name == "default" {
+        "[default]".to_string()
+    } else {
+        format!("[profile {}]", name)
+    };
+
+    let mut cred_buf = String::new();
+    let mut cfg_buf = String::new();
+
+    cred_buf.push_str(&format!("\n{}\n", cred_header));
+    cfg_buf.push_str(&format!("\n{}\n", cfg_header));
+
+    let mut has_cred = false;
+    let mut has_cfg = false;
+
+    let is_cred_key = |k: &str| {
+        k == "aws_access_key_id" || k == "aws_secret_access_key" || k == "aws_session_token" || k == "credential_process" || k == "credential_source"
+    };
+
+    for (k, v) in properties.iter() {
+        if k == "profile" { continue; }
+        if v.is_empty() { continue; }
+        if is_cred_key(k) {
+            cred_buf.push_str(&format!("{} = {}\n", k, v));
+            has_cred = true;
+        } else {
+            cfg_buf.push_str(&format!("{} = {}\n", k, v));
+            has_cfg = true;
         }
     }
 
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&cred_path)
-        .map_err(|e| e.to_string())?;
+    if has_cred {
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&cred_path)
+            .map_err(|e| e.to_string())?;
+        file.write_all(cred_buf.as_bytes()).map_err(|e| e.to_string())?;
+    }
 
-    file.write_all(buf.as_bytes()).map_err(|e| e.to_string())?;
-
-    // Optionally save region to ~/.aws/config
-    if let Some(reg) = region {
-        if !reg.is_empty() {
-            let cfg_path = aws_dir.join("config");
-            let mut cfg_file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&cfg_path)
-                .map_err(|e| e.to_string())?;
-            
-            let cfg_header = if name == "default" {
-                "[default]".to_string()
-            } else {
-                format!("[profile {}]", name)
-            };
-            
-            let mut cfg_buf = String::new();
-            cfg_buf.push_str(&format!("\n{}\n", cfg_header));
-            cfg_buf.push_str(&format!("region = {}\n", reg));
-            
-            cfg_file.write_all(cfg_buf.as_bytes()).map_err(|e| e.to_string())?;
-        }
+    if has_cfg {
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&cfg_path)
+            .map_err(|e| e.to_string())?;
+        file.write_all(cfg_buf.as_bytes()).map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -292,28 +299,18 @@ pub fn get_all_profiles(app_handle: tauri::AppHandle) -> Result<Vec<serde_json::
 
     let mut profiles = Vec::new();
     for name in all_profile_names {
-        let mut ak = String::new();
-        let mut sk = String::new();
-        let mut token = None;
-        let mut region = None;
-
+        let mut props = std::collections::HashMap::new();
         if let Some(m) = creds_map.get(&name) {
-            ak = m.get("aws_access_key_id").cloned().unwrap_or_default();
-            sk = m.get("aws_secret_access_key").cloned().unwrap_or_default();
-            token = m.get("aws_session_token").cloned();
+            props.extend(m.clone());
         }
         if let Some(m) = cfg_map.get(&name) {
-            region = m.get("region").cloned();
+            props.extend(m.clone());
         }
 
-        if !ak.is_empty() && !sk.is_empty() {
-            profiles.push(serde_json::json!({
-                "profile": name,
-                "access_key_id": ak,
-                "secret_access_key": sk,
-                "session_token": token,
-                "region": region,
-            }));
+        if !props.is_empty() {
+            let mut val = serde_json::to_value(props).map_err(|e| e.to_string())?;
+            val.as_object_mut().unwrap().insert("profile".to_string(), serde_json::Value::String(name.clone()));
+            profiles.push(val);
         }
     }
     Ok(profiles)
