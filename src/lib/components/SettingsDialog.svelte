@@ -3,6 +3,7 @@
     import ReorderableList from "./ReorderableList.svelte";
     import { invoke } from "@tauri-apps/api/core";
     import QRCode from "qrcode";
+    import * as fflate from "fflate";
 
     export interface ServiceDef {
         id: string;
@@ -60,7 +61,13 @@
                         return;
                     }
                     const jsonStr = JSON.stringify(toExport);
-                    return QRCode.toDataURL(jsonStr, {
+                    const buf = fflate.strToU8(jsonStr);
+                    const compressed = fflate.deflateSync(buf);
+                    const binString = Array.from(compressed, (byte) => String.fromCharCode(byte)).join("");
+                    const b64 = btoa(binString);
+                    const finalPayload = "zlib:" + b64;
+                    
+                    return QRCode.toDataURL(finalPayload, {
                         width: 300,
                         margin: 2,
                         scale: 4,

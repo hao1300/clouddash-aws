@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Html5QrcodeScanner } from "html5-qrcode";
     import { invoke } from "@tauri-apps/api/core";
+    import * as fflate from "fflate";
 
     let {
         os = "",
@@ -62,7 +63,18 @@
 
     function onScanSuccess(decodedText: string, decodedResult: any) {
         try {
-            const data = JSON.parse(decodedText);
+            let jsonText = decodedText;
+            if (decodedText.startsWith("zlib:")) {
+                const b64 = decodedText.slice(5);
+                const binary = atob(b64);
+                const compressed = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    compressed[i] = binary.charCodeAt(i);
+                }
+                const decompressed = fflate.inflateSync(compressed);
+                jsonText = fflate.strFromU8(decompressed);
+            }
+            const data = JSON.parse(jsonText);
             if (Array.isArray(data)) {
                 Promise.all(
                     data.map(async (p: any) => {
