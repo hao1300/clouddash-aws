@@ -21,7 +21,7 @@
     );
 
     // Provide local state for intermediate dragging steps
-    let localItems = $state(wrappedItems);
+    let localItems = $state(items.map((item) => ({ id: keyFn(item), value: item })));
 
     $effect(() => {
         localItems = wrappedItems;

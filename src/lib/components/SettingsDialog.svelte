@@ -41,8 +41,13 @@
     let qrError = $state("");
     let loadingQr = $state(false);
 
+    let qrCarouselIndex = $state(0);
+    let includeQrSourceProfile = $state(false);
+    let allCreds = $state<any[]>([]);
+    let qrProfiles = $derived(allCreds.filter((c: any) => profileVisible.has(c.profile)));
+
     $effect(() => {
-        if (settingsTab === "qrcode" && !qrCodeDataUrl && !loadingQr && !qrError) {
+        if (settingsTab === "qrcode" && allCreds.length === 0 && !loadingQr && !qrError) {
             loadingQr = true;
             qrError = "";
             invoke("get_all_profiles")
@@ -55,33 +60,53 @@
                         if (idxA !== idxB) return idxA - idxB;
                         return a.profile.localeCompare(b.profile);
                     });
-                    const toExport = creds.filter((c: any) => profileVisible.has(c.profile));
-                    if (toExport.length === 0) {
-                        qrCodeDataUrl = "";
-                        return;
-                    }
-                    const jsonStr = JSON.stringify(toExport);
-                    const buf = fflate.strToU8(jsonStr);
-                    const compressed = fflate.deflateSync(buf);
-                    const binString = Array.from(compressed, (byte) => String.fromCharCode(byte)).join("");
-                    const b64 = btoa(binString);
-                    const finalPayload = "zlib:" + b64;
-                    
-                    return QRCode.toDataURL(finalPayload, {
-                        width: 300,
-                        margin: 2,
-                        scale: 4,
-                    });
-                })
-                .then((url: any) => {
-                    if (url) qrCodeDataUrl = typeof url === "string" ? url : "";
+                    allCreds = creds;
                 })
                 .catch((err: any) => {
-                    qrError = typeof err === "string" ? err : err.message || "Failed to generate QR code";
+                    qrError = typeof err === "string" ? err : err.message || "Failed to load profiles";
                 })
                 .finally(() => {
                     loadingQr = false;
                 });
+        }
+    });
+
+    $effect(() => {
+        if (settingsTab === "qrcode" && allCreds.length > 0) {
+            if (qrProfiles.length === 0) {
+                qrCodeDataUrl = "";
+                return;
+            }
+            if (qrCarouselIndex >= qrProfiles.length) {
+                qrCarouselIndex = Math.max(0, qrProfiles.length - 1);
+            }
+            const activeProfile = qrProfiles[qrCarouselIndex];
+            if (!activeProfile) return;
+
+            const toExport = [activeProfile];
+            if (includeQrSourceProfile && activeProfile.role_arn && activeProfile.source_profile) {
+                const sourceProfile = allCreds.find((c: any) => c.profile === activeProfile.source_profile);
+                if (sourceProfile) {
+                    toExport.push(sourceProfile);
+                }
+            }
+
+            const jsonStr = JSON.stringify(toExport);
+            const buf = fflate.strToU8(jsonStr);
+            const compressed = fflate.deflateSync(buf);
+            const binString = Array.from(compressed, (byte) => String.fromCharCode(byte)).join("");
+            const b64 = btoa(binString);
+            const finalPayload = "zlib:" + b64;
+            
+            QRCode.toDataURL(finalPayload, {
+                width: 300,
+                margin: 2,
+                scale: 4,
+            }).then((url: any) => {
+                if (url) qrCodeDataUrl = typeof url === "string" ? url : "";
+            }).catch((err: any) => {
+                qrError = typeof err === "string" ? err : err.message || "Failed to generate QR code";
+            });
         }
     });
 
@@ -124,8 +149,8 @@
     }
 </script>
 
-<Modal bind:open title="Settings" maxWidth="max-w-xl">
-    <div class="flex -m-5" style="height: 420px;">
+<Modal bind:open title="Settings" maxWidth="max-w-3xl">
+    <div class="flex -m-5 h-[420px] md:h-[600px]">
         <!-- Left vertical tabs -->
         <div
             class="w-32 bg-gray-950 border-r border-gray-800 flex flex-col py-2 shrink-0"
@@ -254,9 +279,13 @@
                         credentials.
                     </div>
 
-                    {#if loadingQr}
+                    {#if loadingQr && allCreds.length === 0}
                         <div class="text-blue-400 font-mono text-sm">
-                            Generating secure QR code...
+                            Loading profiles...
+                        </div>
+                    {:else if qrProfiles.length === 0}
+                        <div class="text-gray-500 text-sm">
+                            No profiles selected to export.
                         </div>
                     {:else if qrError}
                         <div
@@ -265,14 +294,50 @@
                             {qrError}
                         </div>
                     {:else if qrCodeDataUrl}
-                        <div
-                            class="bg-white p-4 rounded-xl shadow-lg border border-gray-700"
-                        >
-                            <img
-                                src={qrCodeDataUrl}
-                                alt="Credentials QR Code"
-                                class="w-[250px] h-[250px] select-none pointer-events-none"
-                            />
+                        <div class="flex items-center gap-6">
+                            <button
+                                onclick={() => qrCarouselIndex = (qrCarouselIndex - 1 + qrProfiles.length) % qrProfiles.length}
+                                class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition disabled:opacity-50"
+                                disabled={qrProfiles.length <= 1}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                            </button>
+
+                            <div class="flex flex-col items-center">
+                                <div class="text-sm font-semibold text-gray-200 mb-3 bg-gray-800 px-3 py-1 rounded-full border border-gray-700">
+                                    {qrProfiles[qrCarouselIndex]?.profile}
+                                </div>
+                                <div
+                                    class="bg-white p-4 rounded-xl shadow-lg border border-gray-700"
+                                >
+                                    <img
+                                        src={qrCodeDataUrl}
+                                        alt="Credentials QR Code"
+                                        class="w-[200px] h-[200px] select-none pointer-events-none"
+                                    />
+                                </div>
+                                {#if qrProfiles[qrCarouselIndex]?.role_arn && qrProfiles[qrCarouselIndex]?.source_profile}
+                                    <label class="mt-4 flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white transition group">
+                                        <div class="relative flex items-center">
+                                            <input type="checkbox" bind:checked={includeQrSourceProfile} class="peer sr-only" />
+                                            <div class="w-4 h-4 rounded border border-gray-600 bg-gray-800 peer-checked:bg-blue-600 peer-checked:border-blue-500 transition-colors"></div>
+                                            <svg class="absolute w-3 h-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100 top-0.5 left-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                        </div>
+                                        <span>Include source <span class="text-blue-400 font-mono text-xs">{qrProfiles[qrCarouselIndex].source_profile}</span></span>
+                                    </label>
+                                {/if}
+                            </div>
+
+                            <button
+                                onclick={() => qrCarouselIndex = (qrCarouselIndex + 1) % qrProfiles.length}
+                                class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition disabled:opacity-50"
+                                disabled={qrProfiles.length <= 1}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            </button>
+                        </div>
+                        <div class="mt-4 text-xs text-gray-500 font-medium">
+                            {qrCarouselIndex + 1} of {qrProfiles.length}
                         </div>
                     {/if}
                 </div>

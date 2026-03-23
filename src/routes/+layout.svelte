@@ -52,10 +52,13 @@
   let allProfiles = $state<string[]>([]);
   let selectedProfile = $state("default");
   let region = $state("us-east-1");
-  let authType = $state<"profile" | "manual" | "qr">("profile");
+  let authType = $state<"profile" | "manual" | "assume" | "qr">("profile");
 
   // Custom API Keys
   let os = $state("");
+  let accountId = $state("");
+  let roleName = $state("");
+  let sourceProfile = $state("default");
   let accessKeyId = $state("");
   let secretAccessKey = $state("");
   let sessionToken = $state("");
@@ -216,6 +219,9 @@
         serviceOrder,
         serviceVisible: [...serviceVisible],
         authType,
+        accountId,
+        roleName,
+        sourceProfile,
         accessKeyId,
         secretAccessKey,
         sessionToken,
@@ -302,6 +308,9 @@
     if (saved?.accessKeyId) accessKeyId = saved.accessKeyId;
     if (saved?.secretAccessKey) secretAccessKey = saved.secretAccessKey;
     if (saved?.sessionToken) sessionToken = saved.sessionToken;
+    if (saved?.accountId) accountId = saved.accountId;
+    if (saved?.roleName) roleName = saved.roleName;
+    if (saved?.sourceProfile) sourceProfile = saved.sourceProfile;
     if (saved?.saveProfileChecked)
       saveProfileChecked = saved.saveProfileChecked;
     if (saved?.saveProfileName) saveProfileName = saved.saveProfileName;
@@ -342,7 +351,7 @@
     }
   });
 
-  function switchAuthType(type: "profile" | "manual" | "qr") {
+  function switchAuthType(type: "profile" | "manual" | "assume" | "qr") {
     authType = type;
     currentLoginId++;
     loading = false;
@@ -359,17 +368,51 @@
         if (!saveProfileName.trim()) {
           throw "Profile Name is required.";
         }
+        
+        let properties: Record<string, string> = { region: region || "" };
+        
         if (!accessKeyId.trim() || !secretAccessKey.trim()) {
           throw "Access Key ID and Secret Access Key are required.";
         }
+        properties["aws_access_key_id"] = accessKeyId.trim();
+        properties["aws_secret_access_key"] = secretAccessKey.trim();
+        if (sessionToken.trim()) properties["aws_session_token"] = sessionToken.trim();
+
         await invoke("save_profile", {
           name: saveProfileName.trim(),
-          properties: {
-            "aws_access_key_id": accessKeyId.trim(),
-            "aws_secret_access_key": secretAccessKey.trim(),
-            "aws_session_token": sessionToken.trim(),
-            "region": region || "",
-          }
+          properties,
+        });
+
+        selectedProfile = saveProfileName.trim();
+        authType = "profile";
+
+        try {
+          allProfiles = await invoke("list_profiles");
+        } catch {
+          allProfiles = [selectedProfile];
+        }
+
+        if (!profileOrder.includes(selectedProfile)) {
+          profileOrder = [...profileOrder, selectedProfile];
+        }
+        profileVisible.add(selectedProfile);
+        profileVisible = profileVisible; // Force reactivity
+      } else if (authType === "assume") {
+        if (!saveProfileName.trim()) {
+          throw "Profile Name is required.";
+        }
+        
+        let properties: Record<string, string> = { region: region || "" };
+        
+        if (!accountId.trim() || !roleName.trim() || !sourceProfile.trim()) {
+          throw "Account ID, Role Name, and Source Profile are required.";
+        }
+        properties["role_arn"] = `arn:aws:iam::${accountId.trim()}:role/${roleName.trim()}`;
+        properties["source_profile"] = sourceProfile.trim();
+
+        await invoke("save_profile", {
+          name: saveProfileName.trim(),
+          properties,
         });
 
         selectedProfile = saveProfileName.trim();
@@ -444,6 +487,9 @@
     <Login
       {os}
       bind:authType
+      bind:accountId
+      bind:roleName
+      bind:sourceProfile
       bind:selectedProfile
       bind:accessKeyId
       bind:secretAccessKey
