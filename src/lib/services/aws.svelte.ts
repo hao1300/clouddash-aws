@@ -14,9 +14,9 @@ import { ElasticBeanstalkClient } from "@aws-sdk/client-elastic-beanstalk";
 import { CloudFormationClient } from "@aws-sdk/client-cloudformation";
 import { SESClient } from "@aws-sdk/client-ses";
 import { fetch } from "@tauri-apps/plugin-http";
-import { getAwsCredentials } from "./aws-creds";
+import type { AwsCreds } from "./aws-creds";
 
-const customRequestHandler = {
+export const customRequestHandler = {
     handle: async (request: any) => {
         const proto = request.protocol?.replace(/:$/, "") || "https";
         let url = request.hostname
@@ -78,18 +78,16 @@ const customRequestHandler = {
 } as any;
 
 class AwsState {
-    #creds = $state<any>(null);
+    #creds = $state<AwsCreds | null>(null);
 
-    constructor() {
-        this.refresh();
+    constructor() {}
+
+    setCredentials(creds: AwsCreds | null) {
+        this.#creds = creds;
     }
 
-    async refresh() {
-        try {
-            this.#creds = await getAwsCredentials();
-        } catch (e) {
-            console.error("Failed to refresh AWS credentials:", e);
-        }
+    getCredentials(): AwsCreds | null {
+        return this.#creds;
     }
 
     #config = $derived.by(() => {

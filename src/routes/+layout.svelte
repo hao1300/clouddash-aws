@@ -431,19 +431,70 @@
         profileVisible = profileVisible; // Force reactivity
       }
 
-      await invoke("authenticate", {
-        payload: {
-          auth_type: authType,
-          profile: authType === "profile" ? selectedProfile : undefined,
-          region,
-        },
-      });
+      let finalCreds = null;
+      let targetRegion = region || "us-east-1";
+
+      if (authType === "qr") {
+          finalCreds = {
+              access_key_id: accessKeyId,
+              secret_access_key: secretAccessKey,
+              session_token: sessionToken || null,
+              region: targetRegion
+          };
+      } else {
+          // All other types fall through to "profile"
+          const profiles = await invoke("get_all_profiles") as any[];
+          const target = profiles.find(p => p.profile === selectedProfile);
+          if (!target) throw new Error("Profile not found");
+
+          targetRegion = target.region || region || "us-east-1";
+
+          if (target.role_arn && target.source_profile) {
+              const source = profiles.find(p => p.profile === target.source_profile);
+              if (!source) throw new Error(`Source profile ${target.source_profile} not found`);
+
+              const { STSClient, AssumeRoleCommand } = await import("@aws-sdk/client-sts");
+              const { customRequestHandler } = await import("$lib/services/aws.svelte");
+
+              const sts = new STSClient({
+                  region: targetRegion,
+                  credentials: {
+                      accessKeyId: source.aws_access_key_id,
+                      secretAccessKey: source.aws_secret_access_key,
+                      sessionToken: source.aws_session_token || undefined
+                  },
+                  requestHandler: customRequestHandler
+              });
+
+              const res = await sts.send(new AssumeRoleCommand({
+                  RoleArn: target.role_arn,
+                  RoleSessionName: "CloudDashSession"
+              }));
+
+              if (!res.Credentials) throw new Error("STS returned no credentials");
+
+              finalCreds = {
+                  access_key_id: res.Credentials.AccessKeyId!,
+                  secret_access_key: res.Credentials.SecretAccessKey!,
+                  session_token: res.Credentials.SessionToken || null,
+                  region: targetRegion
+              };
+          } else {
+              if (!target.aws_access_key_id) throw new Error("Profile has no access keys");
+              finalCreds = {
+                  access_key_id: target.aws_access_key_id,
+                  secret_access_key: target.aws_secret_access_key,
+                  session_token: target.aws_session_token || null,
+                  region: targetRegion
+              };
+          }
+      }
 
       if (loginId !== currentLoginId) return;
 
       isAuthenticated = true;
       error = "";
-      await aws.refresh();
+      aws.setCredentials(finalCreds);
       refreshKey++;
       saveState();
 

@@ -3,7 +3,7 @@ use aws_config::Region;
 use serde::Deserialize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tauri::Manager;
+use tauri::{Manager, Emitter};
 
 fn get_aws_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -85,6 +85,10 @@ pub async fn authenticate(
     state: tauri::State<'_, SharedConfig>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
+    let _ = app_handle.emit("auth_progress", "Starting authentication...");
+    
+    std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
+
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         if let Ok(aws_dir) = get_aws_dir(&app_handle) {
@@ -92,6 +96,7 @@ pub async fn authenticate(
             std::env::set_var("AWS_CONFIG_FILE", aws_dir.join("config"));
         }
     }
+    let _ = app_handle.emit("auth_progress", format!("Resolving region: {}...", payload.region));
     let region_provider = RegionProviderChain::first_try(Region::new(payload.region))
         .or_default_provider()
         .or_else(Region::new("us-east-1"));
@@ -100,6 +105,7 @@ pub async fn authenticate(
         .region(region_provider);
 
     if payload.auth_type.as_deref() == Some("manual") {
+        let _ = app_handle.emit("auth_progress", "Using manual API keys...");
         let ak = payload.access_key_id.filter(|s| !s.is_empty()).ok_or("Access Key ID is required for manual login")?;
         let sk = payload.secret_access_key.filter(|s| !s.is_empty()).ok_or("Secret Access Key is required for manual login")?;
         let token = payload.session_token.filter(|s| !s.is_empty());
@@ -111,16 +117,26 @@ pub async fn authenticate(
     } else {
         if let Some(prof) = payload.profile {
             if !prof.is_empty() {
+                let _ = app_handle.emit("auth_progress", format!("Using profile: {}", prof));
                 config_loader = config_loader.profile_name(&prof);
             }
         }
     }
 
-    let sdk_config = config_loader.load().await;
+    let _ = app_handle.emit("auth_progress", "Loading AWS config... (with 10-second timeout)");
+    let sdk_config = match tokio::time::timeout(std::time::Duration::from_secs(10), config_loader.load()).await {
+        Ok(cfg) => cfg,
+        Err(_) => {
+            let _ = app_handle.emit("auth_progress", "ERROR: AWS configuration loading timed out after 10 seconds. Check your network or credentials setup.");
+            return Err("AWS configuration loading timed out after 10 seconds.".into());
+        }
+    };
 
+    let _ = app_handle.emit("auth_progress", "AWS configuration loaded. Updating state...");
     let mut cfg = state.0.write().await;
     *cfg = Some(sdk_config);
 
+    let _ = app_handle.emit("auth_progress", "Authentication successful.");
     Ok("Authenticated successfully".into())
 }
 

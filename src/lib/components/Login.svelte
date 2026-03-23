@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Html5QrcodeScanner, Html5QrcodeScanType } from "html5-qrcode";
     import { invoke } from "@tauri-apps/api/core";
+    import { listen, type UnlistenFn } from "@tauri-apps/api/event";
     import * as fflate from "fflate";
     import Modal from "./Modal.svelte";
 
@@ -57,6 +58,21 @@
     );
     let importSummary = $state("");
     let importSummaryTimeout: any = null;
+
+    let debugProfilesData = $state<any[]>([]);
+    let debugProfilesError = $state("");
+
+    $effect(() => {
+        if (authType === "profile" && debugProfilesData.length === 0 && !debugProfilesError) {
+            invoke("get_all_profiles")
+                .then((res: any) => {
+                    debugProfilesData = res;
+                })
+                .catch((err: any) => {
+                    debugProfilesError = String(err);
+                });
+        }
+    });
 
     function areProfilesEqual(p1: any, p2: any) {
         const keysToCompare = [
@@ -349,6 +365,17 @@
                                 >{p}</option
                             >{/each}
                     </select>
+                </div>
+                
+                <div class="mt-4 p-2 bg-gray-950 border border-gray-800 rounded text-[10px] font-mono text-gray-400 overflow-auto max-h-48 whitespace-pre-wrap break-all">
+                    <div class="text-gray-500 mb-1 uppercase tracking-wider font-sans">Debug Profiles Data</div>
+                    {#if debugProfilesError}
+                        <div class="text-red-400">{debugProfilesError}</div>
+                    {:else if debugProfilesData.length > 0}
+                        {JSON.stringify(debugProfilesData, null, 2)}
+                    {:else}
+                        Loading...
+                    {/if}
                 </div>
             {:else if authType === "manual"}
                 <div>
