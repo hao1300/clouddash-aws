@@ -53,15 +53,15 @@
             {/if}
 
             <!-- Content Area -->
-            <div class="flex {bottomSnippet ? 'shrink-0' : 'h-full flex-1 min-h-0'} gap-4">
+            <div class="flex flex-col lg:flex-row {bottomSnippet ? 'shrink-0' : 'flex-1 lg:h-full lg:min-h-0'} gap-4">
                 <!-- Main Content Section -->
-                <div class="flex-1 min-w-0 transition-all duration-300 h-full">
+                <div class="flex-1 min-w-0 transition-all duration-300 {bottomSnippet ? '' : 'lg:h-full'}">
                     {@render mainSnippet()}
                 </div>
 
                 <!-- Sidebar Section -->
                 {#if sidebarSnippet}
-                    <div class="{isSidebarCollapsed ? 'w-10' : 'w-80'} shrink-0 transition-all duration-300 flex flex-col relative {bottomSnippet ? 'self-stretch' : 'h-full'}">
+                    <div class="{isSidebarCollapsed ? 'lg:w-10' : 'w-full lg:w-80'} shrink-0 transition-all duration-300 flex flex-col relative {bottomSnippet ? 'self-stretch' : 'min-h-[300px] lg:h-full'}">
                         <button
                             onclick={() => isSidebarCollapsed = !isSidebarCollapsed}
                             class="absolute -left-3 top-1/2 -translate-y-1/2 bg-gray-800 border border-gray-700 rounded-full p-1 text-gray-400 hover:text-white hover:bg-gray-700 z-10 hidden lg:block shadow-md focus:outline-none"
@@ -71,7 +71,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                             </svg>
                         </button>
-                        <div class="{isSidebarCollapsed ? 'opacity-0 invisible' : 'opacity-100 visible'} transition-all duration-300 h-full flex flex-col gap-4 w-80 overflow-y-auto overflow-x-hidden">
+                        <div class="{isSidebarCollapsed ? 'lg:opacity-0 lg:invisible' : 'opacity-100 visible'} transition-all duration-300 flex-1 lg:h-full flex flex-col gap-4 w-full lg:w-80 overflow-y-auto overflow-x-hidden">
                             {@render sidebarSnippet()}
                         </div>
                     </div>

@@ -314,7 +314,11 @@
     if (saved?.saveProfileChecked)
       saveProfileChecked = saved.saveProfileChecked;
     if (saved?.saveProfileName) saveProfileName = saved.saveProfileName;
-    if (saved?.sideMenuOpen !== undefined) sideMenuOpen = saved.sideMenuOpen;
+    if (saved?.sideMenuOpen !== undefined && window.innerWidth >= 640) {
+      sideMenuOpen = saved.sideMenuOpen;
+    } else if (window.innerWidth < 640) {
+      sideMenuOpen = false;
+    }
 
     // Apply initial state from environment variables (forked process)
     if (initialState.profile && allProfiles.includes(initialState.profile)) {
