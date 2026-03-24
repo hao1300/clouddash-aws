@@ -574,20 +574,20 @@
       }}
     />
   {:else}
-    <div class="flex h-full w-full overflow-hidden">
+    <div class="flex h-full w-full overflow-hidden relative">
       {#if sideMenuOpen}
         <!-- Overlay for mobile -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-          class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity sm:hidden z-[150]"
+          class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity sm:hidden z-[150]"
           onclick={() => (sideMenuOpen = false)}
         ></div>
       {/if}
 
       <!-- Left Sidebar -->
       <div
-        class="fixed sm:static inset-y-0 left-0 z-[160] sm:z-auto w-72 max-w-[85vw] bg-gray-900 shadow-2xl sm:shadow-none flex flex-col border-r border-gray-800 shrink-0 transition-all duration-300 {sideMenuOpen
+        class="absolute sm:static inset-y-0 left-0 z-[160] sm:z-auto w-72 max-w-[85vw] bg-gray-900 shadow-2xl sm:shadow-none flex flex-col border-r border-gray-800 shrink-0 transition-all duration-300 {sideMenuOpen
           ? 'translate-x-0 sm:ml-0'
           : '-translate-x-full sm:-ml-72'}"
       >
