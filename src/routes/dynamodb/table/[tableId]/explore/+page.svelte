@@ -13,12 +13,14 @@
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
     import JsonEditor from "$lib/components/JsonEditor.svelte";
+    import { slide } from "svelte/transition";
 
     let tableName = $derived($page.params.tableId || "");
 
     let error = $state("");
     let actionMsg = $state("");
     let loading = $state(false);
+    let isQueryExpanded = $state(true);
 
     let tableSchema = $state<any>(null);
     let results = $state<any[]>([]);
@@ -305,6 +307,8 @@
             resultCurrentToken = resp.LastEvaluatedKey;
             if (results.length === 0)
                 actionMsg = "Scan completed. No results found.";
+            else
+                isQueryExpanded = false;
         } catch (e) {
             error = String(e);
         } finally {
@@ -378,6 +382,8 @@
             resultCurrentToken = resp.LastEvaluatedKey;
             if (results.length === 0)
                 actionMsg = "Query completed. No results found.";
+            else
+                isQueryExpanded = false;
         } catch (e) {
             error = String(e);
         } finally {
@@ -503,20 +509,23 @@
         </div>{/if}
 
     <div
-        class="space-y-3 mb-4 shrink-0 bg-gray-900 border border-gray-800 shadow-sm rounded-md overflow-hidden {error ||
+        class="mb-4 shrink-0 bg-gray-900 border border-gray-800 shadow-sm rounded-md overflow-hidden {error ||
         actionMsg
             ? 'mt-8'
             : ''}"
     >
         <!-- Header -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="p-2 border-b border-gray-800 bg-gray-800/50 flex items-center justify-between"
+            class="p-2 border-b border-gray-800 bg-gray-800/50 flex items-center justify-between cursor-pointer hover:bg-gray-800/70 transition-colors"
+            onclick={() => isQueryExpanded = !isQueryExpanded}
         >
             <div class="flex items-center gap-6">
                 <span class="text-sm font-semibold text-gray-200"
                     >Scan or query items</span
                 >
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-4" onclick={(e) => e.stopPropagation()}>
                     <label
                         class="flex items-center gap-2 text-xs text-gray-300 cursor-pointer hover:text-white"
                     >
@@ -539,9 +548,15 @@
                     </label>
                 </div>
             </div>
+            <div class="pr-2 text-gray-400">
+                <svg class="w-4 h-4 transition-transform duration-300 {!isQueryExpanded ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                </svg>
+            </div>
         </div>
 
-        <div class="p-4 space-y-4">
+        {#if isQueryExpanded}
+        <div class="p-4 space-y-4" transition:slide={{ duration: 200 }}>
             <div class="grid grid-cols-1 gap-4">
                 <div class="space-y-1">
                     <label>
@@ -798,6 +813,7 @@
                 </button>
             </div>
         </div>
+        {/if}
     </div>
 
     <div
