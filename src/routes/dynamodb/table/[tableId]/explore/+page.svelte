@@ -72,7 +72,7 @@
     $effect(() => {
         titleService.setResources([
             { name: "Tables", href: "/dynamodb", path: "/dynamodb" },
-            { name: tableName, path: $page.url.pathname }
+            { name: tableName, path: $page.url.pathname },
         ]);
     });
 
@@ -112,13 +112,19 @@
     }
 
     function buildExpressions(rows: FilterRow[]) {
-        const validRows = rows.filter(row => {
+        const validRows = rows.filter((row) => {
             if (!row.attribute.trim()) return false;
-            if (row.condition === "Exists" || row.condition === "Not exists") return true;
+            if (row.condition === "Exists" || row.condition === "Not exists")
+                return true;
             return row.value.trim() !== "";
         });
 
-        if (validRows.length === 0) return { filterExpr: undefined, names: undefined, values: undefined };
+        if (validRows.length === 0)
+            return {
+                filterExpr: undefined,
+                names: undefined,
+                values: undefined,
+            };
 
         let exprParts: string[] = [];
         let names: Record<string, string> = {};
@@ -131,27 +137,54 @@
 
             let val: any = row.value;
             if (row.type === "Number") val = Number(row.value);
-            else if (row.type === "Boolean") val = row.value.toLowerCase() === "true";
+            else if (row.type === "Boolean")
+                val = row.value.toLowerCase() === "true";
             else if (row.type === "Null") val = null;
 
-            const marshalledVal = row.type === "Number" ? { N: String(val) } :
-                                 row.type === "Boolean" ? { BOOL: val } :
-                                 row.type === "Null" ? { NULL: true } :
-                                 { S: String(val) };
-            
+            const marshalledVal =
+                row.type === "Number"
+                    ? { N: String(val) }
+                    : row.type === "Boolean"
+                      ? { BOOL: val }
+                      : row.type === "Null"
+                        ? { NULL: true }
+                        : { S: String(val) };
+
             values[valKey] = marshalledVal;
 
             switch (row.condition) {
-                case "Equal to": exprParts.push(`${attrKey} = ${valKey}`); break;
-                case "Not equal to": exprParts.push(`${attrKey} <> ${valKey}`); break;
-                case "Less than": exprParts.push(`${attrKey} < ${valKey}`); break;
-                case "Less than or equal to": exprParts.push(`${attrKey} <= ${valKey}`); break;
-                case "Greater than": exprParts.push(`${attrKey} > ${valKey}`); break;
-                case "Greater than or equal to": exprParts.push(`${attrKey} >= ${valKey}`); break;
-                case "Begins with": exprParts.push(`begins_with(${attrKey}, ${valKey})`); break;
-                case "Contains": exprParts.push(`contains(${attrKey}, ${valKey})`); break;
-                case "Exists": exprParts.push(`attribute_exists(${attrKey})`); delete values[valKey]; break;
-                case "Not exists": exprParts.push(`attribute_not_exists(${attrKey})`); delete values[valKey]; break;
+                case "Equal to":
+                    exprParts.push(`${attrKey} = ${valKey}`);
+                    break;
+                case "Not equal to":
+                    exprParts.push(`${attrKey} <> ${valKey}`);
+                    break;
+                case "Less than":
+                    exprParts.push(`${attrKey} < ${valKey}`);
+                    break;
+                case "Less than or equal to":
+                    exprParts.push(`${attrKey} <= ${valKey}`);
+                    break;
+                case "Greater than":
+                    exprParts.push(`${attrKey} > ${valKey}`);
+                    break;
+                case "Greater than or equal to":
+                    exprParts.push(`${attrKey} >= ${valKey}`);
+                    break;
+                case "Begins with":
+                    exprParts.push(`begins_with(${attrKey}, ${valKey})`);
+                    break;
+                case "Contains":
+                    exprParts.push(`contains(${attrKey}, ${valKey})`);
+                    break;
+                case "Exists":
+                    exprParts.push(`attribute_exists(${attrKey})`);
+                    delete values[valKey];
+                    break;
+                case "Not exists":
+                    exprParts.push(`attribute_not_exists(${attrKey})`);
+                    delete values[valKey];
+                    break;
             }
         });
 
@@ -290,13 +323,19 @@
             error = "";
             actionMsg = "";
 
-            const { filterExpr, names: fNames, values: fVals } = buildExpressions(filters);
-            
+            const {
+                filterExpr,
+                names: fNames,
+                values: fVals,
+            } = buildExpressions(filters);
+
             // Combine with KeyCondition names/vals
             let combinedNames = { ...queryNames, ...fNames };
-            
+
             let queryValsParsed = {};
-            try { if (queryValues) queryValsParsed = JSON.parse(queryValues); } catch(e) {}
+            try {
+                if (queryValues) queryValsParsed = JSON.parse(queryValues);
+            } catch (e) {}
             let marshalledQueryVals = marshalValues(queryValsParsed);
             let combinedValues = { ...marshalledQueryVals, ...fVals };
 
@@ -317,8 +356,9 @@
                     ExpressionAttributeNames: Object.keys(combinedNames).length
                         ? combinedNames
                         : undefined,
-                    ExpressionAttributeValues: Object.keys(combinedValues).length 
-                        ? combinedValues 
+                    ExpressionAttributeValues: Object.keys(combinedValues)
+                        .length
+                        ? combinedValues
                         : undefined,
                     ExclusiveStartKey: token,
                     Limit: queryLimit,
@@ -417,22 +457,29 @@
 
     let allColumns = $derived.by(() => {
         const foundKeys = [...new Set(results.flatMap((r) => Object.keys(r)))];
-        let pkName = "", skName = "";
+        let pkName = "",
+            skName = "";
 
         if (tableSchema) {
             let schemaRef = tableSchema.KeySchema;
             if (queryIndex) {
-                const idx = tableSchema.GlobalSecondaryIndexes?.find((i: any) => i.IndexName === queryIndex);
+                const idx = tableSchema.GlobalSecondaryIndexes?.find(
+                    (i: any) => i.IndexName === queryIndex,
+                );
                 if (idx) schemaRef = idx.KeySchema;
             }
-            pkName = schemaRef?.find((k: any) => k.KeyType === "HASH")?.AttributeName || "";
-            skName = schemaRef?.find((k: any) => k.KeyType === "RANGE")?.AttributeName || "";
+            pkName =
+                schemaRef?.find((k: any) => k.KeyType === "HASH")
+                    ?.AttributeName || "";
+            skName =
+                schemaRef?.find((k: any) => k.KeyType === "RANGE")
+                    ?.AttributeName || "";
         }
 
         const primaryKeys = [pkName, skName].filter(Boolean);
-        const otherKeys = foundKeys.filter(k => k !== pkName && k !== skName);
-        
-        return [...primaryKeys, ...otherKeys].map(k => ({
+        const otherKeys = foundKeys.filter((k) => k !== pkName && k !== skName);
+
+        return [...primaryKeys, ...otherKeys].map((k) => ({
             key: k,
             label: k,
             format: (val: any) =>
@@ -443,7 +490,7 @@
     });
 </script>
 
-<div class="h-full flex flex-col p-4 bg-gray-950 overflow-hidden relative">
+<div class="h-full flex flex-col p-2 bg-gray-950 overflow-hidden relative">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
@@ -462,9 +509,13 @@
             : ''}"
     >
         <!-- Header -->
-        <div class="px-4 py-2 border-b border-gray-800 bg-gray-800/50 flex items-center justify-between">
+        <div
+            class="p-2 border-b border-gray-800 bg-gray-800/50 flex items-center justify-between"
+        >
             <div class="flex items-center gap-6">
-                <span class="text-sm font-semibold text-gray-200">Scan or query items</span>
+                <span class="text-sm font-semibold text-gray-200"
+                    >Scan or query items</span
+                >
                 <div class="flex items-center gap-4">
                     <label
                         class="flex items-center gap-2 text-xs text-gray-300 cursor-pointer hover:text-white"
@@ -494,14 +545,19 @@
             <div class="grid grid-cols-1 gap-4">
                 <div class="space-y-1">
                     <label>
-                        <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Select a table or index</span>
+                        <span
+                            class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1"
+                            >Select a table or index</span
+                        >
                         <select
                             bind:value={queryIndex}
                             class="w-full bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
                         >
                             <option value="">Table - {tableName}</option>
                             {#each tableSchema?.GlobalSecondaryIndexes || [] as idx}
-                                <option value={idx.IndexName}>Index - {idx.IndexName}</option>
+                                <option value={idx.IndexName}
+                                    >Index - {idx.IndexName}</option
+                                >
                             {/each}
                         </select>
                     </label>
@@ -510,22 +566,38 @@
 
             {#if exploreMode === "query"}
                 {@const schemaRef = queryIndex
-                    ? tableSchema?.GlobalSecondaryIndexes?.find((i: any) => i.IndexName === queryIndex)?.KeySchema || tableSchema?.KeySchema
+                    ? tableSchema?.GlobalSecondaryIndexes?.find(
+                          (i: any) => i.IndexName === queryIndex,
+                      )?.KeySchema || tableSchema?.KeySchema
                     : tableSchema?.KeySchema}
-                {@const pkAttr = schemaRef?.find((k: any) => k.KeyType === "HASH")?.AttributeName || "pk"}
-                {@const skAttr = schemaRef?.find((k: any) => k.KeyType === "RANGE")?.AttributeName || ""}
+                {@const pkAttr =
+                    schemaRef?.find((k: any) => k.KeyType === "HASH")
+                        ?.AttributeName || "pk"}
+                {@const skAttr =
+                    schemaRef?.find((k: any) => k.KeyType === "RANGE")
+                        ?.AttributeName || ""}
 
                 <!-- Partition Key -->
                 <div class="border-t border-gray-800 pt-4">
-                    <h3 class="text-sm font-bold text-gray-200 mb-3">Partition key</h3>
+                    <h3 class="text-sm font-bold text-gray-200 mb-3">
+                        Partition key
+                    </h3>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Attribute</span>
-                            <span class="text-xs text-gray-300 block py-1.5">{pkAttr}</span>
+                            <span
+                                class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1"
+                                >Attribute</span
+                            >
+                            <span class="text-xs text-gray-300 block py-1.5"
+                                >{pkAttr}</span
+                            >
                         </div>
                         <div>
                             <label>
-                                <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Value</span>
+                                <span
+                                    class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1"
+                                    >Value</span
+                                >
                                 <input
                                     bind:value={partitionKeyInput}
                                     placeholder="Enter attribute value"
@@ -539,21 +611,36 @@
                 <!-- Sort Key -->
                 {#if skAttr}
                     <div class="border-t border-gray-800 pt-4">
-                        <h3 class="text-sm font-bold text-gray-200 mb-0.5">Sort key <span class="text-gray-500 italic font-normal">– optional</span></h3>
+                        <h3 class="text-sm font-bold text-gray-200 mb-0.5">
+                            Sort key <span
+                                class="text-gray-500 italic font-normal"
+                                >– optional</span
+                            >
+                        </h3>
                         <div class="grid grid-cols-2 gap-4 mt-3">
                             <div>
-                                <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Attribute</span>
-                                <span class="text-xs text-gray-300 block py-1.5">{skAttr}</span>
+                                <span
+                                    class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1"
+                                    >Attribute</span
+                                >
+                                <span class="text-xs text-gray-300 block py-1.5"
+                                    >{skAttr}</span
+                                >
                             </div>
                             <div>
-                                <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Value</span>
+                                <span
+                                    class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1"
+                                    >Value</span
+                                >
                                 <div class="flex gap-2">
                                     <select
                                         bind:value={sortKeyOp}
                                         class="bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none w-28"
                                     >
                                         <option value="=">Equal to</option>
-                                        <option value="begins_with">Begins with</option>
+                                        <option value="begins_with"
+                                            >Begins with</option
+                                        >
                                     </select>
                                     <input
                                         bind:value={sortKeyInput}
@@ -563,14 +650,20 @@
                                 </div>
                             </div>
                         </div>
-                        <label class="flex items-center gap-2 mt-3 cursor-pointer w-fit">
+                        <label
+                            class="flex items-center gap-2 mt-3 cursor-pointer w-fit"
+                        >
                             <input
                                 type="checkbox"
                                 checked={!queryScanIndexForward}
-                                onchange={(e) => queryScanIndexForward = !e.currentTarget.checked}
+                                onchange={(e) =>
+                                    (queryScanIndexForward =
+                                        !e.currentTarget.checked)}
                                 class="accent-blue-500 size-3.5"
                             />
-                            <span class="text-xs text-gray-300">Sort descending</span>
+                            <span class="text-xs text-gray-300"
+                                >Sort descending</span
+                            >
                         </label>
                     </div>
                 {/if}
@@ -580,26 +673,36 @@
             <div class="space-y-3 pt-2">
                 <div class="flex items-center gap-2">
                     <span class="text-xs font-bold text-gray-200">Filters</span>
-                    <span class="text-[10px] text-gray-500 italic">- optional</span>
+                    <span class="text-[10px] text-gray-500 italic"
+                        >- optional</span
+                    >
                 </div>
 
                 <div class="space-y-2">
                     {#each filters as filter (filter.id)}
-                        <div class="flex gap-2 items-center animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div
+                            class="flex gap-2 items-center animate-in fade-in slide-in-from-top-1 duration-200"
+                        >
                             <div class="w-1/4">
                                 <label>
-                                    <span class="block text-[10px] text-gray-500 mb-1 ml-1">Attribute name</span>
-                                    <input 
+                                    <span
+                                        class="block text-[10px] text-gray-500 mb-1 ml-1"
+                                        >Attribute name</span
+                                    >
+                                    <input
                                         bind:value={filter.attribute}
                                         placeholder="Enter attribute name"
-                                        class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none" 
+                                        class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
                                     />
                                 </label>
                             </div>
                             <div class="w-1/4">
                                 <label>
-                                    <span class="block text-[10px] text-gray-500 mb-1 ml-1">Condition</span>
-                                    <select 
+                                    <span
+                                        class="block text-[10px] text-gray-500 mb-1 ml-1"
+                                        >Condition</span
+                                    >
+                                    <select
                                         bind:value={filter.condition}
                                         class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
                                     >
@@ -608,7 +711,8 @@
                                         <option>Less than</option>
                                         <option>Less than or equal to</option>
                                         <option>Greater than</option>
-                                        <option>Greater than or equal to</option>
+                                        <option>Greater than or equal to</option
+                                        >
                                         <option>Begins with</option>
                                         <option>Contains</option>
                                         <option>Exists</option>
@@ -618,8 +722,11 @@
                             </div>
                             <div class="w-48">
                                 <label>
-                                    <span class="block text-[10px] text-gray-500 mb-1 ml-1">Type</span>
-                                    <select 
+                                    <span
+                                        class="block text-[10px] text-gray-500 mb-1 ml-1"
+                                        >Type</span
+                                    >
+                                    <select
                                         bind:value={filter.type}
                                         class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
                                     >
@@ -632,17 +739,22 @@
                             </div>
                             <div class="flex-1">
                                 <label>
-                                    <span class="block text-[10px] text-gray-500 mb-1 ml-1">Value</span>
-                                    <input 
+                                    <span
+                                        class="block text-[10px] text-gray-500 mb-1 ml-1"
+                                        >Value</span
+                                    >
+                                    <input
                                         bind:value={filter.value}
-                                        disabled={filter.condition === "Exists" || filter.condition === "Not exists"}
+                                        disabled={filter.condition ===
+                                            "Exists" ||
+                                            filter.condition === "Not exists"}
                                         placeholder="Enter attribute value"
-                                        class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none disabled:bg-gray-900 disabled:text-gray-600" 
+                                        class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none disabled:bg-gray-900 disabled:text-gray-600"
                                     />
                                 </label>
                             </div>
                             <div class="pt-5">
-                                <button 
+                                <button
                                     onclick={() => removeFilter(filter.id)}
                                     class="px-3 py-1.5 text-xs font-semibold text-blue-400 border border-blue-400/50 rounded-full hover:bg-blue-400/10 transition"
                                 >
@@ -652,7 +764,7 @@
                         </div>
                     {/each}
 
-                    <button 
+                    <button
                         onclick={addFilter}
                         class="px-3 py-1.5 text-xs font-semibold text-blue-400 border border-blue-400/50 rounded-full hover:bg-blue-400/10 transition mt-2"
                     >
@@ -663,15 +775,23 @@
 
             <div class="flex gap-4 pt-4 border-t border-gray-800">
                 <button
-                    onclick={() => exploreMode === "scan" ? runScan() : runQuery()}
-                    disabled={loading || (exploreMode === "query" && !partitionKeyInput)}
+                    onclick={() =>
+                        exploreMode === "scan" ? runScan() : runQuery()}
+                    disabled={loading ||
+                        (exploreMode === "query" && !partitionKeyInput)}
                     class="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 px-8 py-2 rounded-full text-xs font-bold text-black transition flex items-center gap-2"
                 >
-                    {#if loading}<span class="animate-spin text-lg">⟳</span>{/if}
+                    {#if loading}<span class="animate-spin text-lg">⟳</span
+                        >{/if}
                     Run
                 </button>
                 <button
-                    onclick={() => { filters = []; partitionKeyInput = ""; sortKeyInput = ""; sortKeyInput2 = ""; }}
+                    onclick={() => {
+                        filters = [];
+                        partitionKeyInput = "";
+                        sortKeyInput = "";
+                        sortKeyInput2 = "";
+                    }}
                     class="text-xs font-bold text-blue-400 hover:text-blue-300 transition"
                 >
                     Reset
@@ -720,7 +840,10 @@
             {#snippet actionsSnippet(item)}
                 <div class="flex gap-1 justify-end">
                     <button
-                        onclick={(e) => { e.stopPropagation(); itemToDelete = item; }}
+                        onclick={(e) => {
+                            e.stopPropagation();
+                            itemToDelete = item;
+                        }}
                         class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
                         >Delete</button
                     >
@@ -739,7 +862,9 @@
         <p class="text-xs text-gray-400 mb-2">
             Edit item JSON. Types are auto-inferred.
         </p>
-        <div class="flex-1 w-full rounded border border-gray-700 outline-none focus-within:border-blue-500 overflow-hidden min-h-0">
+        <div
+            class="flex-1 w-full rounded border border-gray-700 outline-none focus-within:border-blue-500 overflow-hidden min-h-0"
+        >
             <JsonEditor bind:value={itemEditorJson} />
         </div>
         <div class="flex justify-end gap-2 mt-4 shrink-0">

@@ -903,21 +903,6 @@
             >
               <span class="text-xl">☰</span>
             </button>
-            <button
-              onclick={() => {
-                let label = serviceTitle;
-                if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
-                bookmarks.toggle(label);
-              }}
-              class="p-1.5 rounded transition {bookmarks.isBookmarked
-                ? 'text-yellow-400 hover:bg-gray-800'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'}"
-              title={bookmarks.isBookmarked
-                ? "Remove Bookmark"
-                : "Bookmark Page"}
-            >
-              <span class="text-xl">{bookmarks.isBookmarked ? "★" : "☆"}</span>
-            </button>
           </div>
 
           <div class="sm:hidden flex items-center">
@@ -953,6 +938,22 @@
               {/each}
             {/if}
           </div>
+
+          <button
+            onclick={() => {
+              let label = serviceTitle;
+              if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
+              bookmarks.toggle(label);
+            }}
+            class="p-1.5 rounded transition {bookmarks.isBookmarked
+              ? 'text-yellow-400 hover:bg-gray-800'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800'}"
+            title={bookmarks.isBookmarked
+              ? "Remove Bookmark"
+              : "Bookmark Page"}
+          >
+            <span class="text-xl">{bookmarks.isBookmarked ? "★" : "☆"}</span>
+          </button>
         </header>
 
         {#if error}
