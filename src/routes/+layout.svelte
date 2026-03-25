@@ -88,7 +88,7 @@
   // Service Dropdown
   let dropdownOpen = $state(false);
   let sideMenuOpen = $state(window.innerWidth >= 640);
-  let activeSidebarTab = $state<"services" | "bookmarks">("services");
+  let rightPanelOpen = $state(false);
   let searchQuery = $state("");
 
   let filteredServices = $derived(
@@ -297,7 +297,9 @@
 
     // Restore profile/region and auto-login
     let isMobile = os === "android" || os === "ios";
-    let noRealProfiles = allProfiles.length === 0 || (allProfiles.length === 1 && allProfiles[0] === "default");
+    let noRealProfiles =
+      allProfiles.length === 0 ||
+      (allProfiles.length === 1 && allProfiles[0] === "default");
 
     if (saved?.authType) {
       authType = saved.authType;
@@ -372,15 +374,16 @@
         if (!saveProfileName.trim()) {
           throw "Profile Name is required.";
         }
-        
+
         let properties: Record<string, string> = { region: region || "" };
-        
+
         if (!accessKeyId.trim() || !secretAccessKey.trim()) {
           throw "Access Key ID and Secret Access Key are required.";
         }
         properties["aws_access_key_id"] = accessKeyId.trim();
         properties["aws_secret_access_key"] = secretAccessKey.trim();
-        if (sessionToken.trim()) properties["aws_session_token"] = sessionToken.trim();
+        if (sessionToken.trim())
+          properties["aws_session_token"] = sessionToken.trim();
 
         await invoke("save_profile", {
           name: saveProfileName.trim(),
@@ -405,13 +408,14 @@
         if (!saveProfileName.trim()) {
           throw "Profile Name is required.";
         }
-        
+
         let properties: Record<string, string> = { region: region || "" };
-        
+
         if (!accountId.trim() || !roleName.trim() || !sourceProfile.trim()) {
           throw "Account ID, Role Name, and Source Profile are required.";
         }
-        properties["role_arn"] = `arn:aws:iam::${accountId.trim()}:role/${roleName.trim()}`;
+        properties["role_arn"] =
+          `arn:aws:iam::${accountId.trim()}:role/${roleName.trim()}`;
         properties["source_profile"] = sourceProfile.trim();
 
         await invoke("save_profile", {
@@ -439,59 +443,71 @@
       let targetRegion = region || "us-east-1";
 
       if (authType === "qr") {
-          finalCreds = {
-              access_key_id: accessKeyId,
-              secret_access_key: secretAccessKey,
-              session_token: sessionToken || null,
-              region: targetRegion
-          };
+        finalCreds = {
+          access_key_id: accessKeyId,
+          secret_access_key: secretAccessKey,
+          session_token: sessionToken || null,
+          region: targetRegion,
+        };
       } else {
-          // All other types fall through to "profile"
-          const profiles = await invoke("get_all_profiles") as any[];
-          const target = profiles.find(p => p.profile === selectedProfile);
-          if (!target) throw new Error("Profile not found");
+        // All other types fall through to "profile"
+        const profiles = (await invoke("get_all_profiles")) as any[];
+        const target = profiles.find((p) => p.profile === selectedProfile);
+        if (!target) throw new Error("Profile not found");
 
-          targetRegion = target.region || region || "us-east-1";
+        targetRegion = target.region || region || "us-east-1";
 
-          if (target.role_arn && target.source_profile) {
-              const source = profiles.find(p => p.profile === target.source_profile);
-              if (!source) throw new Error(`Source profile ${target.source_profile} not found`);
+        if (target.role_arn && target.source_profile) {
+          const source = profiles.find(
+            (p) => p.profile === target.source_profile,
+          );
+          if (!source)
+            throw new Error(
+              `Source profile ${target.source_profile} not found`,
+            );
 
-              const { STSClient, AssumeRoleCommand } = await import("@aws-sdk/client-sts");
-              const { customRequestHandler } = await import("$lib/services/aws.svelte");
+          const { STSClient, AssumeRoleCommand } = await import(
+            "@aws-sdk/client-sts"
+          );
+          const { customRequestHandler } = await import(
+            "$lib/services/aws.svelte"
+          );
 
-              const sts = new STSClient({
-                  region: targetRegion,
-                  credentials: {
-                      accessKeyId: source.aws_access_key_id,
-                      secretAccessKey: source.aws_secret_access_key,
-                      sessionToken: source.aws_session_token || undefined
-                  },
-                  requestHandler: customRequestHandler
-              });
+          const sts = new STSClient({
+            region: targetRegion,
+            credentials: {
+              accessKeyId: source.aws_access_key_id,
+              secretAccessKey: source.aws_secret_access_key,
+              sessionToken: source.aws_session_token || undefined,
+            },
+            requestHandler: customRequestHandler,
+          });
 
-              const res = await sts.send(new AssumeRoleCommand({
-                  RoleArn: target.role_arn,
-                  RoleSessionName: "CloudDashSession"
-              }));
+          const res = await sts.send(
+            new AssumeRoleCommand({
+              RoleArn: target.role_arn,
+              RoleSessionName: "CloudDashSession",
+            }),
+          );
 
-              if (!res.Credentials) throw new Error("STS returned no credentials");
+          if (!res.Credentials) throw new Error("STS returned no credentials");
 
-              finalCreds = {
-                  access_key_id: res.Credentials.AccessKeyId!,
-                  secret_access_key: res.Credentials.SecretAccessKey!,
-                  session_token: res.Credentials.SessionToken || null,
-                  region: targetRegion
-              };
-          } else {
-              if (!target.aws_access_key_id) throw new Error("Profile has no access keys");
-              finalCreds = {
-                  access_key_id: target.aws_access_key_id,
-                  secret_access_key: target.aws_secret_access_key,
-                  session_token: target.aws_session_token || null,
-                  region: targetRegion
-              };
-          }
+          finalCreds = {
+            access_key_id: res.Credentials.AccessKeyId!,
+            secret_access_key: res.Credentials.SecretAccessKey!,
+            session_token: res.Credentials.SessionToken || null,
+            region: targetRegion,
+          };
+        } else {
+          if (!target.aws_access_key_id)
+            throw new Error("Profile has no access keys");
+          finalCreds = {
+            access_key_id: target.aws_access_key_id,
+            secret_access_key: target.aws_secret_access_key,
+            session_token: target.aws_session_token || null,
+            region: targetRegion,
+          };
+        }
       }
 
       if (loginId !== currentLoginId) return;
@@ -610,190 +626,99 @@
           </button>
         </div>
 
-        <!-- Tab Switcher -->
-        <div
-          class="px-4 pt-4 flex border-b border-gray-800 bg-gray-950 shrink-0"
-        >
-          <button
-            onclick={() => (activeSidebarTab = "services")}
-            class="flex-1 pb-3 text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {activeSidebarTab ===
-            'services'
-              ? 'text-blue-400 border-blue-500'
-              : 'text-gray-500 border-transparent hover:text-gray-300'}"
-          >
-            Services
-          </button>
-          <button
-            onclick={() => (activeSidebarTab = "bookmarks")}
-            class="flex-1 pb-3 text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {activeSidebarTab ===
-            'bookmarks'
-              ? 'text-blue-400 border-blue-500'
-              : 'text-gray-500 border-transparent hover:text-gray-300'}"
-          >
-            Bookmarks
-          </button>
-        </div>
+        <!-- Services List -->
 
         <div class="flex-1 overflow-y-auto p-4 space-y-8 pb-10">
-          {#if activeSidebarTab === "services"}
-            <!-- Services -->
+          <!-- Services -->
+          <div class="space-y-4">
             <div class="space-y-4">
-              <div class="space-y-4">
-                <div class="px-1">
-                  <input
-                    type="text"
-                    bind:value={searchQuery}
-                    placeholder="Search services..."
-                    class="w-full bg-black border border-gray-800 rounded p-2.5 text-xs text-white outline-none focus:border-blue-500 transition shadow-inner"
-                  />
-                </div>
-
-                <div class="grid grid-cols-1 gap-1">
-                  {#each mobileServices as svc, i (svc.id)}
-                    <div animate:flip={{ duration: 300 }}>
-                      {#if !searchQuery && !svc.isStarred && svc.prevIsStarred}
-                        <div
-                          class="mt-4 mb-2 px-2 pb-1 border-b border-gray-800"
-                        >
-                          <span
-                            class="text-[10px] font-bold text-gray-300 uppercase tracking-widest"
-                            >All Services</span
-                          >
-                        </div>
-                      {/if}
-
-                      <div class="space-y-1">
-                        <div
-                          class="flex items-center justify-between w-full px-1 rounded {activeId ===
-                          svc.id
-                            ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
-                            : 'hover:bg-gray-800 text-gray-300 border border-transparent'} transition text-left"
-                        >
-                          <button
-                            onclick={() => {
-                              switchTab(svc.id);
-                              if (window.innerWidth < 640) sideMenuOpen = false;
-                            }}
-                            class="flex-1 px-2 py-3 text-xs font-semibold text-left flex items-center gap-2"
-                          >
-                            {svc.label}
-                            {#if activeId === svc.id}
-                              <div
-                                class="w-1 h-1 rounded-full bg-blue-500"
-                              ></div>
-                            {/if}
-                          </button>
-                          <button
-                            class="px-3 py-3 text-xs hover:scale-110 transition {svc.isStarred
-                              ? 'text-yellow-400'
-                              : 'text-gray-700 hover:text-gray-500'}"
-                            onclick={(e) => toggleStar(svc.id, e)}
-                          >
-                            {svc.isStarred ? "★" : "☆"}
-                          </button>
-                        </div>
-
-                        {#if activeId === svc.id && serviceTabs.length > 1}
-                          <div
-                            class="ml-4 flex flex-col border-l border-gray-800 bg-gray-900/30 rounded-r"
-                          >
-                            {#each serviceTabs as tab}
-                              <button
-                                onclick={() => {
-                                  handleServiceTabChange(tab.id);
-                                  if (window.innerWidth < 640)
-                                    sideMenuOpen = false;
-                                }}
-                                class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
-                                  tab.id ||
-                                (tab.id &&
-                                  serviceActiveTab.startsWith(tab.id + '/'))
-                                  ? 'text-blue-400 font-bold bg-blue-500/10'
-                                  : 'text-gray-300 hover:text-white hover:bg-gray-800'}"
-                              >
-                                {tab.label}
-                              </button>
-                            {/each}
-                          </div>
-                        {/if}
-                      </div>
-                    </div>
-                  {/each}
-
-                  {#if mobileServices.length === 0}
-                    <div class="p-8 text-center">
-                      <div class="text-gray-600 text-xs italic">
-                        No services found matching "{searchQuery}"
-                      </div>
-                    </div>
-                  {/if}
-                </div>
+              <div class="px-1">
+                <input
+                  type="text"
+                  bind:value={searchQuery}
+                  placeholder="Search services..."
+                  class="w-full bg-black border border-gray-800 rounded p-2.5 text-xs text-white outline-none focus:border-blue-500 transition shadow-inner"
+                />
               </div>
-            </div>
-          {:else}
-            <!-- Bookmarks -->
-            <div class="space-y-4">
-              <button
-                onclick={() => {
-                  let label = serviceTitle;
-                  if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
-                  bookmarks.toggle(label);
-                }}
-                class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded text-xs font-bold border border-gray-700 transition shadow-lg"
-              >
-                <span
-                  class={bookmarks.isBookmarked
-                    ? "text-yellow-400"
-                    : "text-gray-400"}
-                >
-                  {bookmarks.isBookmarked ? "★" : "☆"}
-                </span>
-                <span>
-                  {bookmarks.isBookmarked
-                    ? "Remove Current Page"
-                    : "Bookmark Current Page"}
-                </span>
-              </button>
 
               <div class="grid grid-cols-1 gap-1">
-                {#each bookmarks.all as bkm}
-                  <div
-                    class="group flex items-center w-full bg-gray-800/50 border border-gray-800 rounded hover:border-gray-700 transition overflow-hidden"
-                  >
-                    <button
-                      onclick={() => {
-                        goto(bkm.url);
-                        if (window.innerWidth < 640) sideMenuOpen = false;
-                      }}
-                      class="flex-1 px-3 py-3 text-left hover:bg-gray-800 transition"
-                    >
-                      <span
-                        class="text-xs text-blue-400 font-medium break-words leading-tight block"
-                        >{bkm.label}</span
+                {#each mobileServices as svc, i (svc.id)}
+                  <div animate:flip={{ duration: 300 }}>
+                    {#if !searchQuery && !svc.isStarred && svc.prevIsStarred}
+                      <div class="mt-4 mb-2 px-2 pb-1 border-b border-gray-800">
+                        <span
+                          class="text-[10px] font-bold text-gray-300 uppercase tracking-widest"
+                          >All Services</span
+                        >
+                      </div>
+                    {/if}
+
+                    <div class="space-y-1">
+                      <div
+                        class="flex items-center justify-between w-full px-1 rounded {activeId ===
+                        svc.id
+                          ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
+                          : 'hover:bg-gray-800 text-gray-300 border border-transparent'} transition text-left"
                       >
-                    </button>
-                    <button
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        bookmarks.remove(bkm.id);
-                      }}
-                      class="p-3 text-gray-500 hover:text-red-400 transition"
-                      title="Remove bookmark"
-                    >
-                      ✕
-                    </button>
+                        <button
+                          onclick={() => {
+                            switchTab(svc.id);
+                            if (window.innerWidth < 640) sideMenuOpen = false;
+                          }}
+                          class="flex-1 px-2 py-3 text-xs font-semibold text-left flex items-center gap-2"
+                        >
+                          {svc.label}
+                          {#if activeId === svc.id}
+                            <div class="w-1 h-1 rounded-full bg-blue-500"></div>
+                          {/if}
+                        </button>
+                        <button
+                          class="px-3 py-3 text-xs hover:scale-110 transition {svc.isStarred
+                            ? 'text-yellow-400'
+                            : 'text-gray-700 hover:text-gray-500'}"
+                          onclick={(e) => toggleStar(svc.id, e)}
+                        >
+                          {svc.isStarred ? "★" : "☆"}
+                        </button>
+                      </div>
+
+                      {#if activeId === svc.id && serviceTabs.length > 1}
+                        <div
+                          class="ml-4 flex flex-col border-l border-gray-800 bg-gray-900/30 rounded-r"
+                        >
+                          {#each serviceTabs as tab}
+                            <button
+                              onclick={() => {
+                                handleServiceTabChange(tab.id);
+                                if (window.innerWidth < 640)
+                                  sideMenuOpen = false;
+                              }}
+                              class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
+                                tab.id ||
+                              (tab.id &&
+                                serviceActiveTab.startsWith(tab.id + '/'))
+                                ? 'text-blue-400 font-bold bg-blue-500/10'
+                                : 'text-gray-300 hover:text-white hover:bg-gray-800'}"
+                            >
+                              {tab.label}
+                            </button>
+                          {/each}
+                        </div>
+                      {/if}
+                    </div>
                   </div>
                 {/each}
-                {#if bookmarks.all.length === 0}
+
+                {#if mobileServices.length === 0}
                   <div class="p-8 text-center">
                     <div class="text-gray-600 text-xs italic">
-                      No bookmarks yet.
+                      No services found matching "{searchQuery}"
                     </div>
                   </div>
                 {/if}
               </div>
             </div>
-          {/if}
+          </div>
         </div>
 
         <!-- Account & Region Footer -->
@@ -944,17 +869,11 @@
           </div>
 
           <button
-            onclick={() => {
-              let label = serviceTitle;
-              if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
-              bookmarks.toggle(label);
-            }}
+            onclick={() => (rightPanelOpen = !rightPanelOpen)}
             class="p-1.5 rounded transition {bookmarks.isBookmarked
-              ? 'text-yellow-400 hover:bg-gray-800'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800'}"
-            title={bookmarks.isBookmarked
-              ? "Remove Bookmark"
-              : "Bookmark Page"}
+              ? 'text-yellow-400'
+              : 'text-gray-400'} hover:bg-gray-800"
+            title="Bookmarks"
           >
             <span class="text-xl">{bookmarks.isBookmarked ? "★" : "☆"}</span>
           </button>
@@ -983,6 +902,99 @@
           </ServiceLayout>
         </div>
       </div>
+
+      {#if rightPanelOpen}
+        <!-- Right Panel Overlay -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="absolute inset-0 bg-black/60 backdrop-blur-sm z-[200]"
+          onclick={() => (rightPanelOpen = false)}
+          transition:fade={{ duration: 200 }}
+        ></div>
+
+        <!-- Right Sliding Panel -->
+        <div
+          class="absolute inset-y-0 right-0 w-80 max-w-[90vw] bg-gray-900 border-l border-gray-800 shadow-2xl z-[210] flex flex-col overflow-hidden"
+          transition:fly={{ x: 320, duration: 300 }}
+        >
+          <div
+            class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950/50"
+          >
+            <h2 class="font-bold text-gray-100 flex items-center gap-2">
+              <span class="text-yellow-400 text-lg">★</span>
+              Bookmarks
+            </h2>
+            <button
+              onclick={() => (rightPanelOpen = false)}
+              class="p-2 rounded-full hover:bg-gray-800 text-gray-400 transition"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-4 space-y-4">
+            <button
+              onclick={() => {
+                let label = serviceTitle;
+                if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
+                bookmarks.toggle(label);
+              }}
+              class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold transition shadow-lg shrink-0"
+            >
+              <span class={bookmarks.isBookmarked ? "text-yellow-300" : ""}>
+                {bookmarks.isBookmarked ? "★" : "☆"}
+              </span>
+              <span>
+                {bookmarks.isBookmarked
+                  ? "Remove Current Page"
+                  : "Bookmark Current Page"}
+              </span>
+            </button>
+
+            <div class="grid grid-cols-1 gap-2 mt-4">
+              {#each bookmarks.all as bkm}
+                <div
+                  class="group flex items-center w-full bg-gray-800/50 border border-gray-800 rounded hover:border-blue-500/50 hover:bg-gray-800 transition overflow-hidden"
+                >
+                  <button
+                    onclick={() => {
+                      goto(bkm.url);
+                      rightPanelOpen = false;
+                    }}
+                    class="flex-1 px-3 py-3 text-left transition"
+                  >
+                    <span
+                      class="text-xs text-blue-400 font-medium break-words leading-snug block"
+                      >{bkm.label}</span
+                    >
+                  </button>
+                  <button
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      bookmarks.remove(bkm.id);
+                    }}
+                    class="p-3 text-gray-600 hover:text-red-400 transition"
+                    title="Remove bookmark"
+                  >
+                    ✕
+                  </button>
+                </div>
+              {/each}
+              {#if bookmarks.all.length === 0}
+                <div class="py-12 text-center">
+                  <div class="text-gray-600 text-sm italic mb-2">
+                    No bookmarks yet.
+                  </div>
+                  <div class="text-gray-700 text-[10px]">
+                    Add pages to quickly access them later.
+                  </div>
+                </div>
+              {/if}
+            </div>
+          </div>
+        </div>
+      {/if}
     </div>
 
     <SettingsDialog
