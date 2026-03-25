@@ -12,8 +12,19 @@
     import hljs from 'highlight.js';
     import 'highlight.js/styles/github-dark.css';
     import { invoke } from "@tauri-apps/api/core";
+    import { openUrl } from "@tauri-apps/plugin-opener";
     import { settings } from "$lib/services/settings.svelte";
     import { toastService } from "$lib/services/toast.svelte";
+    import { onMount } from "svelte";
+
+    let os = $state("windows");
+    onMount(async () => {
+        try {
+            os = await invoke("get_os");
+        } catch (e) {
+            console.error("Failed to get OS", e);
+        }
+    });
 
     let bucket = $derived($page.params.bucketName || "");
     let key = $derived($page.params.key || "");
@@ -145,7 +156,8 @@
                 const bytes = await body.transformToByteArray();
                 
                 if (settings.downloadFolder) {
-                    let targetPath = `${settings.downloadFolder}\\${fileName}`;
+                    const sep = os === "windows" ? "\\" : "/";
+                    let targetPath = `${settings.downloadFolder}${sep}${fileName}`;
                     
                     if (settings.downloadConflictMode === "rename") {
                         let counter = 1;
@@ -154,17 +166,23 @@
                         const baseName = nameParts.join('.');
                         
                         while (await invoke("file_exists", { path: targetPath })) {
-                            targetPath = `${settings.downloadFolder}\\${baseName} (${counter})${ext}`;
+                            targetPath = `${settings.downloadFolder}${sep}${baseName} (${counter})${ext}`;
                             counter++;
                         }
                     }
 
                     await invoke("save_file", { path: targetPath, data: Array.from(bytes) });
                     
-                    const finalFileName = targetPath.split('\\').pop() || fileName;
-                    toastService.success(`Downloaded ${finalFileName}`, 5000, () => {
-                        invoke("open_folder", { path: settings.downloadFolder });
-                    });
+                    const finalFileName = targetPath.split(sep).pop() || fileName;
+                    if (os === "android" || os === "ios") {
+                        toastService.success(`Downloaded ${finalFileName}. Click to open.`, 5000, () => {
+                            openUrl(`file://${targetPath}`);
+                        });
+                    } else {
+                        toastService.success(`Downloaded ${finalFileName}. Click to open folder.`, 5000, () => {
+                            invoke("open_folder", { path: settings.downloadFolder });
+                        });
+                    }
                 } else {
                     const blob = new Blob([bytes]);
                     const url = URL.createObjectURL(blob);

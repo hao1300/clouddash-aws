@@ -16,6 +16,20 @@ fn get_aws_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, Stri
     }
 }
 
+#[tauri::command]
+pub fn get_default_download_directory(app_handle: tauri::AppHandle) -> Result<String, String> {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let path = app_handle.path().document_dir().map_err(|e| e.to_string())?;
+        Ok(path.to_string_lossy().to_string())
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        let path = dirs::download_dir().unwrap_or_else(|| dirs::home_dir().unwrap().join("Downloads"));
+        Ok(path.to_string_lossy().to_string())
+    }
+}
+
 /// Shared AWS configuration — each service creates its own client from this.
 pub struct SharedConfig(pub Arc<RwLock<Option<aws_config::SdkConfig>>>);
 
@@ -373,4 +387,16 @@ pub async fn open_folder(path: String) -> Result<(), String> {
             .spawn();
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn open_file(path: String) -> Result<(), String> {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        open_folder(path).await
+    }
 }

@@ -20,6 +20,8 @@ pub fn run() {
             state::save_file,
             state::file_exists,
             state::open_folder,
+            state::open_file,
+            state::get_default_download_directory,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,6 +7,20 @@
     import { toastService } from "$lib/services/toast.svelte";
     import QRCode from "qrcode";
     import * as fflate from "fflate";
+    import { onMount } from "svelte";
+
+    let os = $state("windows");
+
+    onMount(async () => {
+        try {
+            os = await invoke("get_os");
+            if (!settings.downloadFolder) {
+                settings.downloadFolder = await invoke("get_default_download_directory");
+            }
+        } catch (e) {
+            console.error("Failed to initialize settings for platform", e);
+        }
+    });
 
     export interface ServiceDef {
         id: string;
@@ -205,13 +219,16 @@
                                     placeholder="Default Downloads folder"
                                     onchange={() => settings.save()}
                                     class="flex-1 bg-black border border-gray-800 rounded px-3 py-2 text-xs text-gray-200 focus:border-blue-500 outline-none transition"
+                                    readonly={os === "android" || os === "ios"}
                                 />
-                                <button
-                                    onclick={browseDownloadFolder}
-                                    class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-2 rounded text-xs font-bold transition shadow-sm border border-gray-700"
-                                >
-                                    Browse...
-                                </button>
+                                {#if os !== "android" && os !== "ios"}
+                                    <button
+                                        onclick={browseDownloadFolder}
+                                        class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-2 rounded text-xs font-bold transition shadow-sm border border-gray-700"
+                                    >
+                                        Browse...
+                                    </button>
+                                {/if}
                             </div>
                             <p class="text-[10px] text-gray-500 italic">
                                 If empty, files will be downloaded to your system's default Downloads folder.

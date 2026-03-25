@@ -8,6 +8,13 @@
   "permissions": [
     "core:default",
     "opener:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "file://*" },
+        { "url": "https://*" }
+      ]
+    },
     "http:default",
     "dialog:default",
     "fs:default",
