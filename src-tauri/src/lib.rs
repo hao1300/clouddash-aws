@@ -7,6 +7,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_scoped_storage::init())
         .manage(state::SharedConfig::default())
         .invoke_handler(tauri::generate_handler![
             state::list_profiles,
@@ -22,6 +23,7 @@ pub fn run() {
             state::open_folder,
             state::open_file,
             state::get_default_download_directory,
+            state::get_android_download_directory,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

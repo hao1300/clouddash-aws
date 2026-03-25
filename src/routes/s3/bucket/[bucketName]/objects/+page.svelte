@@ -15,6 +15,7 @@
     import { openUrl } from "@tauri-apps/plugin-opener";
     import { settings } from "$lib/services/settings.svelte";
     import { toastService } from "$lib/services/toast.svelte";
+    import { writeFile, exists } from "tauri-plugin-scoped-storage-api";
     import { onMount } from "svelte";
 
     let bucket = $derived($page.params.bucketName || "");
@@ -218,7 +219,24 @@
             if (body) {
                 const bytes = await body.transformToByteArray();
                 
-                if (settings.downloadFolder) {
+                if (settings.downloadFolderId) {
+                    // Mobile Scoped Storage path
+                    let targetPath = fileName;
+                    if (settings.downloadConflictMode === "rename") {
+                        let counter = 1;
+                        const nameParts = fileName.split('.');
+                        const ext = nameParts.length > 1 ? `.${nameParts.pop()}` : '';
+                        const baseName = nameParts.join('.');
+                        
+                        while (await exists(settings.downloadFolderId, targetPath)) {
+                            targetPath = `${baseName} (${counter})${ext}`;
+                            counter++;
+                        }
+                    }
+
+                    await writeFile(settings.downloadFolderId, targetPath, bytes);
+                    toastService.success(`Downloaded ${targetPath}`, 5000);
+                } else if (settings.downloadFolder) {
                     const sep = os === "windows" ? "\\" : "/";
                     let targetPath = `${settings.downloadFolder}${sep}${fileName}`;
                     
@@ -245,7 +263,7 @@
                         });
                     }
                 } else {
-                    const blob = new Blob([bytes]);
+                    const blob = new Blob([bytes as any]);
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
                     a.href = url;

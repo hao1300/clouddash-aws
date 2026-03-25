@@ -5,6 +5,7 @@
     import { open as openDialog } from "@tauri-apps/plugin-dialog";
     import { settings } from "$lib/services/settings.svelte";
     import { toastService } from "$lib/services/toast.svelte";
+    import { pickFolder } from "tauri-plugin-scoped-storage-api";
     import QRCode from "qrcode";
     import * as fflate from "fflate";
     import { onMount } from "svelte";
@@ -166,6 +167,23 @@
     }
 
     async function browseDownloadFolder() {
+        if (os === "android" || os === "ios") {
+            try {
+                const folder = await pickFolder();
+                if (folder) {
+                    settings.downloadFolder = folder.uri;
+                    settings.downloadFolderId = folder.id;
+                    settings.downloadFolderName = folder.name;
+                    settings.save();
+                    onChange();
+                }
+            } catch (e) {
+                console.error("Scoped storage picker failed", e);
+                toastService.error("Scoped storage picker failed.");
+            }
+            return;
+        }
+
         try {
             const selected = await openDialog({
                 directory: true,
@@ -216,20 +234,22 @@
                             <div class="flex gap-2">
                                 <input
                                     type="text"
-                                    bind:value={settings.downloadFolder}
+                                    value={settings.downloadFolderId ? settings.downloadFolderName : settings.downloadFolder}
+                                    oninput={(e) => {
+                                        settings.downloadFolder = e.currentTarget.value;
+                                        settings.downloadFolderId = "";
+                                        settings.downloadFolderName = "";
+                                    }}
                                     placeholder="Default Downloads folder"
                                     onchange={() => settings.save()}
                                     class="flex-1 bg-black border border-gray-800 rounded px-3 py-2 text-xs text-gray-200 focus:border-blue-500 outline-none transition"
-                                    readonly={os === "android" || os === "ios"}
                                 />
-                                {#if os !== "android" && os !== "ios"}
-                                    <button
-                                        onclick={browseDownloadFolder}
-                                        class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-2 rounded text-xs font-bold transition shadow-sm border border-gray-700"
-                                    >
-                                        Browse...
-                                    </button>
-                                {/if}
+                                <button
+                                    onclick={browseDownloadFolder}
+                                    class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-2 rounded text-xs font-bold transition shadow-sm border border-gray-700"
+                                >
+                                    Browse...
+                                </button>
                             </div>
                             <p class="text-[10px] text-gray-500 italic">
                                 If empty, files will be downloaded to your system's default Downloads folder.

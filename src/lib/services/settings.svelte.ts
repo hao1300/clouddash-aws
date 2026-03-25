@@ -2,6 +2,8 @@ const STORAGE_KEY = "aws_console_settings";
 
 class SettingsService {
     downloadFolder = $state("");
+    downloadFolderId = $state("");
+    downloadFolderName = $state("");
     downloadConflictMode = $state<"overwrite" | "rename">("rename");
 
     constructor() {
@@ -14,6 +16,8 @@ class SettingsService {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (parsed.downloadFolder) this.downloadFolder = parsed.downloadFolder;
+                if (parsed.downloadFolderId) this.downloadFolderId = parsed.downloadFolderId;
+                if (parsed.downloadFolderName) this.downloadFolderName = parsed.downloadFolderName;
                 if (parsed.downloadConflictMode) this.downloadConflictMode = parsed.downloadConflictMode;
             }
         } catch (e) {
@@ -25,6 +29,8 @@ class SettingsService {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 downloadFolder: this.downloadFolder,
+                downloadFolderId: this.downloadFolderId,
+                downloadFolderName: this.downloadFolderName,
                 downloadConflictMode: this.downloadConflictMode
             }));
         } catch (e) {

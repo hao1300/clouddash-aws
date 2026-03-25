@@ -11,13 +11,20 @@
     {
       "identifier": "opener:allow-open-url",
       "allow": [
-        { "url": "file://*" },
-        { "url": "https://*" }
+        {
+          "url": "file://*"
+        },
+        {
+          "url": "https://*"
+        }
       ]
     },
     "http:default",
     "dialog:default",
     "fs:default",
+    "scoped-storage:allow-pick-folder",
+    "scoped-storage:allow-write-file",
+    "scoped-storage:allow-exists",
     {
       "identifier": "http:allow-fetch",
       "allow": [

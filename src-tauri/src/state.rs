@@ -30,6 +30,24 @@ pub fn get_default_download_directory(app_handle: tauri::AppHandle) -> Result<St
     }
 }
 
+#[tauri::command]
+pub fn get_android_download_directory() -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    {
+        // standard android download folder
+        let path = std::path::Path::new("/storage/emulated/0/Download");
+        if path.exists() {
+            Ok(path.to_string_lossy().to_string())
+        } else {
+            Err("Download directory not found".into())
+        }
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        Err("Not on Android".into())
+    }
+}
+
 /// Shared AWS configuration — each service creates its own client from this.
 pub struct SharedConfig(pub Arc<RwLock<Option<aws_config::SdkConfig>>>);
 
