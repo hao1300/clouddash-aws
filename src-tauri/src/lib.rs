@@ -18,6 +18,8 @@ pub fn run() {
             state::get_all_profiles,
             state::get_os,
             state::save_file,
+            state::file_exists,
+            state::open_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

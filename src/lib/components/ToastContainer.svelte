@@ -3,9 +3,6 @@
     import { onMount } from 'svelte';
     import { toastService } from '$lib/services/toast.svelte';
     
-    onMount(() => {
-        console.log("ToastContainer mounted");
-    });
 </script>
 
 <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none">
@@ -17,14 +14,9 @@
             in:fly={{ y: 20, duration: 300 }}
             out:fade={{ duration: 200 }}
             onclick={() => {
-                console.log("Toast clicked!", toast.id);
                 if (toast.onClick) {
-                    console.log("Calling toast.onClick callback");
                     toast.onClick();
-                } else {
-                    console.log("Toast has no onClick callback");
                 }
-                // Always remove the toast after it's clicked, regardless of whether it had an onClick callback
                 toastService.remove(toast.id);
             }}
             class="pointer-events-auto px-4 py-2 rounded-lg shadow-2xl border flex items-center gap-3 min-w-[200px] max-w-md transition-all

@@ -12,7 +12,6 @@
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     import { invoke } from "@tauri-apps/api/core";
-    import { openPath } from "@tauri-apps/plugin-opener";
     import { settings } from "$lib/services/settings.svelte";
     import { toastService } from "$lib/services/toast.svelte";
 
@@ -196,7 +195,6 @@
 
 
     async function handleDownload(key: string) {
-        console.log(`Starting download for key: ${key}`);
         try {
             const fileName = key.split("/").pop() || "download";
             const s3Client = await aws.getS3ClientForBucket(bucket);
@@ -208,18 +206,29 @@
             const body = res.Body;
             if (body) {
                 const bytes = await body.transformToByteArray();
-                console.log(`Bytes received: ${bytes.length}`);
                 
                 if (settings.downloadFolder) {
-                    console.log(`Saving to custom folder: ${settings.downloadFolder}`);
-                    const path = `${settings.downloadFolder}\\${fileName}`;
-                    await invoke("save_file", { path, data: Array.from(bytes) });
-                    toastService.success(`Downloaded to ${settings.downloadFolder}`, 5000, () => {
-                        console.log(`Opening path: ${settings.downloadFolder}`);
-                        openPath(settings.downloadFolder);
+                    let targetPath = `${settings.downloadFolder}\\${fileName}`;
+                    
+                    if (settings.downloadConflictMode === "rename") {
+                        let counter = 1;
+                        const nameParts = fileName.split('.');
+                        const ext = nameParts.length > 1 ? `.${nameParts.pop()}` : '';
+                        const baseName = nameParts.join('.');
+                        
+                        while (await invoke("file_exists", { path: targetPath })) {
+                            targetPath = `${settings.downloadFolder}\\${baseName} (${counter})${ext}`;
+                            counter++;
+                        }
+                    }
+
+                    await invoke("save_file", { path: targetPath, data: Array.from(bytes) });
+                    
+                    const finalFileName = targetPath.split('\\').pop() || fileName;
+                    toastService.success(`Downloaded ${finalFileName}`, 5000, () => {
+                        invoke("open_folder", { path: settings.downloadFolder });
                     });
                 } else {
-                    console.log("Saving to default folder");
                     const blob = new Blob([bytes]);
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
@@ -331,7 +340,6 @@
                                 >
                                 <button
                                     onclick={() => {
-                                        console.log("Download button clicked for", item.key);
                                         openDropdown = null;
                                         handleDownload(item.key);
                                     }}

@@ -338,10 +338,39 @@ pub fn get_os() -> String {
 }
 
 #[tauri::command]
-pub fn save_file(path: String, data: Vec<u8>) -> Result<(), String> {
+pub async fn save_file(path: String, data: Vec<u8>) -> Result<(), String> {
     use std::io::Write;
     let mut file = std::fs::File::create(path).map_err(|e| e.to_string())?;
     file.write_all(&data).map_err(|e| e.to_string())?;
     Ok(())
 }
 
+#[tauri::command]
+pub async fn file_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
+}
+
+#[tauri::command]
+pub async fn open_folder(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer.exe")
+            .arg(path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open")
+            .arg(path)
+            .spawn();
+    }
+    Ok(())
+}

@@ -10,7 +10,6 @@ class ToastService {
     activeToasts = $state<Toast[]>([]);
 
     show(message: string, type: Toast['type'] = 'info', duration = 3000, onClick?: () => void) {
-        console.log(`Showing toast: ${message} (${type})`);
         const id = Math.random().toString(36).slice(2);
         const toast: Toast = { id, message, type, duration, onClick };
         this.activeToasts = [...this.activeToasts, toast];

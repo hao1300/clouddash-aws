@@ -152,13 +152,11 @@
     }
 
     async function browseDownloadFolder() {
-        console.log("Opening browse dialog...");
         try {
             const selected = await openDialog({
                 directory: true,
                 multiple: false,
             });
-            console.log("Dialog result:", selected);
             if (selected && typeof selected === "string") {
                 settings.downloadFolder = selected;
                 settings.save();
@@ -238,7 +236,7 @@
                                     >Overwrite</button>
                                 </div>
                             </div>
-                            <p class="text-[10px] text-gray-500 italic">
+                            <p class="text-xs text-gray-500 italic">
                                 "Rename" will append a number if the file already exists (e.g., file (1).zip).
                             </p>
                         </div>
