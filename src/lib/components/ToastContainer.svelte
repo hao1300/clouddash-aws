@@ -1,14 +1,34 @@
 <script lang="ts">
     import { fly, fade } from 'svelte/transition';
+    import { onMount } from 'svelte';
     import { toastService } from '$lib/services/toast.svelte';
+    
+    onMount(() => {
+        console.log("ToastContainer mounted");
+    });
 </script>
 
 <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none">
     {#each toastService.activeToasts as toast (toast.id)}
+        <!-- {console.log("Rendering toast:", toast.id)} -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
             in:fly={{ y: 20, duration: 300 }}
             out:fade={{ duration: 200 }}
-            class="pointer-events-auto px-4 py-2 rounded-lg shadow-2xl border flex items-center gap-3 min-w-[200px] max-w-md
+            onclick={() => {
+                console.log("Toast clicked!", toast.id);
+                if (toast.onClick) {
+                    console.log("Calling toast.onClick callback");
+                    toast.onClick();
+                } else {
+                    console.log("Toast has no onClick callback");
+                }
+                // Always remove the toast after it's clicked, regardless of whether it had an onClick callback
+                toastService.remove(toast.id);
+            }}
+            class="pointer-events-auto px-4 py-2 rounded-lg shadow-2xl border flex items-center gap-3 min-w-[200px] max-w-md transition-all
+                {toast.onClick ? 'cursor-pointer hover:scale-[1.02] active:scale-95' : ''}
                 {toast.type === 'success' ? 'bg-green-600/90 border-green-500 text-white' : 
                  toast.type === 'error' ? 'bg-red-600/90 border-red-500 text-white' : 
                  'bg-gray-800/90 border-gray-700 text-gray-200'}"
@@ -21,11 +41,19 @@
                 <span class="text-sm">ℹ</span>
             {/if}
             
-            <span class="text-xs font-medium">{toast.message}</span>
+            <div class="flex flex-col">
+                <span class="text-xs font-medium">{toast.message}</span>
+                {#if toast.onClick}
+                    <span class="text-[9px] opacity-70 underline mt-0.5">Click to open folder</span>
+                {/if}
+            </div>
             
             <button 
-                onclick={() => toastService.remove(toast.id)}
-                class="ml-auto text-white/50 hover:text-white transition-colors text-sm px-1"
+                onclick={(e) => {
+                    e.stopPropagation();
+                    toastService.remove(toast.id);
+                }}
+                class="ml-auto text-white/50 hover:text-white transition-colors text-sm px-1 shrink-0"
             >
                 ×
             </button>

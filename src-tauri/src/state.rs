@@ -337,3 +337,11 @@ pub fn get_os() -> String {
     std::env::consts::OS.to_string()
 }
 
+#[tauri::command]
+pub fn save_file(path: String, data: Vec<u8>) -> Result<(), String> {
+    use std::io::Write;
+    let mut file = std::fs::File::create(path).map_err(|e| e.to_string())?;
+    file.write_all(&data).map_err(|e| e.to_string())?;
+    Ok(())
+}
+

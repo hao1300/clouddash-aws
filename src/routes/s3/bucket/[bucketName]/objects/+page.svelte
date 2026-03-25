@@ -11,6 +11,10 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
+    import { invoke } from "@tauri-apps/api/core";
+    import { openPath } from "@tauri-apps/plugin-opener";
+    import { settings } from "$lib/services/settings.svelte";
+    import { toastService } from "$lib/services/toast.svelte";
 
     let bucket = $derived($page.params.bucketName || "");
     let prefix = $derived($page.url.searchParams.get("prefix") || "");
@@ -190,8 +194,11 @@
         }
     }
 
+
     async function handleDownload(key: string) {
+        console.log(`Starting download for key: ${key}`);
         try {
+            const fileName = key.split("/").pop() || "download";
             const s3Client = await aws.getS3ClientForBucket(bucket);
             if (!s3Client) throw new Error("Could not initialize S3 client");
 
@@ -201,16 +208,32 @@
             const body = res.Body;
             if (body) {
                 const bytes = await body.transformToByteArray();
-                const blob = new Blob([bytes]);
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = key.split("/").pop() || "download";
-                a.click();
-                URL.revokeObjectURL(url);
+                console.log(`Bytes received: ${bytes.length}`);
+                
+                if (settings.downloadFolder) {
+                    console.log(`Saving to custom folder: ${settings.downloadFolder}`);
+                    const path = `${settings.downloadFolder}\\${fileName}`;
+                    await invoke("save_file", { path, data: Array.from(bytes) });
+                    toastService.success(`Downloaded to ${settings.downloadFolder}`, 5000, () => {
+                        console.log(`Opening path: ${settings.downloadFolder}`);
+                        openPath(settings.downloadFolder);
+                    });
+                } else {
+                    console.log("Saving to default folder");
+                    const blob = new Blob([bytes]);
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = fileName;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toastService.success(`Downloaded to your Downloads folder`, 5000);
+                }
             }
         } catch (e: any) {
+            console.error("Download failed", e);
             error = e.message || String(e);
+            toastService.error(`Download failed: ${error}`);
         }
     }
 
@@ -308,6 +331,7 @@
                                 >
                                 <button
                                     onclick={() => {
+                                        console.log("Download button clicked for", item.key);
                                         openDropdown = null;
                                         handleDownload(item.key);
                                     }}

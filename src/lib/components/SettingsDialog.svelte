@@ -2,6 +2,9 @@
     import Modal from "./Modal.svelte";
     import ReorderableList from "./ReorderableList.svelte";
     import { invoke } from "@tauri-apps/api/core";
+    import { open as openDialog } from "@tauri-apps/plugin-dialog";
+    import { settings } from "$lib/services/settings.svelte";
+    import { toastService } from "$lib/services/toast.svelte";
     import QRCode from "qrcode";
     import * as fflate from "fflate";
 
@@ -33,8 +36,8 @@
         onChange: () => void;
     } = $props();
 
-    let settingsTab = $state<"profiles" | "regions" | "services" | "qrcode">(
-        "profiles",
+    let settingsTab = $state<"general" | "profiles" | "regions" | "services" | "qrcode">(
+        "general",
     );
 
     let qrCodeDataUrl = $state("");
@@ -147,6 +150,25 @@
         serviceOrder = newOrder;
         onChange();
     }
+
+    async function browseDownloadFolder() {
+        console.log("Opening browse dialog...");
+        try {
+            const selected = await openDialog({
+                directory: true,
+                multiple: false,
+            });
+            console.log("Dialog result:", selected);
+            if (selected && typeof selected === "string") {
+                settings.downloadFolder = selected;
+                settings.save();
+                onChange();
+            }
+        } catch (e) {
+            console.error("Browse dialog failed", e);
+            toastService.error("Failed to open browse dialog");
+        }
+    }
 </script>
 
 <Modal bind:open title="Settings" maxWidth="max-w-3xl">
@@ -155,7 +177,7 @@
         <div
             class="w-32 bg-gray-950 border-r border-gray-800 flex flex-col py-2 shrink-0"
         >
-            {#each [["profiles", "Profiles"], ["regions", "Regions"], ["qrcode", "Export Keys"]] as const as [key, label]}
+            {#each [["general", "General"], ["profiles", "Profiles"], ["regions", "Regions"], ["qrcode", "Export Keys"]] as const as [key, label]}
                 <button
                     onclick={() => (settingsTab = key)}
                     class="px-4 py-2.5 text-left text-xs font-semibold transition whitespace-nowrap {settingsTab ===
@@ -170,7 +192,59 @@
 
         <!-- Right content -->
         <div class="flex-1 p-4 overflow-auto">
-            {#if settingsTab === "profiles"}
+            {#if settingsTab === "general"}
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
+                            Downloads
+                        </h3>
+                        <div class="space-y-2">
+                            <label class="block text-xs text-gray-400">Download Folder</label>
+                            <div class="flex gap-2">
+                                <input
+                                    type="text"
+                                    bind:value={settings.downloadFolder}
+                                    placeholder="Default Downloads folder"
+                                    onchange={() => settings.save()}
+                                    class="flex-1 bg-black border border-gray-800 rounded px-3 py-2 text-xs text-gray-200 focus:border-blue-500 outline-none transition"
+                                />
+                                <button
+                                    onclick={browseDownloadFolder}
+                                    class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-2 rounded text-xs font-bold transition shadow-sm border border-gray-700"
+                                >
+                                    Browse...
+                                </button>
+                            </div>
+                            <p class="text-[10px] text-gray-500 italic">
+                                If empty, files will be downloaded to your system's default Downloads folder.
+                            </p>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
+                            File Handling
+                        </h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-400">If file exists...</span>
+                                <div class="flex bg-black rounded p-0.5 border border-gray-800">
+                                    <button 
+                                        onclick={() => { settings.downloadConflictMode = "rename"; settings.save(); }}
+                                        class="px-3 py-1 text-[10px] font-bold rounded transition {settings.downloadConflictMode === 'rename' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-300'}"
+                                    >Rename</button>
+                                    <button 
+                                        onclick={() => { settings.downloadConflictMode = "overwrite"; settings.save(); }}
+                                        class="px-3 py-1 text-[10px] font-bold rounded transition {settings.downloadConflictMode === 'overwrite' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-300'}"
+                                    >Overwrite</button>
+                                </div>
+                            </div>
+                            <p class="text-[10px] text-gray-500 italic">
+                                "Rename" will append a number if the file already exists (e.g., file (1).zip).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            {:else if settingsTab === "profiles"}
                 <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
                     Profiles — drag to reorder
                 </h3>

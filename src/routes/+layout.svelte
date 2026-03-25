@@ -80,6 +80,8 @@
   let refreshKey = $state(0);
   let currentLoginId = $state(0);
 
+  // Settings
+
   // Settings dialog
   let showSettings = $state(false);
   type SettingsTab = "profiles" | "regions" | "services";
@@ -321,6 +323,7 @@
     } else if (window.innerWidth < 640) {
       sideMenuOpen = false;
     }
+
 
     // Apply initial state from environment variables (forked process)
     if (initialState.profile && allProfiles.includes(initialState.profile)) {

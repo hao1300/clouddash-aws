@@ -3,15 +3,17 @@ export interface Toast {
     message: string;
     type: 'success' | 'error' | 'info';
     duration?: number;
+    onClick?: () => void;
 }
 
 class ToastService {
     activeToasts = $state<Toast[]>([]);
 
-    show(message: string, type: Toast['type'] = 'info', duration = 3000) {
+    show(message: string, type: Toast['type'] = 'info', duration = 3000, onClick?: () => void) {
+        console.log(`Showing toast: ${message} (${type})`);
         const id = Math.random().toString(36).slice(2);
-        const toast: Toast = { id, message, type, duration };
-        this.activeToasts.push(toast);
+        const toast: Toast = { id, message, type, duration, onClick };
+        this.activeToasts = [...this.activeToasts, toast];
 
         if (duration > 0) {
             setTimeout(() => {
@@ -20,8 +22,8 @@ class ToastService {
         }
     }
 
-    success(message: string, duration?: number) {
-        this.show(message, 'success', duration);
+    success(message: string, duration?: number, onClick?: () => void) {
+        this.show(message, 'success', duration, onClick);
     }
 
     error(message: string, duration?: number) {

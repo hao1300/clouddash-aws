@@ -11,6 +11,10 @@
     import CopyButton from "$lib/components/CopyButton.svelte";
     import hljs from 'highlight.js';
     import 'highlight.js/styles/github-dark.css';
+    import { invoke } from "@tauri-apps/api/core";
+    import { openPath } from "@tauri-apps/plugin-opener";
+    import { settings } from "$lib/services/settings.svelte";
+    import { toastService } from "$lib/services/toast.svelte";
 
     let bucket = $derived($page.params.bucketName || "");
     let key = $derived($page.params.key || "");
@@ -127,8 +131,11 @@
         }
     }
 
+
     async function handleDownload() {
+        console.log(`Starting download for key: ${key}`);
         try {
+            const fileName = key.split("/").pop() || "download";
             const s3Client = await aws.getS3ClientForBucket(bucket);
             if (!s3Client) throw new Error("Could not initialize S3 client");
 
@@ -138,16 +145,32 @@
             const body = res.Body;
             if (body) {
                 const bytes = await body.transformToByteArray();
-                const blob = new Blob([bytes]);
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = key.split("/").pop() || "download";
-                a.click();
-                URL.revokeObjectURL(url);
+                console.log(`Bytes received: ${bytes.length}`);
+                
+                if (settings.downloadFolder) {
+                    console.log(`Saving to custom folder: ${settings.downloadFolder}`);
+                    const path = `${settings.downloadFolder}\\${fileName}`;
+                    await invoke("save_file", { path, data: Array.from(bytes) });
+                    toastService.success(`Downloaded to ${settings.downloadFolder}`, 5000, () => {
+                        console.log(`Opening path: ${settings.downloadFolder}`);
+                        openPath(settings.downloadFolder);
+                    });
+                } else {
+                    console.log("Saving to default folder");
+                    const blob = new Blob([bytes]);
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = fileName;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toastService.success(`Downloaded to your Downloads folder`, 5000);
+                }
             }
         } catch (e: any) {
+            console.error("Download failed", e);
             error = e.message || String(e);
+            toastService.error(`Download failed: ${error}`);
         }
     }
 
@@ -184,7 +207,10 @@
             </h1>
             <div class="flex gap-2 shrink-0">
                 <button
-                    onclick={handleDownload}
+                    onclick={() => {
+                        console.log("Download button clicked for detail page object");
+                        handleDownload();
+                    }}
                     class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-bold transition shadow-lg flex items-center gap-2"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg>
