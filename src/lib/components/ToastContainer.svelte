@@ -2,10 +2,19 @@
     import { fly, fade } from 'svelte/transition';
     import { onMount } from 'svelte';
     import { toastService } from '$lib/services/toast.svelte';
-    
+    import { invoke } from "@tauri-apps/api/core";
+
+    let os = $state("windows");
+    onMount(async () => {
+        try {
+            os = await invoke("get_os");
+        } catch (e) {
+            console.error("Failed to get OS", e);
+        }
+    });
 </script>
 
-<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none">
+<div class="fixed {os === 'android' || os === 'ios' ? 'bottom-20' : 'bottom-6'} left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none">
     {#each toastService.activeToasts as toast (toast.id)}
         <!-- {console.log("Rendering toast:", toast.id)} -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
