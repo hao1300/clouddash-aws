@@ -612,15 +612,17 @@
           : '-translate-x-full sm:-ml-72'}"
       >
         <div
-          class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950 shrink-0 sm:hidden"
+          class="p-3 border-b border-gray-800 flex items-center justify-between bg-gray-950 shrink-0"
         >
           <div class="flex items-center gap-2">
-            <img src="/logo.png" alt="CloudDash" class="h-6 w-6" />
-            <span class="font-bold text-gray-100">CloudDash for AWS</span>
+            <img src="/logo.png" alt="CloudDash" class="h-5 w-5" />
+            <span class="text-sm font-bold text-gray-100 tracking-tight"
+              >CloudDash for AWS</span
+            >
           </div>
           <button
             onclick={() => (sideMenuOpen = false)}
-            class="p-2 rounded-full hover:bg-gray-800 text-gray-400 transition sm:hidden"
+            class="p-1.5 rounded-full hover:bg-gray-800 text-gray-400 transition sm:hidden"
           >
             ✕
           </button>
