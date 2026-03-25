@@ -175,9 +175,7 @@
                     
                     const finalFileName = targetPath.split(sep).pop() || fileName;
                     if (os === "android" || os === "ios") {
-                        toastService.success(`Downloaded ${finalFileName}. Click to open.`, 5000, () => {
-                            openUrl(`file://${targetPath}`);
-                        });
+                        toastService.success(`Downloaded ${finalFileName}`, 5000);
                     } else {
                         toastService.success(`Downloaded ${finalFileName}. Click to open folder.`, 5000, () => {
                             invoke("open_folder", { path: settings.downloadFolder });

@@ -184,18 +184,19 @@
 </script>
 
 <Modal bind:open title="Settings" maxWidth="max-w-3xl">
-    <div class="flex -m-5 h-[420px] md:h-[600px]">
-        <!-- Left vertical tabs -->
+    <div class="flex {os === 'android' || os === 'ios' ? 'flex-col' : 'flex-row'} -m-5 h-[420px] md:h-[600px]">
+        <!-- Tabs -->
         <div
-            class="w-32 bg-gray-950 border-r border-gray-800 flex flex-col py-2 shrink-0"
+            class="{os === 'android' || os === 'ios' ? 'w-full flex-row border-b' : 'w-32 flex-col border-r'} bg-gray-950 border-gray-800 flex py-2 shrink-0 overflow-x-auto"
         >
             {#each [["general", "General"], ["profiles", "Profiles"], ["regions", "Regions"], ["qrcode", "Export Keys"]] as const as [key, label]}
                 <button
                     onclick={() => (settingsTab = key)}
-                    class="px-4 py-2.5 text-left text-xs font-semibold transition whitespace-nowrap {settingsTab ===
-                    key
-                        ? 'bg-gray-800 text-blue-400 border-r-2 border-blue-500'
-                        : 'text-gray-500 hover:text-gray-300 hover:bg-gray-900 border-r-2 border-transparent'}"
+                    class="px-4 py-2.5 text-xs font-semibold transition whitespace-nowrap 
+                        {os === 'android' || os === 'ios' ? 'text-center flex-1 border-b-2' : 'text-left border-r-2'}
+                        {settingsTab === key
+                            ? 'bg-gray-800 text-blue-400 border-blue-500'
+                            : 'text-gray-500 hover:text-gray-300 hover:bg-gray-900 border-transparent'}"
                 >
                     {label}
                 </button>
