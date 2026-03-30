@@ -9,9 +9,9 @@
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "tauri-dev": "tauri dev",
+    "tauri-dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "tauri-build": "tauri build",
-    "tauri-android-dev": "tauri android dev",
+    "tauri-android-dev": "tauri android dev --config src-tauri/tauri.dev.conf.json",
     "tauri-android-build": "tauri android build",
     "tauri": "tauri"
   },

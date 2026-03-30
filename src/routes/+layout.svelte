@@ -159,6 +159,10 @@
     titleService.updateFromUrl($page.url.pathname);
     bookmarks.currentUrl = $page.url.pathname + $page.url.search;
 
+    if ($page.url.pathname !== "/") {
+      localStorage.setItem("aws_console_last_url", $page.url.pathname + $page.url.search);
+    }
+
     if (Object.keys($page.params).length === 0) {
       const manifest = SERVICE_MANIFEST[activeId];
       if (manifest && serviceActiveTab !== undefined) {
@@ -356,7 +360,7 @@
     }
 
     if (shouldAutoConnect) {
-      await login(true, initialState.path || saved?.activeId);
+      await login(true, initialState.path || null);
     }
   });
 
@@ -367,7 +371,7 @@
     error = "";
   }
 
-  async function login(silent = false, initialPath?: string) {
+  async function login(silent = false, initialPath: string | null = null) {
     const loginId = ++currentLoginId;
     try {
       loading = true;
@@ -523,7 +527,18 @@
 
       // Auto redirect to last saved service if we are at root
       if ($page.url.pathname === "/") {
-        let n = initialPath;
+        let lastUrl = localStorage.getItem("aws_console_last_url");
+        if (!initialPath && lastUrl && lastUrl !== "/") {
+          const svcId = lastUrl.split('/')[1];
+          // ensure the reconstructed service tab is actually visible
+          if (svcId && serviceVisible.has(svcId.split('?')[0])) {
+            goto(lastUrl);
+            return;
+          }
+        }
+
+        let fallbackId = loadState()?.activeId;
+        let n = initialPath || fallbackId;
         if (!n || !serviceVisible.has(n)) {
           const first = enabledServices[0];
           n = first ? first.id : "";
