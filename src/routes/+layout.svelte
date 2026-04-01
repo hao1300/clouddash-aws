@@ -11,6 +11,7 @@
   import { aws } from "$lib/services/aws.svelte";
   import { bookmarks } from "$lib/services/bookmarks.svelte";
   import { titleService } from "$lib/services/title.svelte";
+  import { settings } from "$lib/services/settings.svelte";
   import { SERVICE_MANIFEST } from "$lib/services/service-manifest";
   import { transformTabsGeneric } from "$lib/services/tab-utils";
   import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -103,6 +104,7 @@
     const query = searchQuery.toLowerCase();
     const all = services
       .filter((s) => s.label.toLowerCase().includes(query))
+      .filter((s) => s.label.toLowerCase().includes(query))
       .sort((a, b) => {
         const aStarred = serviceVisible.has(a.id);
         const bStarred = serviceVisible.has(b.id);
@@ -145,8 +147,8 @@
       .map((id) => services.find((s) => s.id === id)!)
       .filter(Boolean),
   );
-  let enabledServices = $derived(
-    orderedServices.filter((s) => serviceVisible.has(s.id)),
+  const enabledServices = $derived(
+    orderedServices.filter((s) => serviceVisible.has(s.id))
   );
 
   // To highlight active tab on top
@@ -158,6 +160,11 @@
   $effect(() => {
     titleService.updateFromUrl($page.url.pathname);
     bookmarks.currentUrl = $page.url.pathname + $page.url.search;
+
+    if (!settings.isPro && activeId && activeId !== "settings" && activeId !== "upgrade" && !["cloudwatch", "s3", "dynamodb"].includes(activeId)) {
+        goto("/upgrade", { replaceState: true });
+        return;
+    }
 
     if ($page.url.pathname !== "/") {
       localStorage.setItem("aws_console_last_url", $page.url.pathname + $page.url.search);
@@ -652,7 +659,21 @@
           <!-- Services -->
           <div class="space-y-4">
             <div class="space-y-4">
-              <div class="px-1">
+              <div class="px-1 space-y-3">
+                {#if !settings.isPro}
+                  <a
+                    href="/upgrade"
+                    onclick={(e) => {
+                         e.preventDefault();
+                         goto("/upgrade");
+                         if (window.innerWidth < 640) sideMenuOpen = false;
+                    }}
+                    class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-[11px] font-bold py-2 rounded flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all border border-blue-500/50"
+                  >
+                    <span class="text-sm">👑</span>
+                    Upgrade to Pro
+                  </a>
+                {/if}
                 <input
                   type="text"
                   bind:value={searchQuery}
@@ -682,12 +703,20 @@
                       >
                         <button
                           onclick={() => {
+                            if (!settings.isPro && !["cloudwatch", "s3", "dynamodb"].includes(svc.id)) {
+                                goto("/upgrade");
+                                if (window.innerWidth < 640) sideMenuOpen = false;
+                                return;
+                            }
                             switchTab(svc.id);
                             if (window.innerWidth < 640) sideMenuOpen = false;
                           }}
                           class="flex-1 px-2 py-3 text-xs font-semibold text-left flex items-center gap-2"
                         >
                           {svc.label}
+                          {#if !settings.isPro && !["cloudwatch", "s3", "dynamodb"].includes(svc.id)}
+                            <span class="text-yellow-500 text-[10px]" title="Pro Service">👑</span>
+                          {/if}
                           {#if activeId === svc.id}
                             <div class="w-1 h-1 rounded-full bg-blue-500"></div>
                           {/if}
@@ -885,6 +914,9 @@
                   {part.label}
                 </a>
               {/each}
+            {/if}
+            {#if settings.isPro}
+              <span class="ml-2 px-1.5 py-0.5 bg-blue-600/20 text-blue-400 text-[10px] font-black rounded border border-blue-500/30 uppercase tracking-tighter">Pro</span>
             {/if}
           </div>
 

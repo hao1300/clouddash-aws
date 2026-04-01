@@ -86,7 +86,7 @@
                 new GetObjectCommand({ 
                     Bucket: bucket, 
                     Key: key,
-                    Range: 'bytes=0-1048575' // 1MB
+                    Range: 'bytes=0-102400' // 100KB
                 }),
             );
 
@@ -326,7 +326,7 @@
             <div class="px-4 py-2 border-b border-gray-800 bg-gray-800/50 flex items-center justify-between">
                 <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Object Content Preview</span>
                 {#if previewTruncated}
-                    <span class="text-[10px] text-yellow-500 font-medium italic">Showing first 1MB</span>
+                    <span class="text-[10px] text-yellow-500 font-medium italic">Showing first 100KB</span>
                 {/if}
             </div>
             

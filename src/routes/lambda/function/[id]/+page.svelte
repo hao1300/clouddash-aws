@@ -568,11 +568,11 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Memory (MB)</span>
+                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Runtime</span>
                             <div class="text-sm text-gray-300">{fnDetails?.Runtime || 'N/A'}</div>
                         </div>
                         <div>
-                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Timeout (Seconds)</span>
+                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Architectures</span>
                             <div class="text-sm text-gray-300">{(fnDetails?.Architectures || []).join(', ') || 'N/A'}</div>
                         </div>
                         <div>
