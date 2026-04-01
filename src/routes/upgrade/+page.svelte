@@ -17,7 +17,7 @@
         Unlock the full power of CloudDash
       </h1>
       <p class="text-lg text-gray-400 max-w-xl mx-auto">
-        Upgrade to Pro to get unrestricted access to all AWS services, advanced features, and priority support.
+        Upgrade to Pro to unlock all other services and get priority support from our team.
       </p>
     </div>
 
@@ -26,32 +26,16 @@
         <div class="w-10 h-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl mb-4">
           🚀
         </div>
-        <h3 class="font-bold text-gray-200 mb-2">Unrestricted Access</h3>
-        <p class="text-sm text-gray-400">Unlock all AWS services including SQS, EC2, Lambda, SNS, IAM, Secrets Manager, and more.</p>
-      </div>
-      
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-sm hover:border-blue-500/50 transition duration-300">
-        <div class="w-10 h-10 rounded-lg bg-green-500/20 text-green-400 flex items-center justify-center text-xl mb-4">
-          ⚡
-        </div>
-        <h3 class="font-bold text-gray-200 mb-2">No Rate Limits</h3>
-        <p class="text-sm text-gray-400">Perform unrestricted modifications without UI-level write blocking across all supported services.</p>
+        <h3 class="font-bold text-gray-200 mb-2">Unlock Services</h3>
+        <p class="text-sm text-gray-400">Unlock all other premium AWS services including SQS, EC2, Lambda, and more.</p>
       </div>
 
       <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-sm hover:border-blue-500/50 transition duration-300">
         <div class="w-10 h-10 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl mb-4">
-          🛠️
+          🛡️
         </div>
-        <h3 class="font-bold text-gray-200 mb-2">Advanced Tools</h3>
-        <p class="text-sm text-gray-400">Exclusive access to Logs Insights, SQS Redrive, bulk data manipulations and more.</p>
-      </div>
-
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-sm hover:border-blue-500/50 transition duration-300">
-        <div class="w-10 h-10 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center text-xl mb-4">
-          ⭐
-        </div>
-        <h3 class="font-bold text-gray-200 mb-2">Early Access</h3>
-        <p class="text-sm text-gray-400">Be the first to get access to new services and features as they are released.</p>
+        <h3 class="font-bold text-gray-200 mb-2">Priority Support</h3>
+        <p class="text-sm text-gray-400">Get direct, high-priority support from the CloudDash development team.</p>
       </div>
     </div>
 
