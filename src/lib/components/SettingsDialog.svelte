@@ -8,7 +8,64 @@
     import { pickFolder } from "tauri-plugin-scoped-storage-api";
     import QRCode from "qrcode";
     import * as fflate from "fflate";
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
+
+    let showQrScanner = $state(false);
+    let qrScannerId = 'license-qr-reader';
+    let html5QrScanner: any = null;
+    let licenseKeyInput = $state("");
+
+    $effect(() => {
+        if (settingsTab === "pro") {
+            licenseKeyInput = settings.licenseKey;
+        }
+    });
+
+    async function startQrScanner() {
+        showQrScanner = true;
+        // Wait for the DOM element to render
+        await new Promise(r => setTimeout(r, 100));
+        try {
+            const { Html5Qrcode } = await import("html5-qrcode");
+            html5QrScanner = new Html5Qrcode(qrScannerId);
+            await html5QrScanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 220, height: 220 } },
+                async (decodedText: string) => {
+                    // Stop scanner
+                    await stopQrScanner();
+                    // Auto-populate and validate
+                    licenseKeyInput = decodedText.trim();
+                    await activateLicense();
+                },
+                () => {} // Ignore scan errors
+            );
+        } catch (e) {
+            console.error("QR scanner error", e);
+            toastService.error("Failed to start camera. Please paste your key instead.");
+            showQrScanner = false;
+        }
+    }
+
+    async function stopQrScanner() {
+        if (html5QrScanner) {
+            try {
+                await html5QrScanner.stop();
+                html5QrScanner.clear();
+            } catch { /* ignore */ }
+            html5QrScanner = null;
+        }
+        showQrScanner = false;
+    }
+
+    async function activateLicense() {
+        if (!licenseKeyInput.trim()) return;
+        settings.licenseKey = licenseKeyInput.trim();
+        const valid = await settings.validateLicense();
+        if (valid) {
+            toastService.success("Pro license activated!");
+        }
+    }
 
     let os = $state("windows");
 
@@ -458,6 +515,7 @@
                             License Activation
                         </h3>
                         <div class="space-y-4">
+                            <!-- Status Badge -->
                             <div class="p-4 bg-gray-900/50 rounded-lg border border-gray-800 flex items-center justify-between">
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-full flex items-center justify-center {settings.isPro ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}">
@@ -472,7 +530,11 @@
                                             {settings.isPro ? 'Pro Version Active' : 'Free Version'}
                                         </div>
                                         <div class="text-[10px] text-gray-500">
-                                            {settings.isPro ? 'Thank you for supporting CloudDash!' : 'Read-only access to limited services.'}
+                                            {#if settings.isPro}
+                                                {settings.licenseEmail ? `Licensed to ${settings.licenseEmail}` : 'Thank you for supporting CloudDash!'}
+                                            {:else}
+                                                Read-only access to limited services.
+                                            {/if}
                                         </div>
                                     </div>
                                 </div>
@@ -487,20 +549,34 @@
                                 {/if}
                             </div>
 
+                            <!-- License Key Input -->
                             <div class="space-y-2">
                                 <label class="block text-[11px] font-medium text-gray-400" for="license-key">License Key</label>
                                 <div class="flex gap-2">
                                     <input
                                         id="license-key"
-                                        type="password"
-                                        bind:value={settings.licenseKey}
-                                        oninput={() => settings.save()}
-                                        placeholder="Enter your license key..."
-                                        class="flex-1 bg-black border border-gray-800 rounded px-3 py-2.5 text-xs text-white focus:border-blue-500 outline-none transition font-mono"
+                                        type="text"
+                                        bind:value={licenseKeyInput}
+                                        placeholder="CD-XXXX-XXXX-XXXX-XXXX"
+                                        disabled={settings.licenseValidating}
+                                        class="flex-1 bg-black border rounded px-3 py-2.5 text-xs text-white focus:border-blue-500 outline-none transition font-mono
+                                            {settings.isPro ? 'border-green-500/30' : settings.licenseError ? 'border-red-500/50' : 'border-gray-800'}"
                                     />
+                                    <button
+                                        onclick={activateLicense}
+                                        disabled={settings.licenseValidating || !licenseKeyInput.trim()}
+                                        class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white px-4 py-2 rounded text-[11px] font-bold transition shadow-sm flex items-center gap-1.5"
+                                    >
+                                        {#if settings.licenseValidating}
+                                            <svg class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="opacity-75"></path></svg>
+                                            Validating
+                                        {:else}
+                                            Activate
+                                        {/if}
+                                    </button>
                                     {#if settings.licenseKey}
                                         <button
-                                            onclick={() => { settings.licenseKey = ""; settings.save(); }}
+                                            onclick={() => { settings.clearLicense(); licenseKeyInput = ''; }}
                                             class="bg-gray-800/50 hover:bg-red-500/20 text-gray-400 hover:text-red-400 px-3 py-2 rounded text-xs transition border border-gray-700"
                                             title="Clear License Key"
                                         >
@@ -508,9 +584,50 @@
                                         </button>
                                     {/if}
                                 </div>
+
+                                <!-- Validation Feedback -->
+                                {#if settings.licenseError}
+                                    <div class="flex items-center gap-1.5 text-[11px] text-red-400 mt-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                                        {settings.licenseError}
+                                    </div>
+                                {:else if settings.isPro}
+                                    <div class="flex items-center gap-1.5 text-[11px] text-green-400 mt-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                        License validated successfully
+                                    </div>
+                                {/if}
+
                                 <p class="text-[10px] text-gray-500 italic mt-1 leading-relaxed">
                                     CloudDash Pro unlocks all AWS services (EC2, Lambda, IAM, etc.) and enables write operations like creating, deleting, and editing resources.
                                 </p>
+                            </div>
+
+                            <!-- QR Scanner -->
+                            <div class="border-t border-gray-800/50 pt-4">
+                                {#if showQrScanner}
+                                    <div class="flex flex-col items-center gap-3">
+                                        <div id={qrScannerId} class="w-full max-w-[280px] rounded-lg overflow-hidden border border-gray-700"></div>
+                                        <button
+                                            onclick={stopQrScanner}
+                                            class="text-gray-400 hover:text-white text-xs font-medium transition"
+                                        >
+                                            Cancel Scan
+                                        </button>
+                                    </div>
+                                {:else}
+                                    <button
+                                        onclick={startQrScanner}
+                                        class="w-full flex items-center justify-center gap-2 bg-gray-800/50 hover:bg-gray-800 text-gray-300 hover:text-white py-3 rounded-lg text-xs font-semibold transition border border-gray-700 border-dashed"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                                            <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                                            <rect x="7" y="7" width="10" height="10" rx="1"></rect>
+                                        </svg>
+                                        Scan QR Code from Email
+                                    </button>
+                                {/if}
                             </div>
                         </div>
                     </div>

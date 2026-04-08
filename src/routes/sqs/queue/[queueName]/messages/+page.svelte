@@ -13,6 +13,7 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
+    import CopyButton from "$lib/components/CopyButton.svelte";
 
     let queueName = $derived($page.params.queueName || "");
     let queueUrl = $derived($page.url.searchParams.get("url") || "");
@@ -41,18 +42,29 @@
     >([]);
 
     let viewingMessage = $state<any>(null);
+    let showFullPayload = $state(false);
     let showModal = $state(false);
 
     let displayMessage = $derived.by(() => {
         if (!viewingMessage) return "";
-        try {
-            return JSON.stringify({
-                ...viewingMessage,
-                body: JSON.parse(viewingMessage.body)
-            });
-        } catch {
-            return JSON.stringify(viewingMessage);
+        let content;
+        if (showFullPayload) {
+            try {
+                content = {
+                    ...viewingMessage,
+                    body: JSON.parse(viewingMessage.body),
+                };
+            } catch {
+                content = viewingMessage;
+            }
+        } else {
+            try {
+                content = JSON.parse(viewingMessage.body);
+            } catch {
+                return viewingMessage.body;
+            }
         }
+        return JSON.stringify(content, null, 2);
     });
 
     let queueArn = $state("");
@@ -326,6 +338,23 @@
 </div>
 
 <Modal bind:open={showModal} title="Message Details" maxWidth="max-w-4xl">
+    <div class="flex justify-between items-center mb-2 pr-2">
+        <CopyButton
+            text={displayMessage}
+            label="Copy"
+            class="text-[10px] text-gray-400 hover:text-white pl-1"
+        />
+        <label
+            class="flex items-center gap-2 text-[10px] cursor-pointer text-gray-400 hover:text-white transition"
+        >
+            <input
+                type="checkbox"
+                bind:checked={showFullPayload}
+                class="rounded border-gray-700 bg-gray-950 text-blue-600 focus:ring-blue-500"
+            />
+            Show full payload
+        </label>
+    </div>
     <div class="bg-black/50 p-4 rounded min-h-[40vh] overflow-auto text-xs">
         {#if displayMessage}
             <JsonLogViewer message={displayMessage} />

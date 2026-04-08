@@ -1,10 +1,24 @@
 <script lang="ts">
   import { titleService } from "$lib/services/title.svelte";
   import { settings } from "$lib/services/settings.svelte";
+  import { openUrl } from "@tauri-apps/plugin-opener";
 
   $effect(() => {
     titleService.setResource("Upgrade to Pro", undefined, "/upgrade");
   });
+
+  let checkoutLoading = $state(false);
+
+  async function startCheckout() {
+    checkoutLoading = true;
+    try {
+      await openUrl("https://clouddash.dev/pricing");
+    } catch (e) {
+      console.error("Failed to open pricing page", e);
+    } finally {
+      checkoutLoading = false;
+    }
+  }
 </script>
 
 <div class="h-full flex flex-col items-center justify-center p-8 bg-gray-950 text-white overflow-y-auto">
@@ -46,23 +60,23 @@
           <span class="font-bold">You are already a Pro user!</span>
         </div>
       {:else}
-        <a 
-          href="https://clouddash.dev/pricing" 
-          target="_blank"
-          class="inline-block group relative"
+        <button
+          onclick={startCheckout}
+          disabled={checkoutLoading}
+          class="group relative inline-block"
         >
           <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg blur opacity-70 group-hover:opacity-100 transition duration-200"></div>
-          <button class="relative bg-black border border-gray-800 text-white font-bold py-4 px-12 rounded-lg transition overflow-hidden">
+          <div class="relative bg-black border border-gray-800 text-white font-bold py-4 px-12 rounded-lg transition overflow-hidden">
             <span class="relative z-10 flex items-center gap-2 text-lg">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-              Subscribe to Pro ($59/year)
+              {checkoutLoading ? 'Opening...' : 'Subscribe to Pro ($36/year)'}
             </span>
             <div class="absolute inset-0 h-full w-full opacity-10 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
-          </button>
-        </a>
+          </div>
+        </button>
         <p class="mt-6 text-xs text-gray-500">
           Clicking the button will take you to our secure checkout page on the web. <br />
-          Once you complete your purchase, you'll receive a license key to activate in the app's Settings menu.
+          Once you complete your purchase, you'll receive a license key via email to activate in the app's Settings menu.
         </p>
       {/if}
     </div>
