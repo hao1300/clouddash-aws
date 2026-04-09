@@ -1,0 +1,18 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/contact": [
+		"src/routes/+layout.ts"
+	],
+	"/download": [
+		"src/routes/+layout.ts"
+	],
+	"/pricing": [
+		"src/routes/+layout.ts"
+	],
+	"/privacy": [
+		"src/routes/+layout.ts"
+	]
+}

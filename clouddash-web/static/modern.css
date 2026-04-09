@@ -1,0 +1,182 @@
+/* CloudDash Modern CSS - Dark Theme Redesign */
+
+:root {
+  /* Dark Palette (matching aws-console/gray-950) */
+  --bg-950: #030712;
+  --bg-900: #111827;
+  --bg-800: #1f2937;
+  --border-gray: #374151;
+  
+  /* Text */
+  --text-primary: #f9fafb;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  
+  /* Accents */
+  --primary: #3b82f6; /* Blue accent from app */
+  --primary-dark: #2563eb;
+  --accent-gold: #eab308; /* Pro highlights */
+  
+  --shadow-subtle: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+  color: var(--text-primary);
+  background-color: var(--bg-950);
+  line-height: 1.6;
+}
+
+.font-outfit {
+  font-family: 'Outfit', sans-serif;
+}
+
+/* Typography Enhancements */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  font-family: 'Outfit', sans-serif;
+}
+
+.lh-1 {
+  line-height: 1.1 !important;
+}
+
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Button & UI Element Modernization */
+.btn {
+  padding: 0.8rem 1.8rem;
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+  font-weight: 600;
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-dark);
+  border-color: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4) !important;
+  color: #fff;
+}
+
+.btn-dark {
+  background-color: var(--bg-900);
+  border-color: var(--border-gray);
+  color: #fff;
+}
+
+.btn-dark:hover {
+  background-color: var(--bg-800);
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  color: #fff;
+}
+
+.btn-outline-light:hover {
+  background-color: #fff;
+  color: #000;
+  transform: translateY(-2px);
+}
+
+.rounded-pill {
+  border-radius: 100px !important;
+}
+
+.rounded-4 {
+  border-radius: 1rem !important;
+}
+
+.rounded-5 {
+  border-radius: 1.5rem !important;
+}
+
+/* Card Enhancements */
+.card, .pricing-card, .feature-card {
+  background-color: var(--bg-900);
+  border: 1px solid var(--border-gray);
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+  border-color: var(--primary);
+  background-color: var(--bg-800);
+}
+
+/* Animation Micro-interactions */
+.transition-up {
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.transition-up:hover {
+  transform: translateY(-8px);
+}
+
+/* Glassmorphism Elements */
+.glass {
+  background: rgba(17, 24, 39, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Custom Spacing */
+.py-10 {
+  padding-top: 5rem;
+  padding-bottom: 5rem;
+}
+
+.py-12 {
+  padding-top: 8rem;
+  padding-bottom: 8rem;
+}
+
+@media (min-width: 992px) {
+  .py-10 {
+    padding-top: 7rem;
+    padding-bottom: 7rem;
+  }
+}
+
+/* Navbar overrides */
+.navbar {
+  transition: all 0.3s ease;
+}
+
+.navbar .nav-link {
+  color: var(--text-secondary) !important;
+  font-weight: 500;
+}
+
+.navbar .nav-link:hover {
+  color: var(--primary) !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-950);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-800);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-gray);
+}
