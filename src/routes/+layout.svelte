@@ -57,6 +57,7 @@
 
   // Custom API Keys
   let os = $state("");
+  let isMobile = $derived(os === "android" || os === "ios");
   let accountId = $state("");
   let roleName = $state("");
   let sourceProfile = $state("default");
@@ -309,7 +310,6 @@
     else serviceVisible = new Set(["cloudwatch", "s3", "dynamodb"]);
 
     // Restore profile/region and auto-login
-    let isMobile = os === "android" || os === "ios";
     let noRealProfiles =
       allProfiles.length === 0 ||
       (allProfiles.length === 1 && allProfiles[0] === "default");
@@ -562,7 +562,7 @@
   }
 
   function switchTab(id: string, event?: MouseEvent) {
-    if (event?.ctrlKey || event?.metaKey) {
+    if (!isMobile && (event?.ctrlKey || event?.metaKey)) {
       invoke("fork_process", {
         path: id,
         region,
@@ -850,21 +850,23 @@
               >
                 <span>⚙</span>
               </button>
-              <button
-                onclick={() => {
-                  invoke("fork_process", {
-                    path: activeId,
-                    region,
-                    profile:
-                      authType === "profile" ? selectedProfile : undefined,
-                  });
-                  if (window.innerWidth < 640) sideMenuOpen = false;
-                }}
-                class="flex-[2] bg-blue-600 hover:bg-blue-500 p-2 rounded text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-white shadow-lg"
-                title="Fork to new window"
-              >
-                <span>⧉</span> Fork
-              </button>
+              {#if !isMobile}
+                <button
+                  onclick={() => {
+                    invoke("fork_process", {
+                      path: activeId,
+                      region,
+                      profile:
+                        authType === "profile" ? selectedProfile : undefined,
+                    });
+                    if (window.innerWidth < 640) sideMenuOpen = false;
+                  }}
+                  class="flex-[2] bg-blue-600 hover:bg-blue-500 p-2 rounded text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-white shadow-lg"
+                  title="Fork to new window"
+                >
+                  <span>⧉</span> Fork
+                </button>
+              {/if}
             </div>
           </div>
         </div>
