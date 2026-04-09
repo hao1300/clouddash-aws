@@ -244,6 +244,24 @@
             toastService.error("Failed to open browse dialog");
         }
     }
+
+    function toggleAllProfiles() {
+        if (profileVisible.size === profileOrder.length) {
+            profileVisible = new Set();
+        } else {
+            profileVisible = new Set(profileOrder);
+        }
+        onChange();
+    }
+
+    function toggleAllRegions() {
+        if (regionVisible.size === regionOrder.length) {
+            regionVisible = new Set();
+        } else {
+            regionVisible = new Set(regionOrder);
+        }
+        onChange();
+    }
 </script>
 
 <Modal bind:open title="Settings" maxWidth="max-w-3xl">
@@ -365,9 +383,19 @@
                     </div>
                 </div>
             {:else if settingsTab === "profiles"}
-                <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
-                    Profiles — drag to reorder
-                </h3>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs text-gray-500 uppercase tracking-wider">
+                        Profiles — drag to reorder
+                    </h3>
+                    <button
+                        onclick={toggleAllProfiles}
+                        class="text-[10px] font-bold text-blue-500 hover:text-blue-400 transition uppercase tracking-tight"
+                    >
+                        {profileVisible.size === profileOrder.length
+                            ? "Disable All"
+                            : "Enable All"}
+                    </button>
+                </div>
                 <ReorderableList
                     items={profileOrder}
                     onReorder={handleProfileReorder}
@@ -396,9 +424,19 @@
                     {/snippet}
                 </ReorderableList>
             {:else if settingsTab === "regions"}
-                <h3 class="text-xs text-gray-500 uppercase tracking-wider mb-3">
-                    Regions — drag to reorder
-                </h3>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs text-gray-500 uppercase tracking-wider">
+                        Regions — drag to reorder
+                    </h3>
+                    <button
+                        onclick={toggleAllRegions}
+                        class="text-[10px] font-bold text-blue-500 hover:text-blue-400 transition uppercase tracking-tight"
+                    >
+                        {regionVisible.size === regionOrder.length
+                            ? "Disable All"
+                            : "Enable All"}
+                    </button>
+                </div>
                 <ReorderableList
                     items={regionOrder}
                     onReorder={handleRegionReorder}
