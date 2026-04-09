@@ -1,6 +1,9 @@
 mod state;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
+use tauri::Emitter;
 
+static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static INTERCEPT_BACK: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
@@ -17,10 +20,22 @@ pub extern "C" fn Java_com_clouddash_aws_MainActivity_shouldInterceptBack(
     INTERCEPT_BACK.load(Ordering::Relaxed)
 }
 
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_clouddash_aws_MainActivity_onBackPressedNative(
+    _env: *mut std::ffi::c_void,
+    _class: *mut std::ffi::c_void,
+) {
+    if let Some(app) = APP_HANDLE.get() {
+        let _ = app.emit("tauri://back-button", ());
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            APP_HANDLE.set(app.handle().clone()).ok();
             #[cfg(mobile)]
             app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
             Ok(())

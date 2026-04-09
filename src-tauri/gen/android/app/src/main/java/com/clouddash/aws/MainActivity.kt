@@ -10,15 +10,16 @@ class MainActivity : TauriActivity() {
   // Intercept back button to prevent app exit during scanning
   override fun onBackPressed() {
     if (shouldInterceptBack()) {
-      // Emit event to JS
-      this.app?.emit("tauri://back-button", null)
+      // Call JNI function to emit event via Rust
+      onBackPressedNative()
     } else {
       super.onBackPressed()
     }
   }
 
-  // JNI function implemented in Rust (lib.rs)
+  // JNI functions implemented in Rust (lib.rs)
   private external fun shouldInterceptBack(): Boolean
+  private external fun onBackPressedNative()
 
   companion object {
     init {
