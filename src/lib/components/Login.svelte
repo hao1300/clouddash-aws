@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Html5QrcodeScanner, Html5QrcodeScanType } from "html5-qrcode";
+    import { scan, cancel, Format } from "@tauri-apps/plugin-barcode-scanner";
     import { invoke } from "@tauri-apps/api/core";
     import { listen, type UnlistenFn } from "@tauri-apps/api/event";
     import * as fflate from "fflate";
@@ -53,9 +53,6 @@
         onProfilesSaved?: () => void;
     } = $props();
 
-    let scanner: Html5QrcodeScanner | null = null;
-    let scannerNode: HTMLElement | null = $state(null);
-
     let importQueue = $state<any[]>([]);
     let conflictQueue = $state<{ newProfile: any; existingProfile: any }[]>([]);
     let showConflictModal = $state(false);
@@ -81,27 +78,37 @@
         return true;
     }
 
+    let _scanning = false;
+
     $effect(() => {
-        if (authType === "qr" && scannerNode && !scanner) {
-            scanner = new Html5QrcodeScanner(
-                "qr-reader",
-                {
-                    fps: 10,
-                    qrbox: { width: 250, height: 250 },
-                    supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-                },
-                /* verbose= */ false,
-            );
-            scanner.render(onScanSuccess, onScanFailure);
-        } else if (authType !== "qr" && scanner) {
-            scanner.clear().catch(console.error);
-            scanner = null;
+        if (authType === "qr") {
+            if ((os === "android" || os === "ios") && !_scanning) {
+                _scanning = true;
+                setTimeout(async () => {
+                    try {
+                        const result = await scan({ formats: [Format.QRCode] });
+                        if (result && result.code) {
+                            onScanSuccess(result.code, null);
+                        }
+                    } catch (e) {
+                        console.error("Barcode scan failed", e);
+                    } finally {
+                        _scanning = false;
+                        if (authType === "qr") {
+                            onSwitchAuthType("profile"); // go back if scan dismissed natively
+                        }
+                    }
+                }, 100);
+            }
+        } else if (authType !== "qr" && _scanning) {
+            cancel().catch(console.error);
+            _scanning = false;
         }
 
         return () => {
-            if (scanner) {
-                scanner.clear().catch(console.error);
-                scanner = null;
+            if (_scanning) {
+                cancel().catch(console.error);
+                _scanning = false;
             }
         };
     });
@@ -128,9 +135,9 @@
 
         importQueue = [];
 
-        if (scanner) {
-            scanner.clear().catch(console.error);
-            scanner = null;
+        if (_scanning) {
+            cancel().catch(console.error);
+            _scanning = false;
         }
 
         onSwitchAuthType("profile");
@@ -156,8 +163,10 @@
 
     async function onScanSuccess(decodedText: string, decodedResult: any) {
         try {
-            // Pause scanning while processing
-            if (scanner) scanner.pause(true);
+            if (_scanning) {
+                cancel().catch(console.error);
+                _scanning = false;
+            }
 
             let jsonText = decodedText;
             if (decodedText.startsWith("zlib:")) {
@@ -230,9 +239,9 @@
                 if (reg) region = reg;
 
                 onSwitchAuthType("manual");
-                if (scanner) {
-                    scanner.clear().catch(console.error);
-                    scanner = null;
+                if (_scanning) {
+                    cancel().catch(console.error);
+                    _scanning = false;
                 }
             }
         } catch (e) {
@@ -338,14 +347,16 @@
                             : 'text-gray-500 border-transparent hover:text-gray-300'}"
                         >Assume Role</button
                     >
-                    <button
-                        onclick={() => onSwitchAuthType("qr")}
-                        class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
-                        'qr'
-                            ? 'text-blue-400 border-blue-500'
-                            : 'text-gray-500 border-transparent hover:text-gray-300'}"
-                        >QR Code</button
-                    >
+                    {#if os === "android" || os === "ios"}
+                        <button
+                            onclick={() => onSwitchAuthType("qr")}
+                            class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
+                            'qr'
+                                ? 'text-blue-400 border-blue-500'
+                                : 'text-gray-500 border-transparent hover:text-gray-300'}"
+                            >QR Code</button
+                        >
+                    {/if}
                 </div>
             </div>
 
@@ -513,12 +524,21 @@
                 >
                     <strong>QR Scan:</strong> Scan the credentials QR code from your
                     other device to securely transfer them here.
+                    {#if os !== "android" && os !== "ios"}
+                        <br/><span class="text-red-400 mt-2 block">The barcode scanner is only supported on mobile devices.</span>
+                    {/if}
                 </div>
-                <div
-                    id="qr-reader"
-                    bind:this={scannerNode}
-                    class="w-full bg-white text-black min-h-[300px] rounded overflow-hidden"
-                ></div>
+                {#if os === "android" || os === "ios"}
+                    <div class="flex justify-center py-12">
+                        <div class="animate-pulse flex flex-col items-center">
+                            <svg class="w-12 h-12 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span class="text-gray-400 text-sm">Opening Camera...</span>
+                        </div>
+                    </div>
+                {/if}
             {/if}
             <button
                 onclick={onLogin}
@@ -639,41 +659,4 @@
     {/if}
 </Modal>
 
-<style>
-    /* Make HTML5 QR Code scanner UI larger and better looking */
-    :global(#qr-reader button) {
-        background-color: #2563eb !important; /* blue-600 */
-        color: white !important;
-        font-weight: bold !important;
-        padding: 0.75rem 1.5rem !important;
-        border-radius: 0.5rem !important;
-        border: none !important;
-        font-size: 1rem !important;
-        margin-bottom: 1rem !important;
-        cursor: pointer;
-        transition: opacity 0.2s;
-        box-shadow:
-            0 4px 6px -1px rgba(0, 0, 0, 0.1),
-            0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-    :global(#qr-reader button:hover) {
-        opacity: 0.9;
-    }
-    :global(#qr-reader select) {
-        background-color: #1f2937 !important; /* gray-800 */
-        color: white !important;
-        font-size: 1rem !important;
-        padding: 0.75rem 1rem !important;
-        border-radius: 0.25rem !important;
-        border: 1px solid #374151 !important; /* gray-700 */
-        width: 100% !important;
-        margin-bottom: 1rem !important;
-        outline: none;
-    }
-    :global(#qr-reader span) {
-        color: #d1d5db !important; /* gray-300 */
-    }
-    :global(#qr-reader #html5-qrcode-anchor-scan-type-change) {
-        display: none !important;
-    }
-</style>
+
