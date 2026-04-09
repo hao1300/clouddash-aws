@@ -347,6 +347,8 @@
         }
     }
     let isSidebarCollapsed = $state(false);
+    let queryCollapsed = $state(false);
+    let fieldsCollapsed = $state(false);
 </script>
 
 <DetailLayout
@@ -359,8 +361,21 @@
 >
     {#snippet mainSnippet()}
         <div
-            class="bg-gray-900 border border-gray-800 p-4 rounded-lg shadow-sm"
+            class="bg-gray-900 border border-gray-800 rounded-lg shadow-sm"
         >
+            <!-- Mobile collapse header -->
+            <button
+                class="md:hidden w-full flex items-center justify-between px-4 py-3 border-b border-gray-800 text-left"
+                onclick={() => (queryCollapsed = !queryCollapsed)}
+                aria-expanded={!queryCollapsed}
+            >
+                <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Query Editor</span>
+                <svg
+                    class="w-4 h-4 text-gray-500 transition-transform duration-200 {queryCollapsed ? '' : 'rotate-180'}"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                ><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            <div class="{queryCollapsed ? 'hidden' : ''} md:block p-4">
             <div class="flex gap-4 mb-4 flex-wrap">
                 <div class="flex-1 min-w-[300px]">
                     <label
@@ -605,6 +620,7 @@
                     </div>
                 </div>
             </div>
+            </div><!-- end collapsible query body -->
         </div>
     {/snippet}
 
@@ -612,16 +628,19 @@
         <div
             class="bg-gray-900 border border-gray-800 rounded-lg shadow-sm flex flex-col h-full"
         >
-            <div
-                class="px-4 py-3 border-b border-gray-800 bg-gray-900/80 shrink-0"
+            <!-- Always-visible header; chevron only shown on mobile -->
+            <button
+                class="w-full flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-900/80 shrink-0 text-left cursor-default md:cursor-auto"
+                onclick={() => (fieldsCollapsed = !fieldsCollapsed)}
+                aria-expanded={!fieldsCollapsed}
             >
-                <h3
-                    class="text-xs font-bold text-gray-300 uppercase tracking-wider"
-                >
-                    Log Fields
-                </h3>
-            </div>
-            <div class="p-4 overflow-y-auto flex-1" style="max-height: 300px;">
+                <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider">Log Fields</h3>
+                <svg
+                    class="md:hidden w-4 h-4 text-gray-500 transition-transform duration-200 {fieldsCollapsed ? '' : 'rotate-180'}"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                ><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            <div class="{fieldsCollapsed ? 'hidden' : ''} md:block p-4 overflow-y-auto flex-1" style="max-height: 300px;">
                 {#if fieldsLoading}
                     <div class="text-xs text-gray-500 animate-pulse">
                         Loading fields...
