@@ -727,18 +727,28 @@
                         <tbody class="divide-y divide-gray-800/50">
                             {#each logResults as row}
                                 <tr
-                                    class="hover:bg-gray-800/40 transition-colors group cursor-pointer"
-                                    onclick={() => navigateToLog(row)}
-                                    title="Click to view in log stream"
+                                    class="hover:bg-gray-800/30 transition-colors group"
                                 >
                                     {#each logColumns as col}
                                         <td
-                                            class="px-4 py-2.5 text-gray-300 group-hover:text-blue-300 font-mono text-xs {col ===
-                                            '@message'
-                                                ? 'min-w-[400px]'
-                                                : ''}"
+                                            class="px-4 py-2.5 font-mono text-xs select-text {col === '@message' ? 'min-w-[400px] text-gray-300' : col === '@logStream' ? 'text-blue-400' : 'text-gray-300'}"
                                         >
-                                            {#if col === "@message"}
+                                            {#if col === "@logStream"}
+                                                {@const stream = row[col] ?? ""}
+                                                {@const group = row["@logGroup"] || (selectedLogGroups.length === 1 ? selectedLogGroups[0] : null)}
+                                                {#if group && stream}
+                                                    <button
+                                                        class="inline-flex items-center gap-1 hover:text-blue-300 hover:underline underline-offset-2 transition-colors text-left"
+                                                        onclick={(e) => { e.stopPropagation(); navigateToLog(row); }}
+                                                        title="Open log stream"
+                                                    >
+                                                        {stream}
+                                                        <svg class="w-3 h-3 opacity-60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                    </button>
+                                                {:else}
+                                                    {stream || "-"}
+                                                {/if}
+                                            {:else if col === "@message"}
                                                 <JsonLogViewer
                                                     message={row[col] ?? ""}
                                                     class="whitespace-pre-wrap max-w-full"
