@@ -929,7 +929,11 @@
               : 'text-gray-400'} hover:bg-gray-800"
             title="Bookmarks"
           >
-            <span class="text-xl">{bookmarks.isBookmarked ? "★" : "☆"}</span>
+            {#if bookmarks.isBookmarked}
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+            {:else}
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+            {/if}
           </button>
         </header>
 
@@ -976,7 +980,7 @@
             class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950/50"
           >
             <h2 class="font-bold text-gray-100 flex items-center gap-2">
-              <span class="text-yellow-400 text-lg">★</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark text-yellow-400"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
               Bookmarks
             </h2>
             <button
@@ -997,7 +1001,11 @@
               class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold transition shadow-lg shrink-0"
             >
               <span class={bookmarks.isBookmarked ? "text-yellow-300" : ""}>
-                {bookmarks.isBookmarked ? "★" : "☆"}
+                {#if bookmarks.isBookmarked}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+                {:else}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+                {/if}
               </span>
               <span>
                 {bookmarks.isBookmarked
