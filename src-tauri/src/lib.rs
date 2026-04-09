@@ -1,4 +1,21 @@
 mod state;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static INTERCEPT_BACK: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+fn set_back_button_intercept(enabled: bool) {
+    INTERCEPT_BACK.store(enabled, Ordering::Relaxed);
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_clouddash_aws_MainActivity_shouldInterceptBack(
+    _env: *mut std::ffi::c_void,
+    _class: *mut std::ffi::c_void,
+) -> bool {
+    INTERCEPT_BACK.load(Ordering::Relaxed)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,6 +32,7 @@ pub fn run() {
         .plugin(tauri_plugin_scoped_storage::init())
         .manage(state::SharedConfig::default())
         .invoke_handler(tauri::generate_handler![
+            set_back_button_intercept,
             state::list_profiles,
             state::authenticate,
             state::get_credentials,

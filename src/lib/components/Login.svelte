@@ -87,6 +87,26 @@
         _cameraActive = false;
     });
 
+    // Handle Android back button intercept
+    $effect(() => {
+        if (os === "android") {
+            invoke("set_back_button_intercept", { enabled: _cameraActive });
+        }
+    });
+
+    $effect(() => {
+        let unlisten: UnlistenFn | null = null;
+        if (_cameraActive) {
+            listen("tauri://back-button", () => {
+                _cameraActive = false;
+                cancel().catch(console.error);
+            }).then(u => unlisten = u);
+        }
+        return () => {
+            if (unlisten) unlisten();
+            if (os === "android") invoke("set_back_button_intercept", { enabled: false });
+        };
+    });
 
     $effect(() => {
         if (authType === "qr" && _cameraActive) {
