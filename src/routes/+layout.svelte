@@ -66,6 +66,7 @@
   let sessionToken = $state("");
   let saveProfileChecked = $state(false);
   let saveProfileName = $state("");
+  let mfaSerial = $state("");
 
   let isAuthenticated = $state(false);
   let loading = $state(false);
@@ -398,6 +399,8 @@
         properties["aws_secret_access_key"] = secretAccessKey.trim();
         if (sessionToken.trim())
           properties["aws_session_token"] = sessionToken.trim();
+        if (mfaSerial.trim())
+          properties["mfa_serial"] = mfaSerial.trim();
 
         await invoke("save_profile", {
           name: saveProfileName.trim(),
@@ -431,6 +434,8 @@
         properties["role_arn"] =
           `arn:aws:iam::${accountId.trim()}:role/${roleName.trim()}`;
         properties["source_profile"] = sourceProfile.trim();
+        if (mfaSerial.trim())
+          properties["mfa_serial"] = mfaSerial.trim();
 
         await invoke("save_profile", {
           name: saveProfileName.trim(),
@@ -497,12 +502,40 @@
             requestHandler: customRequestHandler,
           });
 
-          const res = await sts.send(
-            new AssumeRoleCommand({
-              RoleArn: target.role_arn,
-              RoleSessionName: "CloudDashSession",
-            }),
-          );
+          let res;
+          console.log("[Auth] Attempting AssumeRole without MFA for", target.role_arn);
+          try {
+            res = await sts.send(
+              new AssumeRoleCommand({
+                RoleArn: target.role_arn,
+                RoleSessionName: "CloudDashSession",
+              }),
+            );
+            console.log("[Auth] AssumeRole without MFA successful");
+          } catch (err: any) {
+            console.log("[Auth] AssumeRole failed:", err, "Target MFA Serial:", target.mfa_serial);
+            // Check if failure might be due to MFA, and if we have mfa_serial
+            if (target.mfa_serial && (err.name === 'AccessDenied' || err.name === 'AccessDeniedException' || err.message?.toLowerCase().includes('mfa') || err.message?.toLowerCase().includes('multifactorauthentication'))) {
+              console.log("[Auth] Prompting for MFA token...");
+              const mfaToken = window.prompt(`MFA token code required for profile ${selectedProfile}:`);
+              if (!mfaToken) {
+                console.warn("[Auth] MFA token prompt cancelled or empty");
+                throw new Error("MFA token is required to assume this role.");
+              }
+              console.log("[Auth] Retrying AssumeRole with MFA Token...");
+              res = await sts.send(
+                new AssumeRoleCommand({
+                  RoleArn: target.role_arn,
+                  RoleSessionName: "CloudDashSession",
+                  SerialNumber: target.mfa_serial,
+                  TokenCode: mfaToken,
+                }),
+              );
+              console.log("[Auth] AssumeRole with MFA successful");
+            } else {
+              throw err;
+            }
+          }
 
           if (!res.Credentials) throw new Error("STS returned no credentials");
 
@@ -515,12 +548,63 @@
         } else {
           if (!target.aws_access_key_id)
             throw new Error("Profile has no access keys");
-          finalCreds = {
-            access_key_id: target.aws_access_key_id,
-            secret_access_key: target.aws_secret_access_key,
-            session_token: target.aws_session_token || null,
-            region: targetRegion,
-          };
+
+          console.log("[Auth] Using standard access keys. mfa_serial:", target.mfa_serial, "session_token exists:", !!target.aws_session_token);
+
+          if (target.mfa_serial && !target.aws_session_token) {
+            console.log("[Auth] Setting up GetSessionToken for MFA requirement...");
+            const { STSClient, GetSessionTokenCommand } = await import(
+              "@aws-sdk/client-sts"
+            );
+            const { customRequestHandler } = await import(
+              "$lib/services/aws.svelte"
+            );
+
+            const mfaToken = window.prompt(`MFA token code required for profile ${selectedProfile}:`);
+            if (!mfaToken) {
+              throw new Error("MFA token is required for this profile.");
+            }
+
+            const sts = new STSClient({
+              region: targetRegion,
+              credentials: {
+                accessKeyId: target.aws_access_key_id,
+                secretAccessKey: target.aws_secret_access_key,
+              },
+              requestHandler: customRequestHandler,
+            });
+
+            console.log("[Auth] Calling GetSessionToken...");
+            let res;
+            try {
+              res = await sts.send(
+                new GetSessionTokenCommand({
+                  SerialNumber: target.mfa_serial,
+                  TokenCode: mfaToken,
+                })
+              );
+              console.log("[Auth] GetSessionToken successful");
+            } catch (err) {
+              console.error("[Auth] GetSessionToken failed:", err);
+              throw err;
+            }
+
+            if (!res.Credentials) throw new Error("STS returned no credentials");
+
+            finalCreds = {
+              access_key_id: res.Credentials.AccessKeyId!,
+              secret_access_key: res.Credentials.SecretAccessKey!,
+              session_token: res.Credentials.SessionToken || null,
+              region: targetRegion,
+            };
+          } else {
+            finalCreds = {
+              access_key_id: target.aws_access_key_id,
+              secret_access_key: target.aws_secret_access_key,
+              session_token: target.aws_session_token || null,
+              region: targetRegion,
+            };
+          }
         }
       }
 
@@ -590,6 +674,7 @@
       bind:accessKeyId
       bind:secretAccessKey
       bind:sessionToken
+      bind:mfaSerial
       bind:saveProfileName
       bind:region
       visibleProfiles={allProfiles

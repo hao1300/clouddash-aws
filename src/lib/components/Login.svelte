@@ -15,6 +15,7 @@
         accessKeyId = $bindable(""),
         secretAccessKey = $bindable(""),
         sessionToken = $bindable(""),
+        mfaSerial = $bindable(""),
         saveProfileName = $bindable(""),
         region = $bindable("us-east-1"),
         visibleProfiles = [],
@@ -34,6 +35,7 @@
         accessKeyId: string;
         secretAccessKey: string;
         sessionToken: string;
+        mfaSerial: string;
         saveProfileName: string;
         region: string;
         visibleProfiles: string[];
@@ -241,17 +243,21 @@
     let isConnectDisabled = $derived.by(() => {
         if (loading) return true;
 
+        let mfaInvalid = !!(mfaSerial && !/^(arn:aws[-a-z]*:iam::\d{12}:mfa\/[\w+=,.@-]+|[A-Za-z0-9]+)$/.test(mfaSerial));
+
         if (authType === "profile") {
             return !selectedProfile || selectedProfile.trim() === "";
         }
 
         if (authType === "manual") {
             if (!saveProfileName.trim()) return true;
+            if (mfaInvalid) return true;
             return !accessKeyId.trim() || !secretAccessKey.trim();
         }
 
         if (authType === "assume") {
             if (!saveProfileName.trim()) return true;
+            if (mfaInvalid) return true;
             return (
                 !accountId?.trim() ||
                 !roleName?.trim() ||
@@ -396,6 +402,25 @@
                         class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono resize-none"
                     ></textarea>
                 </div>
+                <div class="mt-2 mb-2 border-t border-gray-800 pt-3">
+                    <label
+                        for="mfaInputManual"
+                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                        >MFA Serial ARN <span class="text-[10px] opacity-70"
+                            >(Optional)</span
+                        ></label
+                    >
+                    <input
+                        id="mfaInputManual"
+                        type="text"
+                        bind:value={mfaSerial}
+                        placeholder="arn:aws:iam::123456789012:mfa/user"
+                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                    />
+                    {#if mfaSerial && !/^(arn:aws[-a-z]*:iam::\d{12}:mfa\/[\w+=,.@-]+|[A-Za-z0-9]+)$/.test(mfaSerial)}
+                        <span class="text-[10px] text-red-400 mt-1 block">Expected ARN format or hardware serial</span>
+                    {/if}
+                </div>
                 <div class="mt-4 border-t border-gray-800 pt-3">
                     <label
                         for="profileNameInput"
@@ -454,6 +479,25 @@
                                 >{p}</option
                             >{/each}
                     </select>
+                </div>
+                <div class="mt-2 mb-2 border-t border-gray-800 pt-3">
+                    <label
+                        for="mfaInputAssume"
+                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                        >MFA Serial ARN <span class="text-[10px] opacity-70"
+                            >(Optional)</span
+                        ></label
+                    >
+                    <input
+                        id="mfaInputAssume"
+                        type="text"
+                        bind:value={mfaSerial}
+                        placeholder="arn:aws:iam::123456789012:mfa/user"
+                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                    />
+                    {#if mfaSerial && !/^(arn:aws[-a-z]*:iam::\d{12}:mfa\/[\w+=,.@-]+|[A-Za-z0-9]+)$/.test(mfaSerial)}
+                        <span class="text-[10px] text-red-400 mt-1 block">Expected ARN format or hardware serial</span>
+                    {/if}
                 </div>
                 <div class="mt-4 border-t border-gray-800 pt-3">
                     <label
