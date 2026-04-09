@@ -36,6 +36,9 @@
         },
         {
           "url": "https://clouddash.dev/*"
+        },
+        {
+          "url": "https://*.polar.sh/*"
         }
       ]
     }
