@@ -132,7 +132,6 @@
           <p class="text-secondary mb-0">
             Immediately after purchase, you will receive an email with your license key. Simply
             enter it into the Settings menu of the app to activate your Pro features.
-            Didn't get the email? Use our <a href="/license" class="text-primary">License Lookup</a> page to resend it.
           </p>
         </div>
       </div>
