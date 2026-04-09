@@ -69,6 +69,7 @@
   let mfaSerial = $state("");
 
   let isAuthenticated = $state(false);
+  let isAddingProfile = $state(false);
   let loading = $state(false);
   let error = $state("");
 
@@ -611,6 +612,7 @@
       if (loginId !== currentLoginId) return;
 
       isAuthenticated = true;
+      isAddingProfile = false;
       error = "";
       aws.setCredentials(finalCreds);
       refreshKey++;
@@ -683,6 +685,12 @@
       visibleRegions={ALL_REGIONS.filter((r) => regionVisible.has(r)).sort(
         (a, b) => regionOrder.indexOf(a) - regionOrder.indexOf(b),
       )}
+      isAddingProfile={isAddingProfile}
+      onCancel={() => {
+        isAddingProfile = false;
+        isAuthenticated = true;
+        authType = "profile";
+      }}
       {loading}
       {error}
       onLogin={() => login()}
@@ -872,6 +880,8 @@
                     onchange={() => {
                       if (selectedProfile === "__add_profile__") {
                         selectedProfile = visibleProfiles[0] || "default";
+                        isAddingProfile = true;
+                        authType = "manual";
                         isAuthenticated = false;
                         if (window.innerWidth < 640) sideMenuOpen = false;
                         return;

@@ -20,8 +20,10 @@
         region = $bindable("us-east-1"),
         visibleProfiles = [],
         visibleRegions = [],
+        isAddingProfile = false,
         loading = false,
         error = "",
+        onCancel,
         onLogin,
         onSwitchAuthType,
         onProfilesSaved,
@@ -40,8 +42,10 @@
         region: string;
         visibleProfiles: string[];
         visibleRegions: string[];
+        isAddingProfile?: boolean;
         loading: boolean;
         error: string;
+        onCancel?: () => void;
         onLogin: () => void;
         onSwitchAuthType: (
             type: "profile" | "manual" | "assume" | "qr",
@@ -281,8 +285,13 @@
 
 <div class="flex items-center justify-center flex-1 p-4">
     <div
-        class="w-full max-w-sm bg-gray-900 p-6 rounded-xl shadow-2xl border border-gray-800"
+        class="relative w-full max-w-sm bg-gray-900 p-6 rounded-xl shadow-2xl border border-gray-800"
     >
+        {#if isAddingProfile && onCancel}
+            <button onclick={onCancel} class="absolute top-4 right-4 p-1.5 rounded-full text-gray-500 hover:text-white hover:bg-gray-800 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        {/if}
         <h1 class="text-xl font-bold mb-4 text-blue-400">CloudDash for AWS</h1>
         {#if importSummary}
             <div
@@ -303,7 +312,7 @@
                     role="tablist"
                     aria-label="Login Method"
                 >
-                    {#if !isMobileAndEmpty}
+                    {#if !isMobileAndEmpty && !isAddingProfile}
                         <button
                             onclick={() => onSwitchAuthType("profile")}
                             class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
@@ -386,22 +395,7 @@
                         class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
                     />
                 </div>
-                <div class="mt-2">
-                    <label
-                        for="stInput"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Session Token <span class="text-[10px] opacity-70"
-                            >(Optional)</span
-                        ></label
-                    >
-                    <textarea
-                        id="stInput"
-                        bind:value={sessionToken}
-                        rows="2"
-                        placeholder="IQoJb3..."
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono resize-none"
-                    ></textarea>
-                </div>
+
                 <div class="mt-2 mb-2 border-t border-gray-800 pt-3">
                     <label
                         for="mfaInputManual"
