@@ -692,7 +692,7 @@
         authType = "profile";
       }}
       {loading}
-      {error}
+      bind:error={error}
       onLogin={() => login()}
       onSwitchAuthType={switchAuthType}
       onProfilesSaved={async () => {

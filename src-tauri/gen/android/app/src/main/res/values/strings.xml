@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">CloudDash for AWS</string>
+    <string name="app_name">CloudDash</string>
     <string name="main_activity_title">CloudDash for AWS</string>
 </resources>
