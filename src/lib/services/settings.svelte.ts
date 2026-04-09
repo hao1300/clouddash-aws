@@ -24,6 +24,7 @@ class SettingsService {
 
     constructor() {
         this.load();
+        this.startBackgroundValidation();
     }
 
     load() {
@@ -42,6 +43,20 @@ class SettingsService {
         } catch (e) {
             console.error("Failed to load settings", e);
         }
+    }
+
+    private startBackgroundValidation() {
+        // Re-validate immediately when application opens if they previously had a valid license
+        if (this.licenseKey && this.licenseValid) {
+            this.validateLicense().catch((e) => console.error("Startup validation failed", e));
+        }
+
+        // Periodically validate every hour to ensure the license hasn't been revoked
+        setInterval(() => {
+            if (this.licenseKey) {
+                this.validateLicense().catch((e) => console.error("Periodic validation failed", e));
+            }
+        }, 1000 * 60 * 60); // 1 hour interval
     }
 
     save() {
@@ -98,6 +113,9 @@ class SettingsService {
                 this.licenseError = "";
                 this.save();
                 return true;
+            } else if (res.status >= 500 || res.status === 429) {
+                this.licenseError = "License server overloaded or unavailable. Keeping existing status.";
+                return this.licenseValid;
             } else {
                 let errorMsg = "Invalid license key";
                 try {
