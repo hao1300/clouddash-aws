@@ -644,6 +644,9 @@
             <span class="text-sm font-bold text-gray-100 tracking-tight"
               >CloudDash for AWS</span
             >
+            {#if settings.isPro}
+              <span class="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 text-[10px] font-black rounded border border-blue-500/30 uppercase tracking-tighter">Pro</span>
+            {/if}
           </div>
           <button
             onclick={() => (sideMenuOpen = false)}
@@ -914,9 +917,6 @@
                   {part.label}
                 </a>
               {/each}
-            {/if}
-            {#if settings.isPro}
-              <span class="ml-2 px-1.5 py-0.5 bg-blue-600/20 text-blue-400 text-[10px] font-black rounded border border-blue-500/30 uppercase tracking-tighter">Pro</span>
             {/if}
           </div>
 
