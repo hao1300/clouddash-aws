@@ -1,9 +1,29 @@
 import { fetch } from "@tauri-apps/plugin-http";
 
 const STORAGE_KEY = "aws_console_settings";
-const POLAR_ORGANIZATION_ID = "bf4ff11b-e298-457f-82d7-23f052478d54";
-export const POLAR_API_URL = "https://sandbox-api.polar.sh";
-export const POLAR_CHECKOUT_URL = `${POLAR_API_URL}/v1/checkout-links/polar_cl_wSVggwiHdtEY319YwRsbLh8FlwpUbg4pupCIw44mgED/redirect`;
+interface PolarConfig {
+    organizationId: string;
+    apiUrl: string;
+    checkoutUrl: string;
+}
+
+const DEV_CONFIG: PolarConfig = {
+    organizationId: "bf4ff11b-e298-457f-82d7-23f052478d54",
+    apiUrl: "https://sandbox-api.polar.sh",
+    checkoutUrl: "https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_wSVggwiHdtEY319YwRsbLh8FlwpUbg4pupCIw44mgED/redirect"
+};
+
+const PROD_CONFIG: PolarConfig = {
+    organizationId: "3608078d-3441-4f44-a493-26ef8bfee22a",
+    apiUrl: "https://api.polar.sh",
+    checkoutUrl: "https://buy.polar.sh/polar_cl_kHwh8kO829ikhkxymHPo2G2PD195xw0UIXvyD0Yhn11"
+};
+
+const ACTIVE_CONFIG = import.meta.env.PROD ? PROD_CONFIG : DEV_CONFIG;
+
+const POLAR_ORGANIZATION_ID = ACTIVE_CONFIG.organizationId;
+export const POLAR_API_URL = ACTIVE_CONFIG.apiUrl;
+export const POLAR_CHECKOUT_URL = ACTIVE_CONFIG.checkoutUrl;
 
 class SettingsService {
     downloadFolder = $state("");
