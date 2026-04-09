@@ -12,6 +12,7 @@
     import { page } from "$app/stores";
     import DetailLayout from "$lib/components/DetailLayout.svelte";
     import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
+    import InsightsQueryEditor from "$lib/components/InsightsQueryEditor.svelte";
 
     let error = $state("");
     let actionMsg = $state("");
@@ -593,13 +594,16 @@
                         </button>
                     </div>
                 </div>
-                <textarea
-                    id="query-textarea"
-                    bind:value={logQuery}
-                    rows="5"
-                    class="w-full bg-gray-950/50 border border-gray-700 rounded-lg p-3 text-sm font-mono text-blue-300 outline-none focus:border-blue-500 resize-y shadow-inner mt-2"
-                    placeholder="fields @timestamp, @message | sort @timestamp desc | limit 20"
-                ></textarea>
+                <div class="mt-2">
+                    <InsightsQueryEditor
+                        bind:value={logQuery}
+                        fields={knownFields}
+                        onrun={runInsightsQuery}
+                    />
+                    <div class="text-[10px] text-gray-600 mt-1 text-right">
+                        Press <kbd class="px-1 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-400 font-mono">Ctrl+Enter</kbd> to run query
+                    </div>
+                </div>
             </div>
         </div>
     {/snippet}
