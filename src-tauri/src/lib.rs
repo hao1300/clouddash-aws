@@ -36,8 +36,6 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             APP_HANDLE.set(app.handle().clone()).ok();
-            #[cfg(mobile)]
-            app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())

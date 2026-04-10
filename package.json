@@ -48,6 +48,7 @@
     "chart.js": "^4.4.7",
     "codemirror": "^6.0.2",
     "highlight.js": "^11.11.1",
+    "html5-qrcode": "^2.3.8",
     "qrcode": "1.5.4",
     "svelte-dnd-action": "^0.9.69",
     "tauri-plugin-scoped-storage-api": "^0.1.3"

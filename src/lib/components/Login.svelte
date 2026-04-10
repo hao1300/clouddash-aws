@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { scan, cancel, checkPermissions, requestPermissions, Format } from "@tauri-apps/plugin-barcode-scanner";
+    import QRScanner from "./QRScanner.svelte";
     import { invoke } from "@tauri-apps/api/core";
     import { listen, type UnlistenFn } from "@tauri-apps/api/event";
     import * as fflate from "fflate";
@@ -110,42 +110,13 @@
 
     $effect(() => {
         if (authType === "qr" && _cameraActive) {
-            if ((os === "android" || os === "ios") && !_scanning) {
-                _scanning = true;
-                setTimeout(async () => {
-                    try {
-                        const permissions = await checkPermissions();
-                        if (permissions !== "granted") {
-                            const result = await requestPermissions();
-                            if (result !== "granted") {
-                                throw new Error("Camera permission denied. Please allow camera access in your device settings to use the QR scanner.");
-                            }
-                        }
-                        const result = await scan({ formats: [Format.QRCode] });
-                        if (result && result.code) {
-                            onScanSuccess(result.code, null);
-                        }
-                    } catch (e: any) {
-                        console.error("Barcode scan failed", e);
-                        if (e.message && e.message.includes("permission")) {
-                            error = e.message;
-                        }
-                    } finally {
-                        _scanning = false;
-                        if (authType === "qr") {
-                            onSwitchAuthType("profile"); // go back if scan dismissed natively or failed
-                        }
-                    }
-                }, 100);
-            }
+            // Camera active and QR selected
         } else if (authType !== "qr" && _scanning) {
-            cancel().catch(console.error);
             _scanning = false;
         }
 
         return () => {
             if (_scanning) {
-                cancel().catch(console.error);
                 _scanning = false;
             }
         };
@@ -173,11 +144,6 @@
 
         importQueue = [];
 
-        if (_scanning) {
-            cancel().catch(console.error);
-            _scanning = false;
-        }
-
         onSwitchAuthType("profile");
 
         if (importSummaryTimeout) clearTimeout(importSummaryTimeout);
@@ -201,10 +167,7 @@
 
     async function onScanSuccess(decodedText: string, decodedResult: any) {
         try {
-            if (_scanning) {
-                cancel().catch(console.error);
-                _scanning = false;
-            }
+            _cameraActive = false;
 
             let jsonText = decodedText;
             if (decodedText.startsWith("zlib:")) {
@@ -277,10 +240,6 @@
                 if (reg) region = reg;
 
                 onSwitchAuthType("manual");
-                if (_scanning) {
-                    cancel().catch(console.error);
-                    _scanning = false;
-                }
             }
         } catch (e) {
             console.error("Failed to parse QR code", e);
@@ -385,16 +344,14 @@
                             : 'text-gray-500 border-transparent hover:text-gray-300'}"
                         >Assume Role</button
                     >
-                    {#if os === "android" || os === "ios"}
-                        <button
-                            onclick={() => onSwitchAuthType("qr")}
-                            class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
-                            'qr'
-                                ? 'text-blue-400 border-blue-500'
-                                : 'text-gray-500 border-transparent hover:text-gray-300'}"
-                            >QR Code</button
-                        >
-                    {/if}
+                    <button
+                        onclick={() => onSwitchAuthType("qr")}
+                        class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
+                        'qr'
+                            ? 'text-blue-400 border-blue-500'
+                            : 'text-gray-500 border-transparent hover:text-gray-300'}"
+                        >QR Code</button
+                    >
                 </div>
             </div>
 
@@ -562,50 +519,37 @@
                 >
                     <strong>QR Scan:</strong> Scan the credentials QR code from your
                     other device to securely transfer them here.
-                    {#if os !== "android" && os !== "ios"}
-                        <br/><span class="text-red-400 mt-2 block">The barcode scanner is only supported on mobile devices.</span>
+                </div>
+                <div class="space-y-4">
+                    {#if !_cameraActive}
+                        <div class="flex flex-col gap-3 py-4">
+                            <button
+                                onclick={() => (_cameraActive = true)}
+                                class="w-full bg-blue-600 hover:bg-blue-500 text-white p-3 rounded font-bold text-sm shadow-lg transition flex items-center justify-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                Launch QR Scanner
+                            </button>
+                        </div>
+                    {:else}
+                        <div class="flex flex-col items-center py-2">
+                            <QRScanner 
+                                onSuccess={(text) => onScanSuccess(text, null)}
+                                onError={onScanFailure}
+                            />
+                            
+                            <button
+                                onclick={() => {
+                                    _cameraActive = false;
+                                }}
+                                class="mt-6 text-red-400 hover:text-red-300 text-xs font-bold uppercase tracking-widest transition flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                Stop Scanner
+                            </button>
+                        </div>
                     {/if}
                 </div>
-                {#if os === "android" || os === "ios"}
-                    <div class="space-y-4">
-                        {#if !_cameraActive}
-                            <div class="flex flex-col gap-3 py-4">
-                                <button
-                                    onclick={() => (_cameraActive = true)}
-                                    class="w-full bg-blue-600 hover:bg-blue-500 text-white p-3 rounded font-bold text-sm shadow-lg transition flex items-center justify-center gap-2"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                                    Launch QR Scanner
-                                </button>
-                                <button
-                                    onclick={() => onSwitchAuthType("profile")}
-                                    class="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 p-2.5 rounded font-medium text-xs transition border border-gray-700"
-                                >
-                                    Cancel & Go Back
-                                </button>
-                            </div>
-                        {:else}
-                            <div class="flex flex-col items-center py-8">
-                                <div class="animate-pulse flex flex-col items-center mb-6">
-                                    <svg class="w-12 h-12 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                    <span class="text-gray-400 text-sm">Opening Camera...</span>
-                                </div>
-                                <button
-                                    onclick={() => {
-                                        _cameraActive = false;
-                                        cancel().catch(console.error);
-                                    }}
-                                    class="text-red-400 hover:text-red-300 text-xs font-bold uppercase tracking-widest transition"
-                                >
-                                    Stop Scanner
-                                </button>
-                            </div>
-                        {/if}
-                    </div>
-                {/if}
             {/if}
             {#if authType !== 'qr'}
                 <button
