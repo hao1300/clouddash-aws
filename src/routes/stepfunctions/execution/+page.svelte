@@ -252,45 +252,60 @@
         </div>
     {/if}
 
-    <div class="flex gap-2">
-        {#if logGroupName}
-            <a
-                href={`/cloudwatch/logs?group=${encodeURIComponent(logGroupName)}`}
-                class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-3 py-1.5 rounded text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
-                title="View CloudWatch Logs"
-            >
-                ▤ Logs
-            </a>
-        {/if}
-        {#if ["FAILED", "TIMED_OUT", "ABORTED"].includes(details?.status)}
+    <div class="px-6 border-b border-gray-800 bg-gray-900 shrink-0 flex justify-between items-center flex-wrap gap-y-2 {error ? 'mt-8' : ''}">
+        <nav class="flex gap-4">
             <button
-                onclick={handleRedrive}
-                disabled={isRedriving}
-                class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
+                onclick={() => (viewMode = "graph")}
+                class="py-3 text-xs font-bold uppercase transition border-b-2 {viewMode ===
+                'graph'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-gray-400'}">Visual Graph</button
             >
-                {#if isRedriving}<span class="animate-spin">⟳</span>{/if} Redrive
-            </button>
-        {/if}
-        {#if details?.status === "RUNNING"}
             <button
-                onclick={handleStop}
-                disabled={isStopping}
-                class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
+                onclick={() => (viewMode = "table")}
+                class="py-3 text-xs font-bold uppercase transition border-b-2 {viewMode ===
+                'table'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-gray-400'}">Event History</button
             >
-                {#if isStopping}<span class="animate-spin">⟳</span>{/if} Stop
-            </button>
-        {/if}
-        <button
-            onclick={openStartModal}
-            class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
-        >
-            ▷ Start New
-        </button>
-    </div>
+        </nav>
 
-    <div class="px-3 py-2 flex items-center gap-2 border-b border-gray-800 bg-gray-900 shrink-0">
-        <button onclick={() => viewMode = 'graph'} class="px-3 py-1.5 text-xs font-bold rounded transition-colors {viewMode === 'graph' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'}">Visual Graph</button>
-        <button onclick={() => viewMode = 'table'} class="px-3 py-1.5 text-xs font-bold rounded transition-colors {viewMode === 'table' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'}">Event History</button>
+        <div class="flex items-center gap-2 py-2 flex-wrap justify-end">
+            {#if logGroupName}
+                <a
+                    href={`/cloudwatch/logs?group=${encodeURIComponent(logGroupName)}`}
+                    class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-3 py-1.5 rounded text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
+                    title="View CloudWatch Logs"
+                >
+                    ▤ Logs
+                </a>
+            {/if}
+            {#if ["FAILED", "TIMED_OUT", "ABORTED"].includes(details?.status)}
+                <button
+                    onclick={handleRedrive}
+                    disabled={isRedriving}
+                    class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
+                >
+                    {#if isRedriving}<span class="animate-spin">⟳</span>{/if}
+                    Redrive
+                </button>
+            {/if}
+            {#if details?.status === "RUNNING"}
+                <button
+                    onclick={handleStop}
+                    disabled={isStopping}
+                    class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
+                >
+                    {#if isStopping}<span class="animate-spin">⟳</span>{/if} Stop
+                </button>
+            {/if}
+            <button
+                onclick={openStartModal}
+                class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
+            >
+                ▷ Start New
+            </button>
+        </div>
     </div>
 
     <div class="flex-1 overflow-hidden p-2 flex gap-2 relative">
