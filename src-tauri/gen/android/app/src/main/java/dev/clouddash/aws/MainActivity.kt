@@ -1,4 +1,4 @@
-package com.clouddash.aws
+package dev.clouddash.aws
 
 import android.os.Bundle
 import android.webkit.PermissionRequest

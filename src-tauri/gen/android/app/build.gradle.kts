@@ -16,12 +16,12 @@ val tauriProperties = Properties().apply {
 
 android {
     compileSdk = 36
-    namespace = "com.clouddash.aws"
+    namespace = "dev.clouddash.aws"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         manifestPlaceholders["appName"] = "@string/app_name"
         manifestPlaceholders["activityTitle"] = "@string/main_activity_title"
-        applicationId = "com.clouddash.aws"
+        applicationId = "dev.clouddash.aws"
         minSdk = 24
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
@@ -43,7 +43,6 @@ android {
     }
     buildTypes {
         getByName("debug") {
-            applicationIdSuffix = ".dev"
             manifestPlaceholders["usesCleartextTraffic"] = "true"
             manifestPlaceholders["appName"] = "[dev] CloudDash"
             manifestPlaceholders["activityTitle"] = "[dev] CloudDash"

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "CloudDash",
-  "version": "0.1.2",
-  "identifier": "com.clouddash.aws",
+  "version": "0.8.0",
+  "identifier": "dev.clouddash.aws",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
