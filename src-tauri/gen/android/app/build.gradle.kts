@@ -19,6 +19,8 @@ android {
     namespace = "com.clouddash.aws"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
+        manifestPlaceholders["appName"] = "@string/app_name"
+        manifestPlaceholders["activityTitle"] = "@string/main_activity_title"
         applicationId = "com.clouddash.aws"
         minSdk = 24
         targetSdk = 36
@@ -43,6 +45,8 @@ android {
         getByName("debug") {
             applicationIdSuffix = ".dev"
             manifestPlaceholders["usesCleartextTraffic"] = "true"
+            manifestPlaceholders["appName"] = "[dev] CloudDash"
+            manifestPlaceholders["activityTitle"] = "[dev] CloudDash"
             isDebuggable = true
             isJniDebuggable = true
             isMinifyEnabled = false
