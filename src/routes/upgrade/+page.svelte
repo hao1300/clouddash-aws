@@ -28,7 +28,7 @@
 </script>
 
 <div
-  class="h-full flex flex-col items-center justify-center p-8 bg-gray-950 text-white overflow-y-auto"
+  class="h-full flex flex-col items-center justify-start md:justify-center p-8 bg-gray-950 text-white overflow-y-auto"
 >
   <div class="max-w-2xl w-full text-center space-y-8 py-12">
     <div>
