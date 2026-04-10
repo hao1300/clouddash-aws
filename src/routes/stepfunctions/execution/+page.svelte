@@ -5,6 +5,7 @@
         GetExecutionHistoryCommand,
         RedriveExecutionCommand,
         StopExecutionCommand,
+        StartExecutionCommand,
         type HistoryEvent,
     } from "@aws-sdk/client-sfn";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
@@ -16,6 +17,7 @@
     import { titleService } from "$lib/services/title.svelte";
     import StepFunctionsGraph from "$lib/components/StepFunctionsGraph.svelte";
     import type { StateExecutionDetails } from "$lib/utils/sfnHistoryParser";
+    import JsonEditor from "$lib/components/JsonEditor.svelte";
 
     let execArn = $derived($page.url.searchParams.get("id") || "");
 
@@ -38,6 +40,37 @@
     let selectedNodeState = $state<string | null>(null);
     let selectedNodeDetails = $state<StateExecutionDetails | null>(null);
     let selectedNodeRaw = $state<any>(null);
+
+    let startModalOpen = $state(false);
+    let startInput = $state("{}");
+    let startName = $state("");
+    let isStarting = $state(false);
+
+    function openStartModal() {
+        startInput = details?.input || "{}";
+        startName = "";
+        startModalOpen = true;
+    }
+
+    async function handleStartNew() {
+        if (!aws.sfn || !details?.stateMachineArn) return;
+        try {
+            isStarting = true;
+            const res = await aws.sfn.send(
+                new StartExecutionCommand({
+                    stateMachineArn: details.stateMachineArn,
+                    name: startName || undefined,
+                    input: startInput,
+                }),
+            );
+            startModalOpen = false;
+            goto(`/stepfunctions/execution?id=${res.executionArn}`);
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            isStarting = false;
+        }
+    }
 
     function handleNodeSelect(stateName: string, details: StateExecutionDetails | null, rawDef: any) {
         selectedNodeState = stateName;
@@ -247,6 +280,12 @@
                 {#if isStopping}<span class="animate-spin">⟳</span>{/if} Stop
             </button>
         {/if}
+        <button
+            onclick={openStartModal}
+            class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
+        >
+            ▷ Start New
+        </button>
     </div>
 
     <div class="px-3 py-2 flex items-center gap-2 border-b border-gray-800 bg-gray-900 shrink-0">
@@ -401,5 +440,43 @@
         {#if selectedEvent}
             <JsonLogViewer message={JSON.stringify(selectedEvent, null, 2)} class="text-[11px] text-green-400" />
         {/if}
+    </div>
+</Modal>
+
+<Modal bind:open={startModalOpen} title="Start New Execution" maxWidth="max-w-2xl">
+    <div class="space-y-4">
+        <div>
+            <label for="new-exec-name" class="block text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest">
+                Execution Name (Optional)
+            </label>
+            <input
+                id="new-exec-name"
+                type="text"
+                bind:value={startName}
+                class="w-full bg-black border border-gray-800 rounded p-2 text-xs text-gray-300 focus:border-blue-500 outline-none"
+                placeholder="Leave blank for auto-generated name"
+            />
+        </div>
+        <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest">
+                Input JSON
+            </label>
+            <div class="h-64 border border-gray-800 rounded overflow-hidden bg-black">
+                <JsonEditor bind:value={startInput} />
+            </div>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+            <button onclick={() => startModalOpen = false} class="px-4 py-2 text-xs font-bold text-gray-400 hover:text-gray-200 transition">
+                Cancel
+            </button>
+            <button
+                onclick={handleStartNew}
+                disabled={isStarting}
+                class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded text-xs font-bold transition shadow-sm flex items-center gap-2"
+            >
+                {#if isStarting}<span class="animate-spin">⟳</span>{/if}
+                Run Execution
+            </button>
+        </div>
     </div>
 </Modal>
