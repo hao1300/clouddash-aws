@@ -45,6 +45,43 @@
         selectedNodeRaw = rawDef;
     }
 
+    function getResourceInfo(details: StateExecutionDetails | null, raw: any) {
+        let arn = details?.resource || raw?.Resource;
+
+        // Handle Optimized Integrations (e.g. arn:aws:states:::lambda:invoke)
+        if (arn === "arn:aws:states:::lambda:invoke") {
+            arn = raw?.Parameters?.FunctionName || raw?.Arguments?.FunctionName || details?.resource;
+        } else if (arn?.startsWith("arn:aws:states:::states:startExecution")) {
+            arn = raw?.Parameters?.StateMachineArn || raw?.Arguments?.StateMachineArn || details?.resource;
+        }
+
+        if (!arn || typeof arn !== 'string') return null;
+
+        if (arn.includes(":lambda:")) {
+            // Function name is either the last part or the part after :function:
+            const parts = arn.split(":");
+            const functionIdx = parts.indexOf("function");
+            const name = functionIdx !== -1 && parts[functionIdx + 1] ? parts[functionIdx + 1] : parts[parts.length - 1];
+            
+            return {
+                type: "Lambda",
+                label: "Lambda Function",
+                name,
+                href: `/lambda/function/${encodeURIComponent(arn)}`,
+                logGroup: `/aws/lambda/${name}`
+            };
+        }
+        if (arn.includes(":states:")) {
+            return {
+                type: "StepFunctions",
+                label: "State Machine",
+                name: arn.split(":").pop() || "",
+                href: `/stepfunctions/details?id=${encodeURIComponent(arn)}`
+            };
+        }
+        return null;
+    }
+
     $effect(() => {
         if (aws.sfn && execArn) {
             loadDetails();
@@ -234,6 +271,7 @@
             </div>
 
             {#if selectedNodeState}
+                {@const resInfo = getResourceInfo(selectedNodeDetails, selectedNodeRaw)}
                 <div class="w-80 shrink-0 bg-gray-900 border border-gray-800 rounded-lg flex flex-col overflow-hidden shadow-sm">
                     <div class="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-950">
                         <h3 class="font-bold text-sm text-gray-200 truncate pr-2" title={selectedNodeState}>{selectedNodeState}</h3>
@@ -241,27 +279,61 @@
                     </div>
                     
                     <div class="flex-1 overflow-auto p-3 space-y-4">
-                        <div class="text-[11px] px-2 py-1 bg-gray-800 rounded text-gray-300 font-mono tracking-wider w-fit inline-block border border-gray-700">
-                            Status: <span class="{selectedNodeDetails?.status === 'SUCCEEDED' ? 'text-green-400' : selectedNodeDetails?.status === 'FAILED' ? 'text-red-400' : selectedNodeDetails?.status === 'RUNNING' ? 'text-blue-400 animate-pulse' : 'text-gray-400'}">{selectedNodeDetails?.status || 'PENDING'}</span>
+                        <div class="flex items-center justify-between">
+                            <div class="text-[11px] px-2 py-1 bg-gray-800 rounded text-gray-300 font-mono tracking-wider w-fit inline-block border border-gray-700">
+                                Status: <span class="{selectedNodeDetails?.status === 'SUCCEEDED' ? 'text-green-400' : selectedNodeDetails?.status === 'FAILED' ? 'text-red-400' : selectedNodeDetails?.status === 'RUNNING' ? 'text-blue-400 animate-pulse' : 'text-gray-400'}">{selectedNodeDetails?.status || 'PENDING'}</span>
+                            </div>
+                            <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{selectedNodeRaw?.Type || 'Unknown'}</span>
                         </div>
 
-                        <div>
-                            <h4 class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1">Input</h4>
-                            <div class="bg-black p-2 rounded text-[11px] overflow-auto max-h-48 border border-gray-800/50">
-                                <JsonLogViewer message={selectedNodeDetails?.input} class="text-gray-300" />
+                        {#if resInfo}
+                            <div class="bg-blue-500/5 border border-blue-500/20 rounded p-3 space-y-2">
+                                <div class="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                    Linked {resInfo.label}
+                                </div>
+                                <div class="text-xs text-gray-300 font-bold truncate">{resInfo.name}</div>
+                                <div class="flex gap-2 pt-1">
+                                    <a href={resInfo.href} class="flex-1 text-center bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded text-[10px] font-bold transition shadow-sm">
+                                        Open Resource
+                                    </a>
+                                    {#if resInfo.logGroup}
+                                        <a href={`/cloudwatch/logs/${encodeURIComponent(resInfo.logGroup)}`} class="flex-1 text-center bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-2 py-1 rounded text-[10px] font-bold transition">
+                                            Logs
+                                        </a>
+                                    {/if}
+                                </div>
+                            </div>
+                        {/if}
+
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1">Input</h4>
+                                <div class="bg-black p-2 rounded text-[11px] overflow-auto max-h-40 border border-gray-800/50">
+                                    <JsonLogViewer message={selectedNodeDetails?.input} class="text-gray-300" />
+                                </div>
+                            </div>
+
+                            {#if selectedNodeDetails?.output}
+                                <div>
+                                    <h4 class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1">Output</h4>
+                                    <div class="bg-black p-2 rounded text-[11px] overflow-auto max-h-40 border border-gray-800/50">
+                                        <JsonLogViewer message={selectedNodeDetails?.output} class="text-green-400" />
+                                    </div>
+                                </div>
+                            {/if}
+
+                            <div>
+                                <h4 class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1">Definition</h4>
+                                <div class="bg-black p-2 rounded text-[11px] overflow-auto max-h-48 border border-gray-800/50">
+                                    <JsonLogViewer message={JSON.stringify(selectedNodeRaw, null, 2)} class="text-blue-300" />
+                                </div>
                             </div>
                         </div>
 
-                        <div>
-                            <h4 class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1">Output</h4>
-                            <div class="bg-black p-2 rounded text-[11px] overflow-auto max-h-48 border border-gray-800/50">
-                                <JsonLogViewer message={selectedNodeDetails?.output} class="text-green-400" />
-                            </div>
-                        </div>
-
-                        {#if logGroupName && selectedNodeRaw?.Type === 'Task'}
-                            <a href={`/cloudwatch/logs?group=${encodeURIComponent(logGroupName)}`} class="block w-full text-center bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-3 py-2 rounded text-xs font-bold transition shadow-sm mt-4">
-                                ▤ View Tasks Logs
+                        {#if logGroupName && selectedNodeRaw?.Type === 'Task' && !resInfo?.logGroup}
+                            <a href={`/cloudwatch/logs/${encodeURIComponent(logGroupName)}`} class="block w-full text-center bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-3 py-2 rounded text-xs font-bold transition shadow-sm mt-4">
+                                ▤ View State Machine Logs
                             </a>
                         {/if}
                     </div>

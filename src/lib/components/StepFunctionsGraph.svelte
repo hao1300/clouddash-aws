@@ -47,9 +47,20 @@
         edges = laidOut.edges;
     });
 
-    function handleNodeClick(event: any, n: Node) {
-        const stateName = n.data.label as string;
-        const rawDef = n.data.raw;
+    function handleNodeClick(eventOrObj: any, maybeNode?: Node) {
+        let event, node;
+        if (maybeNode) {
+            event = eventOrObj;
+            node = maybeNode;
+        } else {
+            event = eventOrObj.event;
+            node = eventOrObj.node;
+        }
+
+        if (!node) return;
+
+        const stateName = node.data.label as string;
+        const rawDef = node.data.raw;
         const detailsMap = parseHistoryEvents(historyEvents || []);
         onNodeSelect(stateName, detailsMap[stateName] || null, rawDef);
     }
@@ -62,6 +73,7 @@
         {nodeTypes}
         fitView
         onnodeclick={handleNodeClick}
+        on:nodeclick={(e) => handleNodeClick(e.detail)}
         proOptions={{ hideAttribution: true }}
         colorMode="dark"
         minZoom={0.1}

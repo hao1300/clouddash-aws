@@ -25,7 +25,7 @@
     });
 </script>
 
-<div class="relative min-w-[160px] max-w-[250px] rounded-lg border-2 p-3 shadow-md transition-colors {statusClass}">
+<div class="relative min-w-[160px] max-w-[250px] rounded-lg border-2 p-3 shadow-md transition-all duration-200 cursor-pointer hover:shadow-lg hover:brightness-110 active:scale-95 {statusClass}">
     <Handle type="target" position={Position.Top} {isConnectable} class="w-3 h-3 bg-gray-500 border-none" />
     
     <div class="flex items-center gap-3">
