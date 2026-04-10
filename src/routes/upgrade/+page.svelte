@@ -28,12 +28,12 @@
 </script>
 
 <div
-  class="h-full flex flex-col items-center p-8 bg-gray-950 text-white overflow-y-auto"
+  class="h-full flex flex-col items-center bg-gray-950 text-white overflow-y-auto"
 >
-  <div class="max-w-2xl w-full text-center space-y-8 py-12">
+  <div class="w-full text-center space-y-4 py-4">
     <div>
       <div
-        class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 shadow-xl shadow-yellow-500/20 mb-6"
+        class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 shadow-xl shadow-yellow-500/20 mb-2"
       >
         <span class="text-4xl">👑</span>
       </div>
@@ -42,7 +42,7 @@
       >
         Unlock the full power of CloudDash
       </h1>
-      <p class="text-lg text-gray-400 max-w-xl mx-auto">
+      <p class="text-lg text-gray-400 mx-auto">
         Upgrade to Pro to unlock all other services and get priority support
         from our team.
       </p>
@@ -52,7 +52,7 @@
       class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left max-w-xl mx-auto"
     >
       <div
-        class="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-sm hover:border-blue-500/50 transition duration-300"
+        class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-sm hover:border-blue-500/50 transition duration-300"
       >
         <div
           class="w-10 h-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl mb-4"
@@ -81,16 +81,16 @@
       </div>
     </div>
 
-    <div class="pt-8">
+    <div class="pt-4">
       {#if settings.isPro}
         <div
           class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-green-500/10 text-green-400 border border-green-500/20"
         >
           <span class="text-xl">✅</span>
-          <span class="font-bold">You are already a Pro user!</span>
+          <span class="font-bold">You are now a Pro user!</span>
         </div>
       {:else}
-        <div class="max-w-md mx-auto space-y-6">
+        <div class="max-w-md mx-auto space-y-4">
           <button
             onclick={startCheckout}
             disabled={checkoutLoading}
@@ -138,7 +138,7 @@
           </div>
 
           <div
-            class="bg-gray-900 border border-gray-800 rounded-xl p-6 text-left shadow-lg"
+            class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-left shadow-lg"
           >
             <label class="block text-sm font-medium text-gray-400 mb-3"
               >Have a license key?</label

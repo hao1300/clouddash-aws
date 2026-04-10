@@ -14,6 +14,8 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
+    import StepFunctionsGraph from "$lib/components/StepFunctionsGraph.svelte";
+    import type { StateExecutionDetails } from "$lib/utils/sfnHistoryParser";
 
     let execArn = $derived($page.url.searchParams.get("id") || "");
 
@@ -31,6 +33,17 @@
     
     let eventModalOpen = $state(false);
     let selectedEvent = $state<HistoryEvent | null>(null);
+
+    let viewMode = $state<"graph" | "table">("graph");
+    let selectedNodeState = $state<string | null>(null);
+    let selectedNodeDetails = $state<StateExecutionDetails | null>(null);
+    let selectedNodeRaw = $state<any>(null);
+
+    function handleNodeSelect(stateName: string, details: StateExecutionDetails | null, rawDef: any) {
+        selectedNodeState = stateName;
+        selectedNodeDetails = details;
+        selectedNodeRaw = rawDef;
+    }
 
     $effect(() => {
         if (aws.sfn && execArn) {
@@ -199,80 +212,115 @@
         {/if}
     </div>
 
-    <div class="flex-1 overflow-auto p-2 space-y-2">
-        <div
-            class="bg-gray-900 border border-gray-800 rounded-lg p-5 grid grid-cols-1 md:grid-cols-2 gap-6 shadow-sm"
-        >
-            <div>
-                <h3
-                    class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1"
-                >
-                    Input
-                </h3>
-                <div
-                    class="bg-black p-3 rounded text-[11px] overflow-auto max-h-48 border border-gray-800/50"
-                >
-                    <JsonLogViewer
-                        message={details?.input || "None"}
-                        class="text-gray-300"
-                    />
-                </div>
-            </div>
-            <div>
-                <h3
-                    class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1"
-                >
-                    Output
-                </h3>
-                <div
-                    class="bg-black p-3 rounded text-[11px] overflow-auto max-h-48 border border-gray-800/50"
-                >
-                    <JsonLogViewer
-                        message={details?.output || "None"}
-                        class="text-green-400"
-                    />
-                </div>
-            </div>
-        </div>
+    <div class="px-3 py-2 flex items-center gap-2 border-b border-gray-800 bg-gray-900 shrink-0">
+        <button onclick={() => viewMode = 'graph'} class="px-3 py-1.5 text-xs font-bold rounded transition-colors {viewMode === 'graph' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'}">Visual Graph</button>
+        <button onclick={() => viewMode = 'table'} class="px-3 py-1.5 text-xs font-bold rounded transition-colors {viewMode === 'table' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'}">Event History</button>
+    </div>
 
-        <div
-            class="flex-1 bg-gray-900 border border-gray-800 rounded-lg flex flex-col overflow-hidden min-h-[300px] shadow-sm"
-        >
-            <div class="flex-1 relative">
-                <PaginatedTable
-                    items={historyEvents}
-                    {loading}
-                    onRefresh={() => {
-                        historyTokens = [];
-                        loadHistory();
-                    }}
-                    hasNext={!!historyMarker}
-                    hasPrev={historyTokens.length > 0}
-                    onNext={() => loadHistory(historyMarker)}
-                    onPrev={() => {
-                        historyTokens.pop();
-                        loadHistory(historyTokens[historyTokens.length - 1]);
-                    }}
-                    columns={[
-                        { label: "ID", key: "id" },
-                        { 
-                            label: "Type", 
-                            key: "type",
-                            onClick: (item) => {
-                                selectedEvent = item;
-                                eventModalOpen = true;
-                            }
-                        },
-                        {
-                            label: "Timestamp",
-                            key: "timestamp",
-                            format: (v) =>
-                                v ? new Date(v).toLocaleString() : "",
-                        },
-                    ]}
-                />
+    <div class="flex-1 overflow-hidden p-2 flex gap-2 relative">
+        {#if viewMode === 'graph'}
+            <div class="flex-1 rounded-lg overflow-hidden relative shadow-sm border border-gray-800">
+                {#if smDetails?.definition}
+                    <StepFunctionsGraph 
+                        definition={smDetails.definition} 
+                        {historyEvents} 
+                        onNodeSelect={handleNodeSelect} 
+                    />
+                {:else}
+                    <div class="absolute inset-0 flex items-center justify-center bg-gray-950 text-gray-500 text-sm">
+                        Loading Definition...
+                    </div>
+                {/if}
             </div>
-        </div>
+
+            {#if selectedNodeState}
+                <div class="w-80 shrink-0 bg-gray-900 border border-gray-800 rounded-lg flex flex-col overflow-hidden shadow-sm">
+                    <div class="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-950">
+                        <h3 class="font-bold text-sm text-gray-200 truncate pr-2" title={selectedNodeState}>{selectedNodeState}</h3>
+                        <button onclick={() => selectedNodeState = null} class="text-gray-500 hover:text-gray-300">✕</button>
+                    </div>
+                    
+                    <div class="flex-1 overflow-auto p-3 space-y-4">
+                        <div class="text-[11px] px-2 py-1 bg-gray-800 rounded text-gray-300 font-mono tracking-wider w-fit inline-block border border-gray-700">
+                            Status: <span class="{selectedNodeDetails?.status === 'SUCCEEDED' ? 'text-green-400' : selectedNodeDetails?.status === 'FAILED' ? 'text-red-400' : selectedNodeDetails?.status === 'RUNNING' ? 'text-blue-400 animate-pulse' : 'text-gray-400'}">{selectedNodeDetails?.status || 'PENDING'}</span>
+                        </div>
+
+                        <div>
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1">Input</h4>
+                            <div class="bg-black p-2 rounded text-[11px] overflow-auto max-h-48 border border-gray-800/50">
+                                <JsonLogViewer message={selectedNodeDetails?.input} class="text-gray-300" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1">Output</h4>
+                            <div class="bg-black p-2 rounded text-[11px] overflow-auto max-h-48 border border-gray-800/50">
+                                <JsonLogViewer message={selectedNodeDetails?.output} class="text-green-400" />
+                            </div>
+                        </div>
+
+                        {#if logGroupName && selectedNodeRaw?.Type === 'Task'}
+                            <a href={`/cloudwatch/logs?group=${encodeURIComponent(logGroupName)}`} class="block w-full text-center bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-3 py-2 rounded text-xs font-bold transition shadow-sm mt-4">
+                                ▤ View Tasks Logs
+                            </a>
+                        {/if}
+                    </div>
+                </div>
+            {/if}
+        {:else}
+            <div class="flex-1 flex flex-col space-y-2 overflow-auto">
+                <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 grid grid-cols-1 md:grid-cols-2 gap-6 shadow-sm shrink-0">
+                    <div>
+                        <h3 class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1">Overall Input</h3>
+                        <div class="bg-black p-3 rounded text-[11px] overflow-auto max-h-48 border border-gray-800/50">
+                            <JsonLogViewer message={details?.input || "None"} class="text-gray-300" />
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1">Overall Output</h3>
+                        <div class="bg-black p-3 rounded text-[11px] overflow-auto max-h-48 border border-gray-800/50">
+                            <JsonLogViewer message={details?.output || "None"} class="text-green-400" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 bg-gray-900 border border-gray-800 rounded-lg flex flex-col overflow-hidden min-h-[300px] shadow-sm">
+                    <div class="flex-1 relative">
+                        <PaginatedTable
+                            items={historyEvents}
+                            {loading}
+                            onRefresh={() => {
+                                historyTokens = [];
+                                loadHistory();
+                            }}
+                            hasNext={!!historyMarker}
+                            hasPrev={historyTokens.length > 0}
+                            onNext={() => loadHistory(historyMarker)}
+                            onPrev={() => {
+                                historyTokens.pop();
+                                loadHistory(historyTokens[historyTokens.length - 1]);
+                            }}
+                            columns={[
+                                { label: "ID", key: "id" },
+                                { 
+                                    label: "Type", 
+                                    key: "type",
+                                    onClick: (item) => {
+                                        selectedEvent = item;
+                                        eventModalOpen = true;
+                                    }
+                                },
+                                {
+                                    label: "Timestamp",
+                                    key: "timestamp",
+                                    format: (v) => v ? new Date(v).toLocaleString() : "",
+                                },
+                            ]}
+                        />
+                    </div>
+                </div>
+            </div>
+        {/if}
     </div>
 </div>
 
