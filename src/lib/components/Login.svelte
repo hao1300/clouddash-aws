@@ -373,6 +373,12 @@
                     </select>
                 </div>
             {:else if authType === "manual"}
+                <div
+                    class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
+                >
+                    <strong>API Keys:</strong> To get your Access Key ID and Secret Access Key, follow the <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html" target="_blank" class="underline hover:text-blue-200" rel="noopener noreferrer">official AWS guide</a>.
+                </div>
+
                 <div>
                     <label
                         for="akInput"
@@ -436,6 +442,12 @@
                     />
                 </div>
             {:else if authType === "assume"}
+                <div
+                    class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
+                >
+                    <strong>Assume Role:</strong> You need an IAM Role with a Trust Policy that allows your Source Profile to switch to it. See <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_permissions-to-switch.html" target="_blank" class="underline hover:text-blue-200" rel="noopener noreferrer">AWS documentation</a>.
+                </div>
+
                 <div>
                     <label
                         for="accountIdInput"
@@ -562,9 +574,16 @@
                     {loading ? "Connecting..." : "Connect"}
                 </button>
             {/if}
+
+            <div class="mt-4 pt-4 border-t border-gray-800 text-center">
+                <a href="https://portal.aws.amazon.com/gp/aws/developer/registration/index.html" target="_blank" class="text-[10px] text-gray-500 hover:text-blue-400 underline transition uppercase tracking-widest font-bold" rel="noopener noreferrer">
+                    Don't have an AWS account? Create one here
+                </a>
+            </div>
         </div>
     </div>
 </div>
+
 
 <Modal bind:open={showConflictModal} title="Profile Conflict">
     {#if activeConflict}
