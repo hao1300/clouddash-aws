@@ -23,7 +23,7 @@
       name: "Android",
       icon: SmartphoneIcon,
       type: "Mobile APK",
-      link: "https://static.clouddash.dev/downloads/android/clouddash_0.8.1.apk",
+      link: "https://static.clouddash.dev/downloads/android/clouddash_0.8.2.apk",
       instructions:
         "Direct download for Android devices. Optimized for tablets and foldable phones.",
     },
@@ -99,7 +99,9 @@
       <div
         class="p-4 p-md-5 rounded-5 glass border border-primary border-opacity-20 position-relative overflow-hidden"
       >
-        <div class="position-absolute top-0 end-0 p-4 opacity-10 d-none d-md-block">
+        <div
+          class="position-absolute top-0 end-0 p-4 opacity-10 d-none d-md-block"
+        >
           <SmartphoneIcon size="160" />
         </div>
         <div class="row">
@@ -113,8 +115,9 @@
               Get it on Google Play
             </h2>
             <p class="lead text-secondary mb-5">
-              We're currently in closed beta testing on Android. Join our community
-              to get the latest updates directly through the Play Store.
+              We're currently in closed beta testing on Android. Join our
+              community to get the latest updates directly through the Play
+              Store.
             </p>
 
             <div class="row g-4">
@@ -193,9 +196,13 @@
                 <ZapIcon size="20" />
               </div>
               <div>
-                <span class="text-white fw-bold d-block">Tester Bonus: Free PRO Access</span>
+                <span class="text-white fw-bold d-block"
+                  >Tester Bonus: Free PRO Access</span
+                >
                 <span class="text-secondary small">
-                  Enter code <code class="text-primary fw-bold mx-1">CLOUDDASHTESTER</code> in the app to unlock all features.
+                  Enter code <code class="text-primary fw-bold mx-1"
+                    >CLOUDDASHTESTER</code
+                  > in the app to unlock all features.
                 </span>
               </div>
             </div>
