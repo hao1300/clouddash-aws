@@ -13,68 +13,92 @@ export interface StateExecutionDetails {
 
 export function parseHistoryEvents(events: HistoryEvent[]) {
     const stateDetails: Record<string, StateExecutionDetails> = {};
+    const eventIdMap: Record<number, string> = {};
     
     // Sort chronological
     const sorted = [...events].sort((a,b) => ((a.id || 0) - (b.id || 0)));
 
     for (const event of sorted) {
-        if (!event.type) continue;
+        if (!event.id) continue;
         
         let stateName = '';
         
+        // Association logic
         if (event.stateEnteredEventDetails) {
             stateName = event.stateEnteredEventDetails.name || '';
+        } else if (event.stateExitedEventDetails) {
+            stateName = event.stateExitedEventDetails.name || '';
+        } else if (event.previousEventId && eventIdMap[event.previousEventId]) {
+            stateName = eventIdMap[event.previousEventId];
+        }
+
+        if (stateName) {
+            eventIdMap[event.id] = stateName;
             
             if (!stateDetails[stateName]) {
                 stateDetails[stateName] = { 
                     status: 'RUNNING', 
-                    input: event.stateEnteredEventDetails.input, 
+                    input: event.stateEnteredEventDetails?.input || null, 
                     output: null 
                 };
-            } else {
-                stateDetails[stateName].status = 'RUNNING'; 
-                stateDetails[stateName].input = event.stateEnteredEventDetails.input;
             }
         }
-        
+
+        if (!stateName) continue;
+
+        // Success tracking
         if (event.stateExitedEventDetails) {
-            stateName = event.stateExitedEventDetails.name || '';
-            if (stateDetails[stateName]) {
+            // If it already failed, it means it was caught
+            if (stateDetails[stateName].status === 'FAILED') {
+                stateDetails[stateName].status = 'CAUGHT';
+            } else if (stateDetails[stateName].status === 'RUNNING') {
                 stateDetails[stateName].status = 'SUCCEEDED';
-                stateDetails[stateName].output = event.stateExitedEventDetails.output;
+            }
+            stateDetails[stateName].output = event.stateExitedEventDetails.output;
+        }
+
+        // Failure tracking
+        const type = event.type?.toLowerCase() || '';
+        const isFailure = 
+            type.includes('failed') || 
+            type.includes('timedout') || 
+            type.includes('aborted');
+
+        if (isFailure) {
+            // Check if it's an execution-level failure or state-level
+            if (type.startsWith('execution')) {
+                // For execution level, we mark all currently RUNNING states as FAILED
+                for (const d of Object.values(stateDetails)) {
+                    if (d.status === 'RUNNING') d.status = 'FAILED';
+                }
+            } else {
+                // For state-specific failures
+                stateDetails[stateName].status = 'FAILED';
+                
+                // Try to extract error info
+                const details = 
+                    event.taskFailedEventDetails || 
+                    event.taskTimedOutEventDetails || 
+                    event.lambdaFunctionFailedEventDetails || 
+                    event.lambdaFunctionTimedOutEventDetails || 
+                    event.parallelStateFailedEventDetails ||
+                    event.activityFailedEventDetails ||
+                    event.activityTimedOutEventDetails ||
+                    event.mapStateFailedEventDetails;
+                
+                if (details) {
+                    stateDetails[stateName].error = details;
+                }
             }
         }
 
-        // Try to find resource associations
-        // Many 'Scheduled' events contain the resource ARN.
-        // We can often backtrack from StateEntered if we see a task started/scheduled for that state path.
-        // However, the simplest way is to check the details objects.
+        // Resource associations
         if (event.lambdaFunctionScheduledEventDetails) {
-            // How do we know which state this belongs to? 
-            // Usually, these events follow a StateEntered for a Task state.
-            // We'll look at the most recently 'entered' state that is currently 'RUNNING'.
-            const activeState = Object.entries(stateDetails).findLast(([_, d]) => d.status === 'RUNNING');
-            if (activeState) {
-                stateDetails[activeState[0]].resource = event.lambdaFunctionScheduledEventDetails.resource;
-            }
+            stateDetails[stateName].resource = event.lambdaFunctionScheduledEventDetails.resource;
         } else if (event.taskScheduledEventDetails) {
-            const activeState = Object.entries(stateDetails).findLast(([_, d]) => d.status === 'RUNNING');
-            if (activeState) {
-                stateDetails[activeState[0]].resource = event.taskScheduledEventDetails.resource;
-            }
+            stateDetails[stateName].resource = event.taskScheduledEventDetails.resource;
         } else if (event.stateMachineScheduledEventDetails) {
-            const activeState = Object.entries(stateDetails).findLast(([_, d]) => d.status === 'RUNNING');
-            if (activeState) {
-                stateDetails[activeState[0]].resource = event.stateMachineScheduledEventDetails.stateMachineArn;
-            }
-        }
-    }
-
-    const hasFailed = sorted.find(e => e.type?.includes('Failed') || e.type?.includes('Aborted') || e.type?.includes('TimedOut'));
-    
-    for (const [name, details] of Object.entries(stateDetails)) {
-        if (details.status === 'RUNNING' && hasFailed) {
-            details.status = 'FAILED';
+            stateDetails[stateName].resource = event.stateMachineScheduledEventDetails.stateMachineArn;
         }
     }
 

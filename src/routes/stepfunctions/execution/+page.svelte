@@ -190,7 +190,7 @@
             const res = await aws.sfn.send(
                 new GetExecutionHistoryCommand({
                     executionArn: execArn,
-                    maxResults: 50,
+                    maxResults: 500,
                     nextToken: token,
                     reverseOrder: true,
                 }),
