@@ -9,6 +9,7 @@ export interface StateExecutionDetails {
     resource?: string;
     error?: any;
     logs?: any;
+    lastEventId?: number;
 }
 
 export function parseHistoryEvents(events: HistoryEvent[]) {
@@ -55,6 +56,7 @@ export function parseHistoryEvents(events: HistoryEvent[]) {
                 stateDetails[stateName].status = 'SUCCEEDED';
             }
             stateDetails[stateName].output = event.stateExitedEventDetails.output;
+            stateDetails[stateName].lastEventId = event.id;
         }
 
         // Failure tracking
@@ -74,6 +76,7 @@ export function parseHistoryEvents(events: HistoryEvent[]) {
             } else {
                 // For state-specific failures
                 stateDetails[stateName].status = 'FAILED';
+                stateDetails[stateName].lastEventId = event.id;
                 
                 // Try to extract error info
                 const details = 

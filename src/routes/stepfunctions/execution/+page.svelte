@@ -79,40 +79,96 @@
     }
 
     function getResourceInfo(details: StateExecutionDetails | null, raw: any) {
-        let arn = details?.resource || raw?.Resource;
+        let baseArn = details?.resource || raw?.Resource;
+        if (!baseArn || typeof baseArn !== 'string') return null;
 
-        // Handle Optimized Integrations (e.g. arn:aws:states:::lambda:invoke)
-        if (arn === "arn:aws:states:::lambda:invoke") {
-            arn = raw?.Parameters?.FunctionName || raw?.Arguments?.FunctionName || details?.resource;
-        } else if (arn?.startsWith("arn:aws:states:::states:startExecution")) {
-            arn = raw?.Parameters?.StateMachineArn || raw?.Arguments?.StateMachineArn || details?.resource;
-        }
+        let arn = baseArn;
+        let type = "";
 
-        if (!arn || typeof arn !== 'string') return null;
-
-        if (arn.includes(":lambda:")) {
-            // Function name is either the last part or the part after :function:
-            const parts = arn.split(":");
-            const functionIdx = parts.indexOf("function");
-            const name = functionIdx !== -1 && parts[functionIdx + 1] ? parts[functionIdx + 1] : parts[parts.length - 1];
+        // Handle Optimized Integrations
+        if (baseArn.startsWith("arn:aws:states:::")) {
+            const service = baseArn.split(":")[6];
             
-            return {
-                type: "Lambda",
-                label: "Lambda Function",
-                name,
-                href: `/lambda/function/${encodeURIComponent(arn)}`,
-                logGroup: `/aws/lambda/${name}`
-            };
+            // Try to find the actual resource identifier in Parameters or Arguments
+            const actualResource = 
+                raw?.Parameters?.FunctionName || 
+                raw?.Parameters?.FunctionArn ||
+                raw?.Parameters?.QueueUrl ||
+                raw?.Parameters?.TopicArn ||
+                raw?.Parameters?.StateMachineArn ||
+                raw?.Arguments?.FunctionName ||
+                raw?.Arguments?.FunctionArn ||
+                details?.resource; // fallback
+
+            if (actualResource && typeof actualResource === 'string') {
+                arn = actualResource;
+            }
+
+            if (service === "lambda") type = "Lambda";
+            else if (service === "sns") type = "SNS";
+            else if (service === "sqs") type = "SQS";
+            else if (service === "states") type = "StepFunctions";
+            else if (service === "dynamodb") type = "DynamoDB";
         }
-        if (arn.includes(":states:")) {
-            return {
-                type: "StepFunctions",
-                label: "State Machine",
-                name: arn.split(":").pop() || "",
-                href: `/stepfunctions/details?id=${encodeURIComponent(arn)}`
-            };
+
+        // Determine type from ARN if not set
+        if (!type) {
+            if (arn.includes(":lambda:")) type = "Lambda";
+            else if (arn.includes(":states:")) type = "StepFunctions";
+            else if (arn.includes(":sns:")) type = "SNS";
+            else if (arn.includes(":sqs:")) type = "SQS";
+            else if (arn.includes(":dynamodb:")) type = "DynamoDB";
         }
-        return null;
+
+        if (!type) return null;
+
+        // Extract a friendly name
+        let name = arn;
+        if (arn.includes(":")) {
+            const parts = arn.split(":");
+            // For ARNs like arn:aws:lambda:region:account:function:name
+            const functionIdx = parts.indexOf("function");
+            const stateMachineIdx = parts.indexOf("stateMachine");
+            
+            if (functionIdx !== -1 && parts[functionIdx + 1]) name = parts[functionIdx + 1];
+            else if (stateMachineIdx !== -1 && parts[stateMachineIdx + 1]) name = parts[stateMachineIdx + 1];
+            else name = parts[parts.length - 1];
+        }
+        // If it's a URL (for SQS), take the last part
+        if (name.includes("/")) {
+            name = name.split("/").pop() || name;
+        }
+
+        let href = "#";
+        let logGroup = "";
+        let requestId = "";
+
+        if (type === "Lambda") {
+            href = `/lambda/function/${encodeURIComponent(arn)}`;
+            logGroup = `/aws/lambda/${name}`;
+            
+            if (details?.error?.cause) {
+                try {
+                    const cause = JSON.parse(details.error.cause);
+                    requestId = cause.requestId || "";
+                } catch (e) { /* ignore */ }
+            }
+        } else if (type === "StepFunctions") {
+            href = `/stepfunctions/details?id=${encodeURIComponent(arn)}`;
+        } else if (type === "SQS") {
+            href = `/sqs/queue?url=${encodeURIComponent(arn)}`;
+        } else if (type === "SNS") {
+            href = `/sns/topic?arn=${encodeURIComponent(arn)}`;
+        }
+
+        return {
+            type,
+            label: type === "StepFunctions" ? "State Machine" : `${type} Resource`,
+            name,
+            href,
+            logGroup,
+            requestId
+        };
     }
 
     $effect(() => {
@@ -242,6 +298,43 @@
             goto("/stepfunctions");
         }
     }
+
+    function getEventResource(event: HistoryEvent) {
+        let arn = event.lambdaFunctionScheduledEventDetails?.resource || 
+                    event.taskScheduledEventDetails?.resource ||
+                    event.stateMachineScheduledEventDetails?.stateMachineArn;
+        
+        if (!arn) return null;
+
+        // Handle optimized integrations in history events
+        if (arn.startsWith("arn:aws:states:::") && event.taskScheduledEventDetails?.parameters) {
+            try {
+                const params = JSON.parse(event.taskScheduledEventDetails.parameters);
+                const actual = params.FunctionName || params.FunctionArn || params.QueueUrl || params.TopicArn || params.StateMachineArn;
+                if (actual && typeof actual === 'string') {
+                    arn = actual;
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        if (arn.includes(":lambda:")) {
+            const parts = arn.split(":");
+            const functionIdx = parts.indexOf("function");
+            const name = functionIdx !== -1 && parts[functionIdx + 1] ? parts[functionIdx + 1] : parts[parts.length - 1];
+            return { label: name, href: `/lambda/function/${encodeURIComponent(arn)}` };
+        }
+        if (arn.includes(":states:")) {
+            const name = arn.split(":").pop() || "";
+            return { label: name, href: `/stepfunctions/details?id=${encodeURIComponent(arn)}` };
+        }
+        if (arn.includes(":sqs:")) {
+            return { label: arn.split("/").pop() || "Queue", href: `/sqs/queue?url=${encodeURIComponent(arn)}` };
+        }
+        if (arn.includes(":sns:")) {
+            return { label: arn.split(":").pop() || "Topic", href: `/sns/topic?arn=${encodeURIComponent(arn)}` };
+        }
+        return { label: arn.split(":").pop() || "Resource", href: "#" };
+    }
 </script>
 
 <div class="h-full flex flex-col bg-gray-950 overflow-hidden relative">
@@ -340,6 +433,21 @@
                             <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{selectedNodeRaw?.Type || 'Unknown'}</span>
                         </div>
 
+                        {#if selectedNodeDetails?.status === 'FAILED' && selectedNodeDetails?.error}
+                            <div class="bg-red-500/5 border border-red-500/20 rounded p-3 space-y-2">
+                                <div class="text-[10px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                    Error Details
+                                </div>
+                                <div class="text-xs text-red-300 font-bold">{selectedNodeDetails.error.error || 'Unknown Error'}</div>
+                                {#if selectedNodeDetails.error.cause}
+                                    <div class="text-[10px] text-gray-400 font-mono bg-black/40 p-1.5 rounded border border-red-500/10 overflow-auto max-h-32">
+                                        {selectedNodeDetails.error.cause}
+                                    </div>
+                                {/if}
+                            </div>
+                        {/if}
+
                         {#if resInfo}
                             <div class="bg-blue-500/5 border border-blue-500/20 rounded p-3 space-y-2">
                                 <div class="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -349,11 +457,11 @@
                                 <div class="text-xs text-gray-300 font-bold truncate">{resInfo.name}</div>
                                 <div class="flex gap-2 pt-1">
                                     <a href={resInfo.href} class="flex-1 text-center bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded text-[10px] font-bold transition shadow-sm">
-                                        Open Resource
+                                        Definition
                                     </a>
                                     {#if resInfo.logGroup}
-                                        <a href={`/cloudwatch/logs/${encodeURIComponent(resInfo.logGroup)}`} class="flex-1 text-center bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-2 py-1 rounded text-[10px] font-bold transition">
-                                            Logs
+                                        <a href={`/cloudwatch/logs/${encodeURIComponent(resInfo.logGroup)}${resInfo.requestId ? '?filter=' + encodeURIComponent(resInfo.requestId) : ''}`} class="flex-1 text-center bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-2 py-1 rounded text-[10px] font-bold transition">
+                                            Logs {resInfo.requestId ? ' (Trace)' : ''}
                                         </a>
                                     {/if}
                                 </div>
@@ -434,6 +542,15 @@
                                     onClick: (item) => {
                                         selectedEvent = item;
                                         eventModalOpen = true;
+                                    }
+                                },
+                                {
+                                    label: "Resource",
+                                    key: "id",
+                                    format: (_, item) => getEventResource(item)?.label || "",
+                                    onClick: (item) => {
+                                        const res = getEventResource(item);
+                                        if (res && res.href !== "#") goto(res.href);
                                     }
                                 },
                                 {
