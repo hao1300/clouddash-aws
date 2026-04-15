@@ -79,31 +79,18 @@
     }
 
     function getResourceInfo(details: StateExecutionDetails | null, raw: any) {
+        // 1. Determine Initial Base ARN and Type
         let baseArn = details?.resource || raw?.Resource;
         if (!baseArn || typeof baseArn !== 'string') return null;
 
         let arn = baseArn;
         let type = "";
 
-        // Handle Optimized Integrations
-        if (baseArn.startsWith("arn:aws:states:::")) {
-            const service = baseArn.split(":")[6];
-            
-            // Try to find the actual resource identifier in Parameters or Arguments
-            const actualResource = 
-                raw?.Parameters?.FunctionName || 
-                raw?.Parameters?.FunctionArn ||
-                raw?.Parameters?.QueueUrl ||
-                raw?.Parameters?.TopicArn ||
-                raw?.Parameters?.StateMachineArn ||
-                raw?.Arguments?.FunctionName ||
-                raw?.Arguments?.FunctionArn ||
-                details?.resource; // fallback
-
-            if (actualResource && typeof actualResource === 'string') {
-                arn = actualResource;
-            }
-
+        // 2. Identify Service from Optimized Integrations
+        // Matches: arn:aws:states:::lambda:invoke, arn:aws:states:us-west-2:123:lambda:invoke, etc.
+        const optimizedMatch = baseArn.match(/^arn:aws:states:[^:]*:[^:]*:(?:states:)?([^:]+):/);
+        if (optimizedMatch) {
+            const service = optimizedMatch[1];
             if (service === "lambda") type = "Lambda";
             else if (service === "sns") type = "SNS";
             else if (service === "sqs") type = "SQS";
@@ -111,40 +98,78 @@
             else if (service === "dynamodb") type = "DynamoDB";
         }
 
-        // Determine type from ARN if not set
-        if (!type) {
+        // 3. Extract Actual Resource from Parameters (Priority for Lambda FunctionName)
+        const isTask = raw?.Type === 'Task';
+        if (type || baseArn.startsWith("arn:aws:states:::") || isTask) {
+            const params = raw?.Parameters || raw?.Arguments || {};
+            
+            // Priority list for resource identification
+            const keys = ["FunctionName", "FunctionArn", "QueueUrl", "TopicArn", "StateMachineArn", "Table", "TableName"];
+            
+            let found = "";
+            for (const k of keys) {
+                if (params[k] && typeof params[k] === 'string') {
+                    found = params[k];
+                    // If we found a FunctionName, we can be confident this is a Lambda task
+                    if (k === "FunctionName" || k === "FunctionArn") type = "Lambda";
+                    break;
+                }
+                // Handle dynamic references FunctionName.$
+                if (params[`${k}.$`] && typeof params[`${k}.$`] === 'string') {
+                    found = `(Dynamic) ${params[`${k}.$`]}`;
+                    if (k === "FunctionName" || k === "FunctionArn") type = "Lambda";
+                    break;
+                }
+            }
+            
+            if (found) {
+                arn = found;
+            }
+        }
+
+        // 4. Determine type from ARN if not set or if refined
+        if (!type || type === "Resource") {
             if (arn.includes(":lambda:")) type = "Lambda";
             else if (arn.includes(":states:")) type = "StepFunctions";
             else if (arn.includes(":sns:")) type = "SNS";
-            else if (arn.includes(":sqs:")) type = "SQS";
+            else if (arn.includes(":sqs:") || arn.startsWith("https://sqs.")) type = "SQS";
             else if (arn.includes(":dynamodb:")) type = "DynamoDB";
         }
 
-        if (!type) return null;
+        if (!type && !baseArn.startsWith("arn:aws:states:::")) {
+             // If not optimized and we don't recognize the type, just return null to avoid clutter
+             return null;
+        }
+        
+        // Final fallback for type if baseArn was optimized but we still don't know
+        if (!type && baseArn.startsWith("arn:aws:states:::")) {
+            type = "Resource";
+        }
 
-        // Extract a friendly name
+        // 5. Extract a friendly name
         let name = arn;
         if (arn.includes(":")) {
             const parts = arn.split(":");
-            // For ARNs like arn:aws:lambda:region:account:function:name
             const functionIdx = parts.indexOf("function");
             const stateMachineIdx = parts.indexOf("stateMachine");
+            const tableIdx = parts.indexOf("table");
             
             if (functionIdx !== -1 && parts[functionIdx + 1]) name = parts[functionIdx + 1];
             else if (stateMachineIdx !== -1 && parts[stateMachineIdx + 1]) name = parts[stateMachineIdx + 1];
+            else if (tableIdx !== -1 && parts[tableIdx + 1]) name = parts[tableIdx + 1];
             else name = parts[parts.length - 1];
         }
-        // If it's a URL (for SQS), take the last part
-        if (name.includes("/")) {
-            name = name.split("/").pop() || name;
-        }
+        if (name.includes("/")) name = name.split("/").pop() || name;
 
+        // 6. Build Result
         let href = "#";
         let logGroup = "";
         let requestId = "";
 
         if (type === "Lambda") {
-            href = `/lambda/function/${encodeURIComponent(arn)}`;
+            // If it's a short name, we need to construct a pseudo-ARN or handle it differently
+            // but for now we assume href can take the name if ARN is missing.
+            href = arn.startsWith("arn:aws:") ? `/lambda/function/${encodeURIComponent(arn)}` : `/lambda/function/${encodeURIComponent(name)}`;
             logGroup = `/aws/lambda/${name}`;
             
             if (details?.error?.cause) {
@@ -159,6 +184,8 @@
             href = `/sqs/queue?url=${encodeURIComponent(arn)}`;
         } else if (type === "SNS") {
             href = `/sns/topic?arn=${encodeURIComponent(arn)}`;
+        } else if (type === "DynamoDB") {
+            href = `/dynamodb/table?name=${encodeURIComponent(name)}`;
         }
 
         return {
