@@ -85,9 +85,9 @@
           <div class="hero-glow"></div>
           <div class="hero-image-wrapper p-2 rounded-5 glass shadow-2xl">
             <img
-              src="/screenshots/ec2-metrics.png"
-              alt="CloudDash Dashboard"
-              class="img-fluid rounded-4 shadow-lg border border-gray"
+              src="/screenshots/android-feature-accounts.png"
+              alt="CloudDash Mobile App"
+              class="img-fluid rounded-4 shadow-lg border border-gray hero-preview"
             />
           </div>
         </div>
@@ -135,10 +135,10 @@
         <div class="hero-image-container position-relative text-center">
           <div class="hero-glow opacity-50"></div>
           <img
-            src="/screenshots/android-sqs-list.jpg"
+            src="/screenshots/android-feature-workflows.png"
             alt="CloudDash Android App"
             class="img-fluid rounded-5 shadow-2xl border border-gray position-relative"
-            style="max-width: 300px;"
+            style="max-width: 400px;"
           />
         </div>
       </div>
@@ -185,192 +185,52 @@
         Experience CloudDash
       </h2>
       <p class="text-secondary mw-600 mx-auto lead">
-        A seamless transition between deep desktop analysis and agile mobile
-        management.
+        Agile mobile management designed for the modern cloud engineer.
       </p>
     </div>
 
-    <!-- Desktop Gallery -->
-    <div class="mb-4">
-      <div class="d-flex align-items-center gap-3 mb-4">
-        <div class="bg-primary bg-opacity-10 text-primary p-2 rounded-3">
-          <ZapIcon size="20" />
-        </div>
-        <h3 class="fw-bold h4 mb-0 text-white font-outfit">
-          Desktop Excellence
-        </h3>
-      </div>
-      <div class="row g-4">
-        <div class="col-lg-8">
+    <div class="mt-4">
+      <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+        <div class="col">
           <div
             class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up"
           >
             <img
-              src="/screenshots/logs-insights.png"
-              alt="Logs Insights"
-              class="img-fluid"
-            />
-            <div class="gallery-caption p-3 glass border-top border-gray">
-              <span class="text-white small fw-medium"
-                >CloudWatch Logs Insights Query</span
-              >
-            </div>
-          </div>
-        </div>
-        <div class="col-lg-4">
-          <div class="d-flex flex-column gap-4 h-100">
-            <div
-              class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up flex-grow-1"
-            >
-              <img
-                src="/screenshots/aws-iam.png"
-                alt="IAM Management"
-                class="img-fluid h-100 object-fit-cover"
-                style="object-position: left center;"
-              />
-              <div class="gallery-caption p-3 glass border-top border-gray">
-                <span class="text-white small fw-medium"
-                  >IAM Role & Policy Management</span
-                >
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-          <div
-            class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up"
-          >
-            <img
-              src="/screenshots/cloudfront-metrics.png"
-              alt="CloudFront Metrics"
-              class="img-fluid"
-            />
-            <div class="gallery-caption p-3 glass border-top border-gray">
-              <span class="text-white small fw-medium"
-                >CloudFront Analytics</span
-              >
-            </div>
-          </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-          <div
-            class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up"
-          >
-            <img
-              src="/screenshots/s3-preview.png"
-              alt="S3 Preview"
-              class="img-fluid"
-            />
-            <div class="gallery-caption p-3 glass border-top border-gray">
-              <span class="text-white small fw-medium">S3 Object Preview</span>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-          <div
-            class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up"
-          >
-            <img
-              src="/screenshots/cloudwatch-alarms.png"
-              alt="CloudWatch Alarms"
-              class="img-fluid"
-            />
-            <div class="gallery-caption p-3 glass border-top border-gray">
-              <span class="text-white small fw-medium">Unified Alarms View</span
-              >
-            </div>
-          </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-          <div
-            class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up"
-          >
-            <img
-              src="/screenshots/ec2-metrics.png"
-              alt="EC2 Metrics"
-              class="img-fluid"
-            />
-            <div class="gallery-caption p-3 glass border-top border-gray">
-              <span class="text-white small fw-medium"
-                >EC2 Instance Metrics</span
-              >
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Mobile Gallery -->
-    <div>
-      <div class="d-flex align-items-center gap-3 my-4">
-        <div class="bg-primary bg-opacity-10 text-primary p-2 rounded-3">
-          <ArrowRightIcon size="20" />
-        </div>
-        <h3 class="fw-bold h4 mb-0 text-white font-outfit">Mobile Agility</h3>
-      </div>
-      <div class="row g-3">
-        <div class="col-6 col-md-2">
-          <div
-            class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up"
-          >
-            <img
-              src="/screenshots/android-dynamodb-items.jpg"
-              alt="DynamoDB Items"
+              src="/screenshots/android-feature-accounts.png"
+              alt="Multi-Account Control"
               class="img-fluid"
             />
           </div>
         </div>
-        <div class="col-6 col-md-2">
+        <div class="col">
           <div
             class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up"
           >
             <img
-              src="/screenshots/android-cloudwatch-logs.jpg"
-              alt="CloudWatch Logs"
+              src="/screenshots/android-feature-logs.png"
+              alt="Live Logs"
               class="img-fluid"
             />
           </div>
         </div>
-        <div class="col-6 col-md-2">
+        <div class="col">
           <div
             class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up"
           >
             <img
-              src="/screenshots/android-lambda-payloads.jpg"
-              alt="Lambda History"
+              src="/screenshots/android-feature-monitoring.png"
+              alt="Real-Time Monitoring"
               class="img-fluid"
             />
           </div>
         </div>
-        <div class="col-6 col-md-2">
+        <div class="col">
           <div
             class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up"
           >
             <img
-              src="/screenshots/android-sqs-list.jpg"
-              alt="SQS List"
-              class="img-fluid"
-            />
-          </div>
-        </div>
-        <div class="col-6 col-md-2">
-          <div
-            class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up"
-          >
-            <img
-              src="/screenshots/android-dynamodb-query.jpg"
-              alt="DynamoDB Query"
-              class="img-fluid"
-            />
-          </div>
-        </div>
-        <div class="col-6 col-md-2">
-          <div
-            class="gallery-item rounded-4 overflow-hidden border border-gray shadow-lg transition-up"
-          >
-            <img
-              src="/screenshots/android-alarm-details.jpg"
-              alt="Alarm Details"
+              src="/screenshots/android-feature-resources.png"
+              alt="Resource Management"
               class="img-fluid"
             />
           </div>
@@ -452,6 +312,12 @@
     transform: perspective(1000px) rotateY(0deg) rotateX(0deg);
   }
 
+  .hero-preview {
+    max-height: 480px;
+    object-fit: cover;
+    object-position: top;
+  }
+
   .cta-banner {
     background-color: var(--bg-900);
     border: 1px solid var(--border-gray);
@@ -477,6 +343,10 @@
   }
 
   .gallery-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    aspect-ratio: 1 / 2.1;
     transition: transform 0.5s ease;
   }
 
