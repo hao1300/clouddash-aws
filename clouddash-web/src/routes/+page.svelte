@@ -80,8 +80,8 @@
         </div>
       </div>
 
-      <div class="col-lg-6">
-        <div class="hero-image-container position-relative">
+      <div class="col-lg-6 text-center">
+        <div class="hero-image-container position-relative d-inline-block">
           <div class="hero-glow"></div>
           <div class="hero-image-wrapper p-2 rounded-5 glass shadow-2xl">
             <img
@@ -302,6 +302,8 @@
   }
 
   .hero-image-wrapper {
+    width: fit-content;
+    margin: 0 auto;
     transform: perspective(1000px) rotateY(-5deg) rotateX(2deg);
     transition: transform 0.5s ease;
     position: relative;
