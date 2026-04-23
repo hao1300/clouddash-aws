@@ -20,13 +20,13 @@ function run(command) {
 function uploadIfExists(src, destPath) {
     if (fs.existsSync(src)) {
         uploadToR2(src, destPath);
-        return true;
+        return src;
     }
-    return false;
+    return null;
 }
 
 function findAndUpload(searchDir, pattern, destPath) {
-    if (!fs.existsSync(searchDir)) return false;
+    if (!fs.existsSync(searchDir)) return null;
     
     const findFiles = (dir) => {
         let results = [];
@@ -46,9 +46,9 @@ function findAndUpload(searchDir, pattern, destPath) {
     const files = findFiles(searchDir);
     if (files.length > 0) {
         uploadToR2(files[0], destPath);
-        return true;
+        return files[0];
     }
-    return false;
+    return null;
 }
 
 try {
@@ -67,11 +67,20 @@ try {
         }
     }
 
-    // Upload AAB
-    const aabDestPath = `store/clouddash-${version}.aab`;
-    if (!uploadIfExists(AAB_PATH, aabDestPath)) {
+    // Handle AAB
+    const aabFileName = `clouddash-${version}.aab`;
+    const aabDestPath = `store/${aabFileName}`;
+    let foundAab = uploadIfExists(AAB_PATH, aabDestPath);
+    if (!foundAab) {
         console.warn(`Warning: No AAB found at ${AAB_PATH}, searching for alternatives...`);
-        findAndUpload('src-tauri/gen/android', '-release.aab', aabDestPath);
+        foundAab = findAndUpload('src-tauri/gen/android', '-release.aab', aabDestPath);
+    }
+
+    if (foundAab) {
+        fs.copyFileSync(foundAab, aabFileName);
+        console.log(`Copied AAB to root: ${aabFileName}`);
+    } else {
+        console.warn('Warning: Could not find any release AAB');
     }
 
     updateWebVersion(version);
