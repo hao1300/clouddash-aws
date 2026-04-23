@@ -7,6 +7,7 @@ export interface ServiceTab {
 
 export interface ServiceEntry {
     label: string;
+    icon: string;
     tabs: Record<string, string>;
     resourcePrefix?: string;
     contextualTabs?: string[];
@@ -18,6 +19,7 @@ export interface ServiceEntry {
 export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     cloudwatch: {
         label: "CloudWatch",
+        icon: "/icons/cloudwatch.svg",
         tabs: {
             alarms: "Alarms",
             metrics: "Metrics",
@@ -27,6 +29,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     },
     ec2: {
         label: "EC2",
+        icon: "/icons/ec2.svg",
         tabs: {
             instances: "Instances",
             amis: "AMIs",
@@ -41,6 +44,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     },
     s3: {
         label: "S3",
+        icon: "/icons/s3.svg",
         tabs: {
             objects: "Objects",
             details: "Details",
@@ -50,6 +54,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     },
     dynamodb: {
         label: "DynamoDB",
+        icon: "/icons/dynamodb.svg",
         tabs: {
             "explore": "Explore",
             "details": "Details",
@@ -59,6 +64,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     },
     sqs: {
         label: "SQS",
+        icon: "/icons/sqs.svg",
         tabs: {
             messages: "Messages",
             metrics: "Metrics",
@@ -68,21 +74,25 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     },
     cloudfront: {
         label: "CloudFront",
+        icon: "/icons/cloudfront.svg",
         tabs: {
         }
     },
     stepfunctions: {
         label: "Step Functions",
+        icon: "/icons/stepfunctions.svg",
         tabs: {
         }
     },
     lambda: {
         label: "Lambda",
+        icon: "/icons/lambda.svg",
         tabs: {
         }
     },
     sns: {
         label: "SNS",
+        icon: "/icons/sns.svg",
         tabs: {
             "": "Topics",
             subscriptions: "Subscriptions",
@@ -90,6 +100,7 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     },
     iam: {
         label: "IAM",
+        icon: "/icons/iam.svg",
         tabs: {
             users: "Users",
             groups: "Groups",
@@ -99,11 +110,13 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     },
     secretsmanager: {
         label: "Secrets Manager",
+        icon: "/icons/secretsmanager.svg",
         tabs: {
         }
     },
     elasticbeanstalk: {
         label: "Elastic Beanstalk",
+        icon: "/icons/elasticbeanstalk.svg",
         tabs: {
             environment: "Environments",
             application: "Application",
@@ -112,11 +125,13 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
     },
     cloudformation: {
         label: "CloudFormation",
+        icon: "/icons/cloudformation.svg",
         tabs: {
         }
     },
     ses: {
         label: "SES",
+        icon: "/icons/ses.svg",
         tabs: {
         }
     }

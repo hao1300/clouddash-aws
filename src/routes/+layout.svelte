@@ -64,6 +64,7 @@
   const services = Object.entries(SERVICE_MANIFEST).map(([id, entry]) => ({
     id,
     label: entry.label,
+    icon: entry.icon,
     defaultEnabled: true,
   }));
 
@@ -866,6 +867,9 @@
                           }}
                           class="flex-1 px-2 py-3 text-xs font-semibold text-left flex items-center gap-2"
                         >
+                          {#if svc.icon}
+                            <Icon path={svc.icon} size={18} class={activeId === svc.id ? "text-blue-400" : "text-gray-400 group-hover:text-gray-300"} />
+                          {/if}
                           {svc.label}
                           {#if !settings.isPro && !["cloudwatch", "s3", "dynamodb"].includes(svc.id)}
                             <Icon path={mdiCrown} size={12} color="rgb(234 179 8)" class="ml-1" />

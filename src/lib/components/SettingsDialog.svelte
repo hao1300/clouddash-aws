@@ -50,6 +50,7 @@
     export interface ServiceDef {
         id: string;
         label: string;
+        icon: string;
         defaultEnabled?: boolean;
     }
 
@@ -477,9 +478,12 @@
                     {#snippet children(id)}
                         {@const svc = services.find((s) => s.id === id)}
                         {#if svc}
-                            <span class="flex-1 text-sm text-gray-200"
-                                >{svc.label}</span
-                            >
+                            <div class="flex items-center gap-2 flex-1 min-w-0">
+                                <Icon path={svc.icon} size={18} class="text-gray-400 shrink-0" />
+                                <span class="text-sm text-gray-200 truncate"
+                                    >{svc.label}</span
+                                >
+                            </div>
                             <button
                                 onclick={() => toggleService(id)}
                                 aria-label="Toggle {svc.label}"
