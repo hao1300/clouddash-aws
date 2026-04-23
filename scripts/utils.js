@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { fromIni } from '@aws-sdk/credential-provider-ini';
 
@@ -20,12 +21,36 @@ export function updateWebVersion(version) {
     console.log(`Updated ${webPath} to version ${version}`);
 }
 
-export async function uploadToR2(src, destPath) {
+function getMimeType(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes = {
+        '.apk': 'application/vnd.android.package-archive',
+        '.exe': 'application/x-msdownload',
+        '.appimage': 'application/x-executable',
+        '.deb': 'application/vnd.debian.binary-package',
+        '.rpm': 'application/x-rpm',
+        '.zip': 'application/zip',
+        '.json': 'application/json',
+        '.txt': 'text/plain',
+        '.html': 'text/html',
+        '.js': 'application/javascript',
+        '.css': 'text/css',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.svg': 'image/svg+xml',
+    };
+    return mimeTypes[ext] || 'application/octet-stream';
+}
+
+export async function uploadToR2(src, destPath, contentType = null) {
     const bucket = "static-clouddash-dev";
     const endpoint = "https://9e5d25b88e77c04686ef4f03124ee940.r2.cloudflarestorage.com";
     const profile = "chromestatsr2";
     
-    console.log(`Uploading to R2: ${src} -> s3://${bucket}/${destPath}`);
+    const finalContentType = contentType || getMimeType(src);
+    
+    console.log(`Uploading to R2: ${src} -> s3://${bucket}/${destPath} (${finalContentType})`);
     
     const client = new S3Client({
         region: "auto",
@@ -54,6 +79,7 @@ export async function uploadToR2(src, destPath) {
             Bucket: bucket,
             Key: destPath,
             Body: fileStream,
+            ContentType: finalContentType,
             ChecksumAlgorithm: "CRC32",
         }));
         
