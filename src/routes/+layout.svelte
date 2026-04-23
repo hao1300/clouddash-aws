@@ -1098,7 +1098,9 @@
           >
             <div class="absolute inset-0">
               {#key refreshKey}
-                {@render children()}
+                <div class="contents">
+                  {@render children()}
+                </div>
               {/key}
             </div>
           </ServiceLayout>
