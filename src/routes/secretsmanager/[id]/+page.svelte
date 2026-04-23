@@ -12,6 +12,7 @@
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     import JsonEditor from "$lib/components/JsonEditor.svelte";
+    import InfoCard from "$lib/components/InfoCard.svelte";
 
     let secretId = $derived($page.params.id || "");
 
@@ -145,62 +146,11 @@
         </div>{/if}
 
     <div class="flex-1 overflow-auto p-2 space-y-2 flex flex-col min-h-0">
-        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 shrink-0">
-            <h3
-                class="text-[10px] font-bold text-gray-500 uppercase mb-4 tracking-widest border-b border-gray-800 pb-1"
-            >
-                Metadata
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                <div>
-                    <h4
-                        class="text-[10px] font-bold text-gray-600 uppercase mb-1"
-                    >
-                        ARN
-                    </h4>
-                    <span class="text-xs text-gray-300 font-mono break-all"
-                        >{secretDetails?.ARN || secretId}</span
-                    >
-                </div>
-                <div>
-                    <h4
-                        class="text-[10px] font-bold text-gray-600 uppercase mb-1"
-                    >
-                        Description
-                    </h4>
-                    <span class="text-xs text-gray-300 break-words"
-                        >{secretDetails?.Description || "-"}</span
-                    >
-                </div>
-                <div>
-                    <h4
-                        class="text-[10px] font-bold text-gray-600 uppercase mb-1"
-                    >
-                        Created Date
-                    </h4>
-                    <span class="text-xs text-gray-300"
-                        >{secretDetails?.CreatedDate
-                            ? new Date(
-                                  secretDetails.CreatedDate,
-                              ).toLocaleString()
-                            : "-"}</span
-                    >
-                </div>
-                <div>
-                    <h4
-                        class="text-[10px] font-bold text-gray-600 uppercase mb-1"
-                    >
-                        Last Accessed Date (UTC)
-                    </h4>
-                    <span class="text-xs text-gray-300"
-                        >{secretDetails?.LastAccessedDate
-                            ? new Date(
-                                  secretDetails.LastAccessedDate,
-                              ).toLocaleDateString(undefined, { timeZone: "UTC" })
-                            : "-"}</span
-                    >
-                </div>
-            </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
+            <InfoCard label="ARN" value={secretDetails?.ARN || secretId} />
+            <InfoCard label="Description" value={secretDetails?.Description || "-"} />
+            <InfoCard label="Created Date" value={secretDetails?.CreatedDate ? new Date(secretDetails.CreatedDate).toLocaleString() : "-"} />
+            <InfoCard label="Last Accessed Date (UTC)" value={secretDetails?.LastAccessedDate ? new Date(secretDetails.LastAccessedDate).toLocaleDateString(undefined, { timeZone: "UTC" }) : "-"} />
         </div>
 
         <div

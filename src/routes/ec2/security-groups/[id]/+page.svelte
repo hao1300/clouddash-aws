@@ -14,6 +14,7 @@
     import { titleService } from "$lib/services/title.svelte";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
+    import InfoCard from "$lib/components/InfoCard.svelte";
 
     let sgId = $derived($page.params.id);
 
@@ -231,24 +232,11 @@
             Security Group Not Found
         </div>
     {:else}
-        <!-- Summary Cards -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="bg-gray-900/50 border border-gray-800 p-4 rounded-xl shadow-inner">
-                <div class="text-[10px] font-bold text-gray-600 uppercase tracking-tighter mb-1">Name</div>
-                <div class="text-xs font-bold text-gray-200 truncate" title={sg.name}>{sg.name}</div>
-            </div>
-            <div class="bg-gray-900/50 border border-gray-800 p-4 rounded-xl shadow-inner">
-                <div class="text-[10px] font-bold text-gray-600 uppercase tracking-tighter mb-1">Group ID</div>
-                <div class="text-xs font-bold text-gray-400 truncate" title={sg.id}>{sg.id}</div>
-            </div>
-            <div class="bg-gray-900/50 border border-gray-800 p-4 rounded-xl shadow-inner">
-                <div class="text-[10px] font-bold text-gray-600 uppercase tracking-tighter mb-1">VPC ID</div>
-                <div class="text-xs font-bold text-blue-400 truncate" title={sg.vpc}>{sg.vpc}</div>
-            </div>
-            <div class="bg-gray-900/50 border border-gray-800 p-4 rounded-xl shadow-inner">
-                <div class="text-[10px] font-bold text-gray-600 uppercase tracking-tighter mb-1">Description</div>
-                <div class="text-xs font-bold text-gray-300 truncate" title={sg.description}>{sg.description}</div>
-            </div>
+            <InfoCard label="Name" value={sg.name} />
+            <InfoCard label="Group ID" value={sg.id} />
+            <InfoCard label="VPC ID" value={sg.vpc} />
+            <InfoCard label="Description" value={sg.description} />
         </div>
 
         <!-- Inbound Rules -->

@@ -10,6 +10,7 @@
     import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
     import CopyButton from "$lib/components/CopyButton.svelte";
     import MetricChart from "$lib/components/MetricChart.svelte";
+    import InfoCard from "$lib/components/InfoCard.svelte";
 
     let bucket = $derived($page.params.bucketName || "");
     
@@ -139,45 +140,23 @@
             </div>
         {/if}
 
-        <div class="bg-gray-900 border border-gray-800 rounded-lg p-6 shadow-sm">
-            <h1 class="text-xl font-bold mb-4">Bucket Details: {bucket}</h1>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-                <div class="space-y-4">
-                    <div>
-                        <div class="text-gray-500 font-bold text-[10px] uppercase tracking-wider mb-1">Region</div>
-                        <div class="text-gray-200">{region || (loading ? 'Loading...' : 'Unknown')}</div>
-                    </div>
-                    <div>
-                        <div class="text-gray-500 font-bold text-[10px] uppercase tracking-wider mb-1">Creation Date</div>
-                        <div class="text-gray-200">
-                            {bucketData?.CreationDate ? new Date(bucketData.CreationDate).toLocaleString() : (loading ? 'Loading...' : '-')}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="space-y-4 lg:col-span-2">
-                    <div>
-                        <div class="text-gray-500 font-bold text-[10px] uppercase tracking-wider mb-1">Amazon Resource Name (ARN)</div>
-                        <div class="flex items-center gap-2 bg-black/40 rounded p-2 border border-white/5">
-                            <CopyButton text={arn} label={arn} class="text-gray-300 text-xs font-medium truncate flex-1" />
-                        </div>
-                    </div>
-                    
-                    {#if metricsConfigs.length > 0}
-                    <div>
-                        <div class="text-gray-500 font-bold text-[10px] uppercase tracking-wider mb-1">Metrics Configurations</div>
-                        <div class="flex flex-wrap gap-2 mt-1">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <InfoCard label="Region" value={region || (loading ? 'Loading...' : 'Unknown')} />
+            <InfoCard label="Creation Date" value={bucketData?.CreationDate ? new Date(bucketData.CreationDate).toLocaleString() : (loading ? 'Loading...' : '-')} />
+            <InfoCard label="Amazon Resource Name (ARN)" value={arn} />
+            {#if metricsConfigs.length > 0}
+                <InfoCard label="Metrics Configurations">
+                    {#snippet children()}
+                        <div class="flex flex-wrap gap-2">
                             {#each metricsConfigs as config}
                                 <span class="bg-blue-600/10 text-blue-400 border border-blue-600/20 px-2 py-1 rounded text-[11px] font-mono">
                                     {config.Id}
                                 </span>
                             {/each}
                         </div>
-                    </div>
-                    {/if}
-                </div>
-            </div>
+                    {/snippet}
+                </InfoCard>
+            {/if}
         </div>
 
         <!-- CloudWatch Metrics Section -->

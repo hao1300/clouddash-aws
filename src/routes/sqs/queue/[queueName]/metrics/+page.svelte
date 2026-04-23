@@ -5,6 +5,7 @@
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
     import Select from "$lib/components/Select.svelte";
+    import InfoCard from "$lib/components/InfoCard.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiClockOutline, mdiTrendingUp, mdiTrendingDown, mdiMinus } from "@mdi/js";
 
@@ -153,14 +154,12 @@
                 { label: 'Received', value: latestValues.received, color: 'text-purple-400', bg: 'bg-purple-400/5' },
                 { label: 'Deleted', value: latestValues.deleted, color: 'text-red-400', bg: 'bg-red-400/5' }
             ] as card}
-                <div class="{card.bg} border border-gray-800/50 rounded-xl p-3 flex flex-col gap-1 shadow-sm hover:border-gray-700 transition-colors">
-                    <span class="text-[9px] uppercase tracking-wider font-bold text-gray-500">{card.label}</span>
-                    <div class="flex items-baseline gap-1">
-                        <span class="text-lg font-mono font-bold {card.color}">
-                            {card.value.toLocaleString()}
-                        </span>
-                    </div>
-                </div>
+                <InfoCard 
+                    label={card.label} 
+                    value={card.value.toLocaleString()} 
+                    className="{card.bg} !p-3 !rounded-xl"
+                    valueClass="!text-lg !font-mono {card.color} !bg-transparent !border-none !px-0 !py-0"
+                />
             {/each}
         </div>
 

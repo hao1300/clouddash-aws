@@ -10,6 +10,7 @@
         type EnvironmentDescription,
     } from "@aws-sdk/client-elastic-beanstalk";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
+    import InfoCard from "$lib/components/InfoCard.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
@@ -111,67 +112,11 @@
             Loading Application...
         </div>
     {:else if app}
-        <div
-            class="flex items-center gap-3 mb-6 bg-gray-900 p-3 rounded-lg border border-gray-800 shadow-sm shrink-0"
-        >
-            <span class="text-sm font-bold text-gray-200 truncate flex-1"
-                >{app.ApplicationName}</span
-            >
-        </div>
-
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 shrink-0">
-            <div
-                class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm overflow-hidden"
-            >
-                <div
-                    class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
-                >
-                    Description
-                </div>
-                <div class="text-base font-bold text-gray-200 truncate" title={app.Description || ""}>
-                    {app.Description || "-"}
-                </div>
-            </div>
-            <div
-                class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
-            >
-                <div
-                    class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
-                >
-                    Versions
-                </div>
-                <div class="text-base font-bold text-gray-200">
-                    {app.Versions?.length || 0}
-                </div>
-            </div>
-            <div
-                class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
-            >
-                <div
-                    class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
-                >
-                    Created
-                </div>
-                <div class="text-sm font-bold text-gray-200 truncate">
-                    {app.DateCreated
-                        ? new Date(app.DateCreated).toLocaleString()
-                        : "-"}
-                </div>
-            </div>
-            <div
-                class="bg-gray-900 p-4 rounded-lg border border-gray-800 shadow-sm"
-            >
-                <div
-                    class="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold"
-                >
-                    Updated
-                </div>
-                <div class="text-sm font-bold text-gray-200 truncate">
-                    {app.DateUpdated
-                        ? new Date(app.DateUpdated).toLocaleString()
-                        : "-"}
-                </div>
-            </div>
+            <InfoCard label="Description" value={app.Description || "-"} />
+            <InfoCard label="Versions" value={String(app.Versions?.length || 0)} />
+            <InfoCard label="Created" value={app.DateCreated ? new Date(app.DateCreated).toLocaleString() : "-"} />
+            <InfoCard label="Updated" value={app.DateUpdated ? new Date(app.DateUpdated).toLocaleString() : "-"} />
         </div>
 
         <div class="flex-1 min-h-0 min-h-[300px] bg-gray-900 rounded-lg border border-gray-800 flex flex-col">

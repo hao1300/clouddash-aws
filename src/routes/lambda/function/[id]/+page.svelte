@@ -18,6 +18,7 @@
     import BackButton from "$lib/components/BackButton.svelte";
     import Select from "$lib/components/Select.svelte";
     import MetricChart from "$lib/components/MetricChart.svelte";
+    import InfoCard from "$lib/components/InfoCard.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiRefresh, mdiClose, mdiInformation, mdiChevronRight } from "@mdi/js";
 
@@ -567,34 +568,12 @@
         {:else if detailTab === "configuration"}
             <div class="max-w-4xl space-y-6">
                 <!-- Function Overview -->
-                <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
-                    <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
-                        <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Function Overview</h3>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Runtime</span>
-                            <div class="text-sm text-gray-300">{fnDetails?.Runtime || 'N/A'}</div>
-                        </div>
-                        <div>
-                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Architectures</span>
-                            <div class="text-sm text-gray-300">{(fnDetails?.Architectures || []).join(', ') || 'N/A'}</div>
-                        </div>
-                        <div>
-                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Package Type</span>
-                            <div class="text-sm text-gray-300">{fnDetails?.PackageType || 'N/A'}</div>
-                        </div>
-                        <div>
-                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Last Modified</span>
-                            <div class="text-sm text-gray-300">{fnDetails?.LastModified ? new Date(fnDetails.LastModified).toLocaleString() : 'N/A'}</div>
-                        </div>
-                        <div class="md:col-span-2">
-                            <span class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Handler</span>
-                            <div class="text-sm text-blue-400 truncate" title={fnDetails?.Role || ''}>
-                                {fnDetails?.Role || 'N/A'}
-                            </div>
-                        </div>
-                    </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <InfoCard label="Runtime" value={fnDetails?.Runtime || "N/A"} />
+                    <InfoCard label="Architectures" value={(fnDetails?.Architectures || []).join(", ") || "N/A"} />
+                    <InfoCard label="Package Type" value={fnDetails?.PackageType || "N/A"} />
+                    <InfoCard label="Last Modified" value={fnDetails?.LastModified ? new Date(fnDetails.LastModified).toLocaleString() : "N/A"} />
+                    <InfoCard label="Execution Role" value={fnDetails?.Role || "N/A"} />
                 </div>
 
                 <!-- General Config -->
@@ -615,59 +594,50 @@
                             >
                         {/if}
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <div
-                                class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
-                                >Memory (MB)</div
-                            >
-                            {#if isEditingConfig}
+                    
+                    {#if isEditingConfig}
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <div
+                                    class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
+                                    >Memory (MB)</div
+                                >
                                 <input
                                     type="number"
                                     bind:value={editMemory}
                                     class="w-full bg-black border border-gray-700 rounded p-1.5 text-xs text-white"
                                 />
-                            {:else}
-                                <div class="text-sm text-gray-300">
-                                    {fnDetails?.MemorySize} MB
-                                </div>
-                            {/if}
-                        </div>
-                        <div>
-                            <div
-                                class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
-                                >Timeout (s)</div
-                            >
-                            {#if isEditingConfig}
+                            </div>
+                            <div>
+                                <div
+                                    class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
+                                    >Timeout (s)</div
+                                >
                                 <input
                                     type="number"
                                     bind:value={editTimeout}
                                     class="w-full bg-black border border-gray-700 rounded p-1.5 text-xs text-white"
                                 />
-                            {:else}
-                                <div class="text-sm text-gray-300">
-                                    {fnDetails?.Timeout} s
-                                </div>
-                            {/if}
-                        </div>
-                        <div class="md:col-span-2">
-                            <div
-                                class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
-                                >Handler</div
-                            >
-                            {#if isEditingConfig}
+                            </div>
+                            <div class="md:col-span-2">
+                                <div
+                                    class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
+                                    >Handler</div
+                                >
                                 <input
                                     type="text"
                                     bind:value={editHandler}
                                     class="w-full bg-black border border-gray-700 rounded p-1.5 text-xs font-mono text-white"
                                 />
-                            {:else}
-                                <div class="text-sm text-gray-300 font-mono">
-                                    {fnDetails?.Handler}
-                                </div>
-                            {/if}
+                            </div>
                         </div>
-                    </div>
+                    {:else}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <InfoCard label="Memory" value={`${fnDetails?.MemorySize} MB`} />
+                            <InfoCard label="Timeout" value={`${fnDetails?.Timeout} s`} />
+                            <InfoCard label="Handler" value={fnDetails?.Handler || "N/A"} />
+                        </div>
+                    {/if}
                     {#if isEditingConfig}
                         <div class="mt-4 flex justify-between gap-2">
                             <button

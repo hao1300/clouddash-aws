@@ -9,6 +9,7 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
+    import InfoCard from "$lib/components/InfoCard.svelte";
 
     let stackId = $derived($page.params.id || "");
 
@@ -72,23 +73,10 @@
         </div>
     {:else if stack}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {#each [{ label: "Stack ID", value: stack.StackId }, { label: "Status", value: stack.StackStatus }, { label: "Created", value: stack.CreationTime?.toLocaleString() }, { label: "Description", value: stack.Description || "-" }] as item}
-                <div
-                    class="bg-gray-900/50 border border-gray-800 p-4 rounded-xl shadow-inner"
-                >
-                    <div
-                        class="text-[10px] font-bold text-gray-600 uppercase tracking-tighter mb-1"
-                    >
-                        {item.label}
-                    </div>
-                    <div
-                        class="text-xs font-bold text-gray-200 truncate"
-                        title={item.value}
-                    >
-                        {item.value}
-                    </div>
-                </div>
-            {/each}
+            <InfoCard label="Stack ID" value={stack.StackId} />
+            <InfoCard label="Status" value={stack.StackStatus} />
+            <InfoCard label="Created" value={stack.CreationTime?.toLocaleString()} />
+            <InfoCard label="Description" value={stack.Description || "-"} />
         </div>
 
         <div class="flex-1 min-h-0 flex flex-col">
