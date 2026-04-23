@@ -2,7 +2,7 @@
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
     import Icon from "./Icon.svelte";
-    import { mdiDotsHorizontal } from "@mdi/js";
+    import { mdiDotsVertical } from "@mdi/js";
 
     let {
         tabs,
@@ -24,8 +24,9 @@
     function updateOverflow() {
         if (!container || tabElements.length === 0) return;
 
-        const containerWidth = container.clientWidth;
-        const MORE_BUTTON_WIDTH = 48; // Estimate for "..." button
+        // Account for px-6 padding (24px each side = 48px total)
+        const availableWidth = container.clientWidth - 48;
+        const MORE_BUTTON_WIDTH = 56; // Buffer for "..." button
         let currentWidth = 0;
         let newVisibleCount = 0;
 
@@ -35,7 +36,7 @@
             // If this is not the last tab, we need to account for the "More" button possibly appearing
             const spaceNeeded = currentWidth + tabWidth + (i < tabs.length - 1 ? MORE_BUTTON_WIDTH : 0);
             
-            if (spaceNeeded <= containerWidth) {
+            if (spaceNeeded <= availableWidth) {
                 currentWidth += tabWidth;
                 newVisibleCount++;
             } else {
@@ -45,7 +46,7 @@
         
         // Special case: if we can fit ALL tabs without the "More" button
         let totalWidth = tabElements.reduce((acc, el) => acc + el.offsetWidth + 16, 0) - 16;
-        if (totalWidth <= containerWidth) {
+        if (totalWidth <= availableWidth) {
             newVisibleCount = tabs.length;
         }
 
@@ -103,7 +104,7 @@
                     }}
                     class="p-2 text-gray-400 hover:text-white transition rounded-md hover:bg-gray-800 {isActiveInDropdown ? 'text-blue-400' : ''}"
                 >
-                    <Icon path={mdiDotsHorizontal} size={18} />
+                    <Icon path={mdiDotsVertical} size={18} />
                 </button>
 
                 {#if dropdownOpen}
