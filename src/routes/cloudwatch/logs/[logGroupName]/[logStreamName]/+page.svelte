@@ -6,6 +6,8 @@
     } from "@aws-sdk/client-cloudwatch-logs";
     import { aws } from "$lib/services/aws.svelte";
     import { titleService } from "$lib/services/title.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiRefresh } from "@mdi/js";
 
     import { untrack } from "svelte";
 
@@ -258,7 +260,7 @@
                     <div
                         class="h-40 flex items-center justify-center text-gray-400 text-sm animate-pulse"
                     >
-                        <span class="animate-spin mr-2">⟳</span> Loading events...
+                        <Icon path={mdiRefresh} size={14} class="animate-spin mr-2" /> Loading events...
                     </div>
                 {:else if logEvents.length === 0}
                     <div
@@ -279,7 +281,7 @@
                             class="mb-2 text-xs font-bold text-blue-400 hover:text-blue-300 transition disabled:opacity-30 disabled:cursor-not-allowed bg-gray-900 border border-gray-800 rounded px-6 py-2 shadow-sm flex items-center gap-2"
                         >
                             {#if loadingDirection === "prev"}
-                                <span class="animate-spin">⟳</span> Loading...
+                                <Icon path={mdiRefresh} size={14} class="animate-spin" /> Loading...
                             {:else}
                                 ↑ Load older events
                             {/if}
@@ -311,7 +313,7 @@
                             class="mt-4 text-xs font-bold text-blue-400 hover:text-blue-300 transition disabled:opacity-30 disabled:cursor-not-allowed bg-gray-900 border border-gray-800 rounded px-6 py-2 shadow-sm flex items-center gap-2"
                         >
                             {#if loadingDirection === "next"}
-                                <span class="animate-spin">⟳</span> Loading...
+                                <Icon path={mdiRefresh} size={14} class="animate-spin" /> Loading...
                             {:else}
                                 Load newer events ↓
                             {/if}

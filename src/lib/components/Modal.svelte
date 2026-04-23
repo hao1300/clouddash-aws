@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiClose } from "@mdi/js";
 
     let {
         open = $bindable(false),
@@ -47,7 +49,7 @@
                 <button
                     onclick={() => (open = false)}
                     class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition text-lg leading-none"
-                    title="Close">✕</button
+                    title="Close"><Icon path={mdiClose} size={20} /></button
                 >
             </div>
 

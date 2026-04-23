@@ -11,6 +11,8 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiRefresh, mdiCircle } from "@mdi/js";
 
     let error = $state("");
     let loading = $state(false);
@@ -211,6 +213,13 @@
     }
 </script>
 
+{#snippet statusCell(v: string)}
+    <div class="flex items-center gap-1.5">
+        <Icon path={mdiCircle} size={10} class={v === "ACTIVE" ? "text-green-500" : "text-gray-500"} />
+        <span>{v}</span>
+    </div>
+{/snippet}
+
 <div class="h-full relative overflow-hidden flex flex-col">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
@@ -244,7 +253,7 @@
                 {
                     key: "status",
                     label: "Status",
-                    format: (v) => (v === "ACTIVE" ? "🟢 ACTIVE" : `⚪ ${v}`),
+                    renderCell: statusCell,
                 },
                 {
                     key: "item_count",
@@ -389,7 +398,7 @@
                 disabled={createTableLoading || !newTableName || !newPkName}
                 class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2"
             >
-                {#if createTableLoading}<span class="animate-spin">⟳</span>{/if}
+                {#if createTableLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if}
                 Create
             </button>
         </div>
@@ -414,7 +423,7 @@
                 disabled={deleteTableLoading}
                 class="bg-red-600 hover:bg-red-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2"
             >
-                {#if deleteTableLoading}<span class="animate-spin">⟳</span>{/if}
+                {#if deleteTableLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if}
                 Delete
             </button>
         </div>

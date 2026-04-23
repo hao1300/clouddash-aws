@@ -1,6 +1,8 @@
 <script lang="ts">
     import Modal from "./Modal.svelte";
     import ReorderableList from "./ReorderableList.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiClose, mdiChevronLeft, mdiChevronRight } from "@mdi/js";
     import { invoke } from "@tauri-apps/api/core";
     import { open as openDialog } from "@tauri-apps/plugin-dialog";
     import {
@@ -537,18 +539,7 @@
                                 class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition disabled:opacity-50"
                                 disabled={qrProfiles.length <= 1}
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    class="w-5 h-5"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="2"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    ><polyline points="15 18 9 12 15 6"
-                                    ></polyline></svg
-                                >
+                                <Icon path={mdiChevronLeft} size={20} />
                             </button>
 
                             <div class="flex flex-col items-center">
@@ -613,18 +604,7 @@
                                 class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition disabled:opacity-50"
                                 disabled={qrProfiles.length <= 1}
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    class="w-5 h-5"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="2"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    ><polyline points="9 18 15 12 9 6"
-                                    ></polyline></svg
-                                >
+                                <Icon path={mdiChevronRight} size={20} />
                             </button>
                         </div>
                         <div class="mt-4 text-xs text-gray-500 font-medium">
@@ -722,10 +702,25 @@
                                     <input
                                         id="license-key"
                                         type="text"
-                                        value={settings.isPro && settings.licenseKey ? (settings.licenseKey.length > 15 ? settings.licenseKey.slice(0, 9) + "••••••••••••••••" + settings.licenseKey.slice(-4) : settings.licenseKey) : licenseKeyInput}
-                                        oninput={(e) => { if (!settings.isPro) licenseKeyInput = e.currentTarget.value; }}
+                                        value={settings.isPro &&
+                                        settings.licenseKey
+                                            ? settings.licenseKey.length > 15
+                                                ? settings.licenseKey.slice(
+                                                      0,
+                                                      9,
+                                                  ) +
+                                                  "••••••••••••••••" +
+                                                  settings.licenseKey.slice(-4)
+                                                : settings.licenseKey
+                                            : licenseKeyInput}
+                                        oninput={(e) => {
+                                            if (!settings.isPro)
+                                                licenseKeyInput =
+                                                    e.currentTarget.value;
+                                        }}
                                         placeholder="CD-..."
-                                        disabled={settings.licenseValidating || settings.isPro}
+                                        disabled={settings.licenseValidating ||
+                                            settings.isPro}
                                         readonly={settings.isPro}
                                         class="flex-1 bg-black border rounded px-3 py-2.5 text-xs text-white focus:border-blue-500 outline-none transition font-mono
                                             {settings.isPro
@@ -776,7 +771,7 @@
                                             class="bg-gray-800/50 hover:bg-red-500/20 text-gray-400 hover:text-red-400 px-3 py-2 rounded text-xs transition border border-gray-700"
                                             title="Clear License Key"
                                         >
-                                            ✕
+                                            <Icon path={mdiClose} size={14} />
                                         </button>
                                     {/if}
                                 </div>

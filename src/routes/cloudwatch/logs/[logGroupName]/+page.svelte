@@ -14,6 +14,8 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { titleService } from "$lib/services/title.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiDotsVertical, mdiClockOutline, mdiDelete } from "@mdi/js";
 
     let logGroupName = $derived($page.params.logGroupName || "");
     let error = $state("");
@@ -197,11 +199,7 @@
                         class="p-2 hover:bg-gray-800 rounded transition text-gray-400 hover:text-white flex items-center justify-center border border-gray-700 bg-gray-900/50"
                         title="Actions"
                     >
-                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="1" />
-                            <circle cx="12" cy="5" r="1" />
-                            <circle cx="12" cy="19" r="1" />
-                        </svg>
+                        <Icon path={mdiDotsVertical} size={20} />
                     </button>
                     {#if menuOpen}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -215,9 +213,7 @@
                                 onclick={() => { setRetention(); menuOpen = false; }}
                                 class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-800 text-blue-400 font-bold transition flex items-center gap-2"
                             >
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
+                                <Icon path={mdiClockOutline} size={16} />
                                 Retention
                             </button>
                             <div class="border-t border-gray-800"></div>
@@ -225,9 +221,7 @@
                                 onclick={() => { deleteLogGroup(); menuOpen = false; }}
                                 class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-800 text-red-500 font-bold transition flex items-center gap-2"
                             >
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
+                                <Icon path={mdiDelete} size={16} />
                                 Delete Group
                             </button>
                         </div>

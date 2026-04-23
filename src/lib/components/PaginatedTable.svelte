@@ -1,5 +1,7 @@
 <script lang="ts" generics="T">
     import type { Snippet } from "svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiMagnify, mdiClose, mdiArrowUp, mdiArrowDown, mdiChevronLeft, mdiChevronRight } from "@mdi/js";
 
     let {
         items = [],
@@ -15,6 +17,7 @@
         onRowClick = undefined,
         actionsSnippet = undefined,
         headerActionsSnippet = undefined,
+        cellSnippet = undefined,
         children = undefined,
     }: {
         items?: T[];
@@ -23,6 +26,7 @@
             label: string;
             sortable?: boolean;
             format?: (val: any, item: T) => string;
+            renderCell?: Snippet<[any, T]>;
             onClick?: (item: T) => void;
         }[];
         loading?: boolean;
@@ -36,6 +40,7 @@
         onRowClick?: (item: T) => void;
         actionsSnippet?: Snippet<[T]>;
         headerActionsSnippet?: Snippet;
+        cellSnippet?: Snippet<[string, any, T]>;
         children?: Snippet<[T]>;
     } = $props();
 
@@ -163,7 +168,7 @@
             <div class="relative w-full sm:w-64 shrink-0">
                 <span
                     class="absolute inset-y-0 left-2.5 flex items-center text-gray-500"
-                    >🔍</span
+                    ><Icon path={mdiMagnify} size={14} /></span
                 >
                 <input
                     type="text"
@@ -175,7 +180,7 @@
                     <button
                         onclick={() => (filterText = "")}
                         class="absolute inset-y-0 right-2 flex items-center text-gray-500 hover:text-gray-300"
-                        >✕</button
+                        ><Icon path={mdiClose} size={14} /></button
                     >
                 {/if}
             </div>
@@ -214,7 +219,7 @@
                                     {#if sortKey === col.key}
                                         <span
                                             class="text-blue-400 text-xs shrink-0"
-                                            >{sortAsc ? "▲" : "▼"}</span
+                                            ><Icon path={sortAsc ? mdiArrowUp : mdiArrowDown} size={14} /></span
                                         >
                                     {/if}
                                 </div>
@@ -303,16 +308,23 @@
                                                           ] ?? "-",
                                                       )}
                                             </button>
+                                        {:else if col.renderCell}
+                                            {@render col.renderCell((item as any)[col.key], item)}
+                                        {:else if cellSnippet}
+                                            {@render cellSnippet(
+                                                col.key,
+                                                (item as any)[col.key],
+                                                item,
+                                            )}
+                                        {:else if col.format}
+                                            {col.format(
+                                                (item as any)[col.key],
+                                                item,
+                                            )}
                                         {:else}
-                                            {col.format
-                                                ? col.format(
-                                                      (item as any)[col.key],
-                                                      item,
-                                                  )
-                                                : String(
-                                                      (item as any)[col.key] ??
-                                                          "-",
-                                                  )}
+                                            {String(
+                                                (item as any)[col.key] ?? "-",
+                                            )}
                                         {/if}
                                     </td>
                                 {/each}
@@ -344,14 +356,14 @@
                     disabled={!hasPrev || loading}
                     class="bg-gray-800 hover:bg-gray-700 border border-gray-700 p-1 rounded text-sm transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                    ◀
+                    <Icon path={mdiChevronLeft} size={18} />
                 </button>
                 <button
                     onclick={onNext}
                     disabled={!hasNext || loading}
                     class="bg-gray-800 hover:bg-gray-700 border border-gray-700 p-1 rounded text-sm transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                    ▶
+                    <Icon path={mdiChevronRight} size={18} />
                 </button>
             </div>
         </div>

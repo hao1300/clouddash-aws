@@ -12,6 +12,8 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiRefresh } from "@mdi/js";
     import JsonEditor from "$lib/components/JsonEditor.svelte";
     import { slide } from "svelte/transition";
 
@@ -796,8 +798,7 @@
                         (exploreMode === "query" && !partitionKeyInput)}
                     class="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 px-8 py-2 rounded-full text-xs font-bold text-black transition flex items-center gap-2"
                 >
-                    {#if loading}<span class="animate-spin text-lg">⟳</span
-                        >{/if}
+                    {#if loading}<Icon path={mdiRefresh} size={18} class="animate-spin" />{/if}
                     Run
                 </button>
                 <button
@@ -894,7 +895,7 @@
                 disabled={itemEditorLoading}
                 class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2"
             >
-                {#if itemEditorLoading}<span class="animate-spin">⟳</span>{/if}
+                {#if itemEditorLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if}
                 Save
             </button>
         </div>
@@ -917,7 +918,7 @@
                 disabled={deleteItemLoading}
                 class="bg-red-600 hover:bg-red-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2"
             >
-                {#if deleteItemLoading}<span class="animate-spin">⟳</span>{/if}
+                {#if deleteItemLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if}
                 Delete
             </button>
         </div>

@@ -12,11 +12,12 @@
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     import { invoke } from "@tauri-apps/api/core";
-    import { openUrl } from "@tauri-apps/plugin-opener";
     import { settings } from "$lib/services/settings.svelte";
     import { toastService } from "$lib/services/toast.svelte";
     import { writeFile, exists } from "tauri-plugin-scoped-storage-api";
     import { onMount } from "svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiFileDocument, mdiFolder, mdiDotsVertical, mdiRefresh } from "@mdi/js";
 
     let bucket = $derived($page.params.bucketName || "");
     let prefix = $derived($page.url.searchParams.get("prefix") || "");
@@ -314,8 +315,6 @@
                 {
                     label: "Name",
                     key: "name",
-                    format: (v, item) =>
-                        (item.type === "folder" ? "📁 " : "📄 ") + v,
                     onClick: (item) =>
                         item.type === "folder"
                             ? navigateToFolder(item.key)
@@ -325,6 +324,21 @@
                 { label: "Last Modified", key: "lastModified" },
             ]}
         >
+            {#snippet cellSnippet(key, val, item)}
+                {#if key === "name"}
+                    <div class="flex items-center gap-2">
+                        <Icon 
+                            path={item.type === "folder" ? mdiFolder : mdiFileDocument} 
+                            size={16} 
+                            class={item.type === "folder" ? "text-yellow-500/80" : "text-blue-400/80"} 
+                        />
+                        <span>{val}</span>
+                    </div>
+                {:else}
+                    {val}
+                {/if}
+            {/snippet}
+
             {#snippet headerActionsSnippet()}
                 <input
                     type="file"
@@ -337,7 +351,7 @@
                     disabled={uploading}
                     class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-[10px] font-bold transition flex items-center gap-1 shadow"
                 >
-                    {#if uploading}<span class="animate-spin">⟳</span>{/if} Upload
+                    {#if uploading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if} Upload
                 </button>
                 <button
                     onclick={() => (showCreateFolder = true)}
@@ -354,7 +368,7 @@
                         }}
                         class="text-xs text-gray-400 hover:text-white px-2 py-1 border border-transparent hover:border-gray-700 rounded transition"
                     >
-                        ⋮
+                        <Icon path={mdiDotsVertical} size={18} />
                     </button>
                     {#if openDropdown === item.key}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -418,7 +432,7 @@
                 disabled={creatingFolder}
                 class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-bold transition flex items-center gap-2"
             >
-                {#if creatingFolder}<span class="animate-spin">⟳</span>{/if} Create
+                {#if creatingFolder}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if} Create
                 Folder
             </button>
         </div>

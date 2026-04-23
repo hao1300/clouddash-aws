@@ -17,6 +17,18 @@
   import ServiceLayout from "$lib/components/ServiceLayout.svelte";
   import BackButton from "$lib/components/BackButton.svelte";
   import ToastContainer from "$lib/components/ToastContainer.svelte";
+  import Icon from "$lib/components/Icon.svelte";
+  import {
+    mdiCrown,
+    mdiKey,
+    mdiWindowRestore,
+    mdiRefresh,
+    mdiCog,
+    mdiMenu,
+    mdiClose,
+    mdiStar,
+    mdiStarOutline,
+  } from "@mdi/js";
 
   let { children }: { children: Snippet } = $props();
 
@@ -745,7 +757,7 @@
             onclick={() => (sideMenuOpen = false)}
             class="p-1.5 rounded-full hover:bg-gray-800 text-gray-400 transition sm:hidden"
           >
-            ✕
+            <Icon path={mdiClose} size={16} />
           </button>
         </div>
 
@@ -766,7 +778,7 @@
                     }}
                     class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-[11px] font-bold py-2 rounded flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all border border-blue-500/50"
                   >
-                    <span class="text-sm">👑</span>
+                    <Icon path={mdiCrown} size={16} />
                     Upgrade to Pro
                   </a>
                 {/if}
@@ -811,7 +823,7 @@
                         >
                           {svc.label}
                           {#if !settings.isPro && !["cloudwatch", "s3", "dynamodb"].includes(svc.id)}
-                            <span class="text-yellow-500 text-[10px]" title="Pro Service">👑</span>
+                            <Icon path={mdiCrown} size={12} color="rgb(234 179 8)" class="ml-1" />
                           {/if}
                           {#if activeId === svc.id}
                             <div class="w-1 h-1 rounded-full bg-blue-500"></div>
@@ -823,7 +835,7 @@
                             : 'text-gray-700 hover:text-gray-500'}"
                           onclick={(e) => toggleStar(svc.id, e)}
                         >
-                          {svc.isStarred ? "★" : "☆"}
+                          <Icon path={svc.isStarred ? mdiStar : mdiStarOutline} size={14} />
                         </button>
                       </div>
 
@@ -900,9 +912,9 @@
                   </select>
                 {:else}
                   <div
-                    class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono border border-gray-700 truncate"
+                    class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono border border-gray-700 truncate flex items-center gap-1.5"
                   >
-                    🔑 Custom
+                    <Icon path={mdiKey} size={14} /> Custom
                   </div>
                 {/if}
               </div>
@@ -932,7 +944,7 @@
                 class="flex-1 bg-gray-900 hover:bg-gray-800 p-2 rounded text-[11px] font-semibold border border-gray-800 transition flex items-center justify-center gap-1.5 text-white"
                 title="Refresh data"
               >
-                <span>⟳</span>
+                <Icon path={mdiRefresh} size={14} />
               </button>
               <button
                 onclick={() => {
@@ -943,10 +955,10 @@
                 class="flex-1 bg-gray-900 hover:bg-gray-800 p-2 rounded text-[11px] font-semibold border border-gray-800 transition flex items-center justify-center gap-1.5 text-white"
                 title="Settings"
               >
-                <span>⚙</span>
+                <Icon path={mdiCog} size={14} />
               </button>
               {#if !isMobile}
-                <button
+                  <button
                   onclick={() => {
                     invoke("fork_process", {
                       path: activeId,
@@ -959,7 +971,7 @@
                   class="flex-[2] bg-blue-600 hover:bg-blue-500 p-2 rounded text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-white shadow-lg"
                   title="Fork to new window"
                 >
-                  <span>⧉</span> Fork
+                  <Icon path={mdiWindowRestore} size={14} /> Fork
                 </button>
               {/if}
             </div>
@@ -979,7 +991,7 @@
               class="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition"
               title="Toggle Sidebar"
             >
-              <span class="text-xl">☰</span>
+              <Icon path={mdiMenu} size={20} />
             </button>
           </div>
 
@@ -1082,7 +1094,7 @@
               onclick={() => (rightPanelOpen = false)}
               class="p-2 rounded-full hover:bg-gray-800 text-gray-400 transition"
             >
-              ✕
+              <Icon path={mdiClose} size={18} />
             </button>
           </div>
 
@@ -1134,7 +1146,7 @@
                     class="p-3 text-gray-600 hover:text-red-400 transition"
                     title="Remove bookmark"
                   >
-                    ✕
+                    <Icon path={mdiClose} size={14} />
                   </button>
                 </div>
               {/each}

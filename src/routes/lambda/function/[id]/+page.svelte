@@ -15,6 +15,8 @@
     import JsonEditor from "$lib/components/JsonEditor.svelte";
     import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
     import MetricChart from "$lib/components/MetricChart.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiRefresh, mdiClose, mdiInformation, mdiChevronRight } from "@mdi/js";
 
     let fnName = $derived($page.params.id || "");
 
@@ -452,18 +454,16 @@
                                     href={`/cloudwatch/logs/${encodeURIComponent('/aws/lambda/' + fnName)}`}
                                     class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded transition border border-gray-700 flex items-center gap-2 shadow-sm"
                                 >
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <Icon path={mdiInformation} size={14} />
                                     View Logs
                                 </a>
-                                <button
-                                    onclick={handleInvoke}
-                                    disabled={invokeLoading}
-                                    class="bg-orange-600 hover:bg-orange-500 text-white px-6 py-2 rounded text-xs font-bold transition shadow flex items-center gap-2"
-                                >
-                                    {#if invokeLoading}<span class="animate-spin"
-                                            >⟳</span
-                                        >{/if} Invoke
-                                </button>
+                                    <button
+                                        onclick={handleInvoke}
+                                        disabled={invokeLoading}
+                                        class="bg-orange-600 hover:bg-orange-500 text-white px-6 py-2 rounded text-xs font-bold transition shadow flex items-center gap-2"
+                                    >
+                                        {#if invokeLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if} Invoke
+                                    </button>
                             </div>
                         </div>
 
@@ -508,9 +508,11 @@
                         class="absolute -left-3 top-1/2 -translate-y-1/2 bg-gray-800 border border-gray-700 rounded-full p-1 text-gray-400 hover:text-white hover:bg-gray-700 z-10 hidden lg:block shadow-md focus:outline-none"
                         title={isInvokeSidebarCollapsed ? "Expand history" : "Collapse history"}
                     >
-                        <svg class="w-4 h-4 transition-transform duration-300 {isInvokeSidebarCollapsed ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                        </svg>
+                        <Icon 
+                            path={mdiChevronRight} 
+                            size={16} 
+                            class="transition-transform duration-300 {isInvokeSidebarCollapsed ? 'rotate-180' : ''}" 
+                        />
                     </button>
                     <div class="{isInvokeSidebarCollapsed ? 'opacity-0 invisible' : 'opacity-100 visible'} transition-all duration-300 h-full flex flex-col w-80">
                         <div class="bg-gray-900 rounded-xl border border-gray-800 flex flex-col overflow-hidden h-full shadow-sm">
@@ -549,7 +551,7 @@
                                                 class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-gray-500 hover:text-red-400 bg-gray-900 hover:bg-gray-800 rounded z-10 border border-transparent hover:border-gray-700 shadow-sm"
                                                 title="Delete from history"
                                             >
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                                <Icon path={mdiClose} size={14} />
                                             </button>
                                         </div>
                                     {/each}
@@ -692,7 +694,7 @@
                         <div class="flex items-center gap-2">
                             <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Service Connections</h3>
                             {#if connectionsLoading}
-                                <span class="animate-spin text-gray-500 text-xs">⟳</span>
+                                <Icon path={mdiRefresh} size={14} class="animate-spin text-gray-500" />
                             {/if}
                         </div>
                     </div>
@@ -768,7 +770,7 @@
                                     <button
                                         onclick={() => editEnvVars.splice(i, 1)}
                                         class="text-gray-500 hover:text-red-400"
-                                        >✕</button
+                                        ><Icon path={mdiClose} size={16} /></button
                                     >
                                 </div>
                             {/each}
@@ -819,7 +821,7 @@
                 <div class="flex items-center gap-2">
                     <h3 class="text-xs text-gray-400 uppercase tracking-widest font-bold">Metrics Dashboard</h3>
                     {#if metricsLoading}
-                        <span class="animate-spin text-gray-500 text-xs">⟳</span>
+                        <Icon path={mdiRefresh} size={14} class="animate-spin text-gray-500" />
                     {/if}
                 </div>
                 <select

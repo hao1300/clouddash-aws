@@ -9,6 +9,8 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { pushToken, popToken } from "$lib/utils/pagination";
     import { aws } from "$lib/services/aws.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiCircle } from "@mdi/js";
 
     let error = $state("");
     let actionMsg = $state("");
@@ -105,6 +107,17 @@
     }
 </script>
 
+{#snippet statusCell(v: string)}
+    <div class="flex items-center gap-1.5">
+        <Icon 
+            path={mdiCircle} 
+            size={10} 
+            class={v === "ALARM" ? "text-red-500" : v === "OK" ? "text-green-500" : "text-gray-500"} 
+        />
+        <span>{v}</span>
+    </div>
+{/snippet}
+
 <PaginatedTable
     items={alarms}
     loading={alarmsLoading}
@@ -129,12 +142,7 @@
         {
             key: "state",
             label: "State",
-            format: (v) =>
-                v === "ALARM"
-                    ? "🔴 ALARM"
-                    : v === "OK"
-                      ? "🟢 OK"
-                      : `⚪ ${v}`,
+            renderCell: statusCell,
         },
         {
             key: "metric",

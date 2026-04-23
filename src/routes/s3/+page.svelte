@@ -12,6 +12,8 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiBucket, mdiDotsVertical, mdiRefresh } from "@mdi/js";
 
     let buckets = $state<any[]>([]);
     let loading = $state(false);
@@ -165,11 +167,16 @@
                     label: "Bucket Name",
                     key: "name",
                     onClick: (item) => handleSelectBucket(item.name),
-                    format: (v) => "🪣 " + v,
                 },
                 { label: "Creation Date", key: "creation" },
             ]}
         >
+            {#snippet children(item)}
+                <div class="flex items-center gap-2">
+                    <Icon path={mdiBucket} size={16} class="text-blue-400" />
+                    <span>{item.name}</span>
+                </div>
+            {/snippet}
             {#snippet headerActionsSnippet()}
                 <button
                     onclick={() => (showCreateModal = true)}
@@ -187,7 +194,7 @@
                         }}
                         class="text-xs text-gray-400 hover:text-white px-2 py-1 border border-transparent hover:border-gray-700 rounded transition"
                     >
-                        ⋮
+                        <Icon path={mdiDotsVertical} size={18} />
                     </button>
                     {#if openDropdown === item.name}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -265,7 +272,7 @@
                 disabled={creating}
                 class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-bold transition flex items-center gap-2"
             >
-                {#if creating}<span class="animate-spin">⟳</span>{/if} Create
+                {#if creating}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if} Create
             </button>
         </div>
     </div>

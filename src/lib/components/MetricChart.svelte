@@ -1,6 +1,8 @@
 <script lang="ts">
     import { onMount, untrack } from "svelte";
     import Chart from "chart.js/auto";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiRefresh } from "@mdi/js";
 
     interface DataPoint {
         rawTimestamp: Date;
@@ -203,7 +205,7 @@
         <div
             class="h-40 flex items-center justify-center text-gray-400 text-xs animate-pulse bg-gray-950/20 rounded border border-gray-800/50"
         >
-            <span class="animate-spin mr-2">⟳</span> Loading metrics...
+            <Icon path={mdiRefresh} size={14} class="animate-spin mr-2" /> Loading metrics...
         </div>
     {:else if !data || data.length === 0}
         <div

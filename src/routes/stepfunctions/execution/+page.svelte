@@ -18,6 +18,8 @@
     import StepFunctionsGraph from "$lib/components/StepFunctionsGraph.svelte";
     import type { StateExecutionDetails } from "$lib/utils/sfnHistoryParser";
     import JsonEditor from "$lib/components/JsonEditor.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiRefresh, mdiClose, mdiFormatListText, mdiPlay } from "@mdi/js";
 
     let execArn = $derived($page.url.searchParams.get("id") || "");
 
@@ -397,7 +399,7 @@
                     class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-3 py-1.5 rounded text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
                     title="View CloudWatch Logs"
                 >
-                    ▤ Logs
+                    <Icon path={mdiFormatListText} size={14} /> Logs
                 </a>
             {/if}
             {#if ["FAILED", "TIMED_OUT", "ABORTED"].includes(details?.status)}
@@ -406,7 +408,7 @@
                     disabled={isRedriving}
                     class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
                 >
-                    {#if isRedriving}<span class="animate-spin">⟳</span>{/if}
+                    {#if isRedriving}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if}
                     Redrive
                 </button>
             {/if}
@@ -416,14 +418,14 @@
                     disabled={isStopping}
                     class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
                 >
-                    {#if isStopping}<span class="animate-spin">⟳</span>{/if} Stop
+                    {#if isStopping}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if} Stop
                 </button>
             {/if}
             <button
                 onclick={openStartModal}
                 class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2"
             >
-                ▷ Start New
+                <Icon path={mdiPlay} size={14} /> Start New
             </button>
         </div>
     </div>
@@ -449,7 +451,7 @@
                 <div class="w-80 shrink-0 bg-gray-900 border border-gray-800 rounded-lg flex flex-col overflow-hidden shadow-sm">
                     <div class="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-950">
                         <h3 class="font-bold text-sm text-gray-200 truncate pr-2" title={selectedNodeState}>{selectedNodeState}</h3>
-                        <button onclick={() => selectedNodeState = null} class="text-gray-500 hover:text-gray-300">✕</button>
+                        <button onclick={() => selectedNodeState = null} class="text-gray-500 hover:text-gray-300"><Icon path={mdiClose} size={16} /></button>
                     </div>
                     
                     <div class="flex-1 overflow-auto p-3 space-y-4">
@@ -522,7 +524,7 @@
 
                         {#if logGroupName && selectedNodeRaw?.Type === 'Task' && !resInfo?.logGroup}
                             <a href={`/cloudwatch/logs/${encodeURIComponent(logGroupName)}`} class="block w-full text-center bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-3 py-2 rounded text-xs font-bold transition shadow-sm mt-4">
-                                ▤ View State Machine Logs
+                                <Icon path={mdiFormatListText} size={14} /> View State Machine Logs
                             </a>
                         {/if}
                     </div>
@@ -633,7 +635,7 @@
                 disabled={isStarting}
                 class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded text-xs font-bold transition shadow-sm flex items-center gap-2"
             >
-                {#if isStarting}<span class="animate-spin">⟳</span>{/if}
+                {#if isStarting}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if}
                 Run Execution
             </button>
         </div>

@@ -10,6 +10,8 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiRefresh } from "@mdi/js";
 
     let subs = $state<Subscription[]>([]);
     let loading = $state(false);
@@ -219,7 +221,7 @@
                 disabled={creating}
                 class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-bold transition flex items-center gap-2"
             >
-                {#if creating}<span class="animate-spin">⟳</span>{/if} Create
+                {#if creating}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if} Create
             </button>
         </div>
     </div>

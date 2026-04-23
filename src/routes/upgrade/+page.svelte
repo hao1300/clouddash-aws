@@ -2,6 +2,8 @@
   import { titleService } from "$lib/services/title.svelte";
   import { settings, POLAR_CHECKOUT_URL } from "$lib/services/settings.svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
+import Icon from "$lib/components/Icon.svelte";
+import { mdiCrown, mdiRocketLaunch, mdiShieldCheck, mdiCheckCircle } from "@mdi/js";
 
   $effect(() => {
     titleService.setResource("Upgrade to Pro", undefined, "/upgrade");
@@ -35,7 +37,7 @@
       <div
         class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 shadow-xl shadow-yellow-500/20 mb-2"
       >
-        <span class="text-4xl">👑</span>
+        <Icon path={mdiCrown} size={48} color="white" />
       </div>
       <h1
         class="text-4xl md:text-5xl font-black tracking-tight mb-4 bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent"
@@ -57,7 +59,7 @@
         <div
           class="w-10 h-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl mb-4"
         >
-          🚀
+          <Icon path={mdiRocketLaunch} size={24} />
         </div>
         <h3 class="font-bold text-gray-200 mb-2">Unlock Services</h3>
         <p class="text-sm text-gray-400">
@@ -72,7 +74,7 @@
         <div
           class="w-10 h-10 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl mb-4"
         >
-          🛡️
+          <Icon path={mdiShieldCheck} size={24} />
         </div>
         <h3 class="font-bold text-gray-200 mb-2">Priority Support</h3>
         <p class="text-sm text-gray-400">
@@ -86,7 +88,7 @@
         <div
           class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-green-500/10 text-green-400 border border-green-500/20"
         >
-          <span class="text-xl">✅</span>
+          <Icon path={mdiCheckCircle} size={24} />
           <span class="font-bold">You are now a Pro user!</span>
         </div>
       {:else}

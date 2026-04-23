@@ -14,6 +14,8 @@
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
     import CopyButton from "$lib/components/CopyButton.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiRefresh } from "@mdi/js";
 
     let queueName = $derived($page.params.queueName || "");
     let queueUrl = $derived($page.url.searchParams.get("url") || "");
@@ -266,7 +268,7 @@
                     disabled={!sendBody.trim() || sendLoading}
                     class="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white px-6 rounded text-xs font-bold transition flex items-center gap-2"
                 >
-                    {#if sendLoading}<span class="animate-spin">⟳</span>{/if} Send
+                    {#if sendLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if} Send
                 </button>
             </div>
             <div class="mt-2 flex items-center justify-end">
@@ -281,8 +283,7 @@
                         disabled={!queueArn || redriveLoading}
                         class="bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white px-3 py-1 rounded text-[10px] font-bold transition flex items-center gap-2"
                     >
-                        {#if redriveLoading}<span class="animate-spin">⟳</span
-                            >{/if}
+                        {#if redriveLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if}
                         Start Redrive
                     </button>
                     <button
@@ -290,7 +291,7 @@
                         disabled={msgLoading}
                         class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-1 rounded text-[10px] font-bold transition flex items-center gap-2"
                     >
-                        {#if msgLoading}<span class="animate-spin">⟳</span>{/if}
+                        {#if msgLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if}
                         Poll Messages
                     </button>
                 </div>

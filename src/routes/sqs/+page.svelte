@@ -11,6 +11,8 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiRefresh } from "@mdi/js";
     let queues = $state<any[]>([]);
     let loading = $state(false);
     let error = $state("");
@@ -312,7 +314,7 @@
                 disabled={createLoading || !createParams.QueueName}
                 class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2"
             >
-                {#if createLoading}<span class="animate-spin">⟳</span>{/if} Create
+                {#if createLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if} Create
             </button>
         </div>
     </div>
@@ -336,7 +338,7 @@
                 disabled={deleteLoading}
                 class="bg-red-600 hover:bg-red-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2"
             >
-                {#if deleteLoading}<span class="animate-spin">⟳</span>{/if} Delete
+                {#if deleteLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if} Delete
             </button>
         </div>
     </div>

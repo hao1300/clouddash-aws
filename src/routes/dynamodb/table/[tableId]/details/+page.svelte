@@ -8,6 +8,8 @@
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiRefresh, mdiCircle } from "@mdi/js";
 
     let tableName = $derived($page.params.tableId || "");
 
@@ -291,7 +293,7 @@
 
     {#if loading && !tableSchema}
         <div class="flex items-center justify-center h-48 text-gray-500">
-            <span class="animate-spin text-2xl mr-3">⟳</span> Loading table details...
+            <Icon path={mdiRefresh} size={24} class="animate-spin mr-3" /> Loading table details...
         </div>
     {:else if tableSchema}
         <div class="space-y-4 max-w-5xl {error || actionMsg ? 'pt-8' : ''}">
@@ -321,9 +323,11 @@
                                     ? "text-green-400"
                                     : "text-yellow-400"}
                             >
-                                {tableSchema.TableStatus === "ACTIVE"
-                                    ? "🟢"
-                                    : "⚪"}
+                                <Icon 
+                                    path={mdiCircle} 
+                                    size={10} 
+                                    class={tableSchema.TableStatus === "ACTIVE" ? "text-green-500" : "text-gray-500"} 
+                                />
                                 {tableSchema.TableStatus}
                             </span>
                         </div>
@@ -529,9 +533,11 @@
                                                     ? "text-green-400"
                                                     : "text-yellow-400"}
                                             >
-                                                {gsi.IndexStatus === "ACTIVE"
-                                                    ? "🟢"
-                                                    : "⚪"}
+                                                <Icon 
+                                                    path={mdiCircle} 
+                                                    size={10} 
+                                                    class={gsi.IndexStatus === "ACTIVE" ? "text-green-500" : "text-gray-500"} 
+                                                />
                                                 {gsi.IndexStatus || "-"}
                                             </span>
                                         </div>
@@ -637,8 +643,7 @@
                 disabled={editCapacityLoading}
                 class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2"
             >
-                {#if editCapacityLoading}<span class="animate-spin">⟳</span
-                    >{/if} Save
+                {#if editCapacityLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if} Save
             </button>
         </div>
     </div>
@@ -732,7 +737,7 @@
                     !newIndexPkName}
                 class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2"
             >
-                {#if createIndexLoading}<span class="animate-spin">⟳</span>{/if}
+                {#if createIndexLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if}
                 Create Index
             </button>
         </div>
@@ -757,7 +762,7 @@
                 disabled={deleteIndexLoading}
                 class="bg-red-600 hover:bg-red-500 disabled:opacity-50 px-4 py-2 rounded text-sm font-bold transition flex items-center gap-2"
             >
-                {#if deleteIndexLoading}<span class="animate-spin">⟳</span>{/if}
+                {#if deleteIndexLoading}<Icon path={mdiRefresh} size={14} class="animate-spin" />{/if}
                 Delete
             </button>
         </div>

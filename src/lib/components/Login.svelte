@@ -4,6 +4,8 @@
     import { listen, type UnlistenFn } from "@tauri-apps/api/event";
     import * as fflate from "fflate";
     import Modal from "./Modal.svelte";
+    import Icon from "./Icon.svelte";
+    import { mdiClose } from "@mdi/js";
 
     let {
         os = "",
@@ -295,7 +297,7 @@
     >
         {#if isAddingProfile && onCancel}
             <button onclick={onCancel} class="absolute top-4 right-4 p-1.5 rounded-full text-gray-500 hover:text-white hover:bg-gray-800 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <Icon path={mdiClose} size={20} />
             </button>
         {/if}
         <h1 class="text-xl font-bold mb-4 text-blue-400">CloudDash for AWS</h1>

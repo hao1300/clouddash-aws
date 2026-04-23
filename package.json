@@ -46,6 +46,7 @@
     "@tauri-apps/plugin-http": "^2.5.7",
     "@tauri-apps/plugin-opener": "^2",
     "@xyflow/svelte": "^1.5.2",
+    "@mdi/js": "^7.4.47",
     "chart.js": "^4.4.7",
     "codemirror": "^6.0.2",
     "dagre": "^0.8.5",

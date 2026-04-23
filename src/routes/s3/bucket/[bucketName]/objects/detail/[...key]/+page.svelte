@@ -9,6 +9,8 @@
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     import CopyButton from "$lib/components/CopyButton.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiCloudDownload, mdiRefresh } from "@mdi/js";
     import hljs from 'highlight.js';
     import 'highlight.js/styles/github-dark.css';
     import { invoke } from "@tauri-apps/api/core";
@@ -253,7 +255,7 @@
                     onclick={handleDownload}
                     class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-bold transition shadow-lg flex items-center gap-2"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg>
+                    <Icon path={mdiCloudDownload} size={16} />
                     Download
                 </button>
                 <button
@@ -313,7 +315,7 @@
                         class="w-full bg-gray-800 hover:bg-gray-700 text-white py-2 rounded text-xs font-bold transition flex items-center justify-center gap-2"
                     >
                         {#if presignedLoading}
-                            <span class="animate-spin truncate">⟳</span>
+                            <Icon path={mdiRefresh} size={14} class="animate-spin" />
                         {/if}
                         {presignedUrl ? 'Regenerate URL' : 'Generate Presigned URL'}
                     </button>
