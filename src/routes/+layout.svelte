@@ -231,6 +231,30 @@
     return tabs;
   });
 
+  let sidebarTabs = $derived.by(() => {
+    const manifest = SERVICE_MANIFEST[activeId];
+    if (!manifest) return serviceTabs;
+    const contextual = manifest.contextualTabs || [];
+    return serviceTabs.filter((t) => {
+      const parts = t.id.split("/");
+      const lastPart = parts[parts.length - 1];
+      // If it's a landing page (empty string id), it might not be in contextual
+      // But we check the original id.
+      return !contextual.includes(lastPart);
+    });
+  });
+
+  let topTabs = $derived.by(() => {
+    const manifest = SERVICE_MANIFEST[activeId];
+    if (!manifest) return [];
+    const contextual = manifest.contextualTabs || [];
+    return serviceTabs.filter((t) => {
+      const parts = t.id.split("/");
+      const lastPart = parts[parts.length - 1];
+      return contextual.includes(lastPart);
+    });
+  });
+
   let serviceActiveTab = $derived(
     $page.data.activeTab ||
       $page.url.pathname.split("/").slice(2).join("/") ||
@@ -886,11 +910,11 @@
                         </button>
                       </div>
 
-                      {#if activeId === svc.id && serviceTabs.length > 1}
+                      {#if activeId === svc.id && sidebarTabs.length > 0}
                         <div
                           class="ml-4 flex flex-col border-l border-gray-800 bg-gray-900/30 rounded-r"
                         >
-                          {#each serviceTabs as tab}
+                          {#each sidebarTabs as tab}
                             <button
                               onclick={() => {
                                 handleServiceTabChange(tab.id);
@@ -1097,7 +1121,7 @@
         <div class="flex-1 overflow-hidden relative flex flex-col min-w-0">
           <ServiceLayout
             title={serviceTitle}
-            tabs={serviceTabs}
+            tabs={topTabs}
             activeTab={serviceActiveTab}
             onTabChange={handleServiceTabChange}
           >
