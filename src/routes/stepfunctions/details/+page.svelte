@@ -16,8 +16,6 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
-    import Icon from "$lib/components/Icon.svelte";
-    import { mdiCircle } from "@mdi/js";
 
     let smArn = $derived($page.url.searchParams.get("id") || "");
 

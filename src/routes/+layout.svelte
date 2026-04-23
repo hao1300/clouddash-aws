@@ -1,11 +1,14 @@
 <script lang="ts">
   import "../app.css";
   import { invoke } from "@tauri-apps/api/core";
-  import { onMount, type Snippet } from "svelte";
+  import { onMount, onDestroy, type Snippet } from "svelte";
   import { flip } from "svelte/animate";
   import { fly, fade } from "svelte/transition";
-  import { goto } from "$app/navigation";
+  import { goto, afterNavigate } from "$app/navigation";
   import { page } from "$app/stores";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { mobileState } from "$lib/services/mobile";
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
   import Login from "$lib/components/Login.svelte";
   import Select from "$lib/components/Select.svelte";
@@ -96,6 +99,16 @@
 
   let refreshKey = $state(0);
   let currentLoginId = $state(0);
+
+  // History tracking for mobile back button
+  let historyStack: string[] = [];
+  afterNavigate(({ type, from }) => {
+    if (type === "popstate") {
+      historyStack.pop();
+    } else if (from && from.url.pathname !== window.location.pathname) {
+      historyStack.push(from.url.pathname + from.url.search);
+    }
+  });
 
   // Settings
 
@@ -262,11 +275,30 @@
     );
   }
 
+  let backUnlisten: UnlistenFn | null = null;
   onMount(async () => {
     try {
       os = await invoke("get_os");
     } catch {
       os = "windows";
+    }
+
+    if (os === "android") {
+      invoke("set_back_button_intercept", { enabled: true }).catch(console.error);
+      backUnlisten = await listen("tauri://back-button", async () => {
+        if (mobileState.preventGlobalBack) return;
+
+        if (historyStack.length > 0) {
+          window.history.back();
+        } else {
+          try {
+            const w = await getCurrentWindow();
+            w.close();
+          } catch (e) {
+            console.error("Failed to close window", e);
+          }
+        }
+      });
     }
 
     const initialState = await invoke<{
@@ -382,7 +414,8 @@
     }
 
     if (shouldAutoConnect) {
-      await login(true, initialState.path || null);
+      const isFirstLaunch = !initialState.region && !saved?.region;
+      await login(true, initialState.path || null, isFirstLaunch);
     }
   });
 
@@ -393,7 +426,7 @@
     error = "";
   }
 
-  async function login(silent = false, initialPath: string | null = null) {
+  async function login(silent = false, initialPath: string | null = null, forceProfileRegion = false) {
     const loginId = ++currentLoginId;
     try {
       loading = true;
@@ -488,7 +521,11 @@
         const target = profiles.find((p) => p.profile === selectedProfile);
         if (!target) throw new Error("Profile not found");
 
-        targetRegion = target.region || region || "us-east-1";
+        if (forceProfileRegion && target.region) {
+          region = target.region;
+        }
+
+        targetRegion = region || "us-east-1";
 
         if (target.role_arn && target.source_profile) {
           const source = profiles.find(
@@ -673,6 +710,10 @@
     goto(`/${id}`);
     saveState();
   }
+
+  onDestroy(() => {
+    if (backUnlisten) backUnlisten();
+  });
 </script>
 
 <main
@@ -706,7 +747,7 @@
       }}
       {loading}
       bind:error={error}
-      onLogin={() => login()}
+      onLogin={() => login(false, null, true)}
       onSwitchAuthType={switchAuthType}
       onProfilesSaved={async () => {
         try {
@@ -899,7 +940,7 @@
                         if (window.innerWidth < 640) sideMenuOpen = false;
                         return;
                       }
-                      login();
+                      login(false, null, true);
                       if (window.innerWidth < 640) sideMenuOpen = false;
                     }}
                     options={[

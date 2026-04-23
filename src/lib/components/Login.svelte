@@ -7,6 +7,7 @@
     import Select from "./Select.svelte";
     import Icon from "./Icon.svelte";
     import { mdiClose } from "@mdi/js";
+    import { mobileState } from "$lib/services/mobile";
 
     let {
         os = "",
@@ -90,10 +91,10 @@
         _cameraActive = false;
     });
 
-    // Handle Android back button intercept
+    // Handle Android back button intercept state
     $effect(() => {
         if (os === "android") {
-            invoke("set_back_button_intercept", { enabled: _cameraActive });
+            mobileState.preventGlobalBack = _cameraActive;
         }
     });
 

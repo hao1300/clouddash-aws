@@ -13,7 +13,7 @@ fn set_back_button_intercept(enabled: bool) {
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "C" fn Java_com_clouddash_aws_MainActivity_shouldInterceptBack(
+pub extern "C" fn Java_dev_clouddash_aws_MainActivity_shouldInterceptBack(
     _env: *mut std::ffi::c_void,
     _class: *mut std::ffi::c_void,
 ) -> bool {
@@ -22,7 +22,7 @@ pub extern "C" fn Java_com_clouddash_aws_MainActivity_shouldInterceptBack(
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "C" fn Java_com_clouddash_aws_MainActivity_onBackPressedNative(
+pub extern "C" fn Java_dev_clouddash_aws_MainActivity_onBackPressedNative(
     _env: *mut std::ffi::c_void,
     _class: *mut std::ffi::c_void,
 ) {
