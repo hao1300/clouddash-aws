@@ -988,12 +988,8 @@
             </button>
           </div>
 
-          <div class="sm:hidden flex items-center">
-            {#if titleService.parts.length > 1}
-              <BackButton
-                href={titleService.parts[titleService.parts.length - 2].href}
-              />
-            {/if}
+          <div class="flex items-center">
+            <BackButton />
           </div>
 
           <div
