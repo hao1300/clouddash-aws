@@ -16,6 +16,7 @@
     import DetailLayout from "$lib/components/DetailLayout.svelte";
     import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
     import InsightsQueryEditor from "$lib/components/InsightsQueryEditor.svelte";
+    import Select from "$lib/components/Select.svelte";
 
     let error = $state("");
     let actionMsg = $state("");
@@ -388,47 +389,18 @@
                     >
                     <div class="flex flex-col gap-2">
                         <div class="relative">
-                            <select
-                                id="log-group-select"
-                                class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 appearance-none shadow-sm"
+                            <Select
+                                placeholder="Select log groups to add..."
+                                options={logGroups
+                                    .filter((g) => !selectedLogGroups.includes(g.name))
+                                    .map((g) => g.name)}
                                 value=""
-                                onchange={(e) => {
-                                    const val = e.currentTarget.value;
-                                    if (
-                                        val &&
-                                        !selectedLogGroups.includes(val)
-                                    ) {
-                                        selectedLogGroups = [
-                                            ...selectedLogGroups,
-                                            val,
-                                        ];
+                                onchange={(val) => {
+                                    if (val && !selectedLogGroups.includes(val)) {
+                                        selectedLogGroups = [...selectedLogGroups, val];
                                     }
-                                    e.currentTarget.value = "";
                                 }}
-                            >
-                                <option value="" disabled selected
-                                    >Select log groups to add...</option
-                                >
-                                {#if lgLoading}
-                                    <option value="" disabled>Loading...</option
-                                    >
-                                {/if}
-                                {#each logGroups.filter((g) => !selectedLogGroups.includes(g.name)) as lg}
-                                    <option value={lg.name}>{lg.name}</option>
-                                {/each}
-                            </select>
-                            <div
-                                class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"
-                            >
-                                <svg
-                                    class="fill-current h-4 w-4"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 20 20"
-                                    ><path
-                                        d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
-                                    /></svg
-                                >
-                            </div>
+                            />
                         </div>
                         {#if selectedLogGroups.length > 0}
                             <div class="flex flex-wrap gap-2">
@@ -437,7 +409,7 @@
                                         class="inline-flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-full px-3 py-1 text-xs text-gray-300 shadow-sm"
                                     >
                                         <span
-                                            class="truncate max-w-[250px]"
+                                            class="whitespace-normal break-all line-clamp-3 overflow-hidden max-w-[300px]"
                                             title={group}>{group}</span
                                         >
                                         <button

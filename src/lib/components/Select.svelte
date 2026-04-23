@@ -72,7 +72,7 @@
         onclick={toggle}
         class="w-full flex items-center justify-between gap-2 bg-gray-800 rounded border border-gray-700 hover:border-gray-600 transition-all text-left {small ? 'p-1.5 text-[10px]' : 'p-2 text-sm'} {mono || selectedOption?.fontMono ? 'font-mono' : ''}"
     >
-        <span class="truncate {selectedOption || primary ? 'text-blue-400' : 'text-gray-500'}">
+        <span class="flex-1 whitespace-normal break-all line-clamp-3 overflow-hidden {selectedOption || primary ? 'text-blue-400' : 'text-gray-500'}">
             {selectedOption ? selectedOption.label : placeholder}
         </span>
         <Icon path={mdiChevronDown} size={small ? 14 : 16} class="{selectedOption || primary ? 'text-blue-400' : 'text-gray-500'} shrink-0 transition-transform {isOpen ? 'rotate-180' : ''}" />
@@ -88,7 +88,7 @@
                     onclick={() => select(opt.value)}
                     class="w-full text-left px-3 py-2 text-xs hover:bg-blue-600/20 hover:text-blue-400 transition-colors flex items-center justify-between {opt.value === value ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-300'} {mono || opt.fontMono ? 'font-mono' : ''}"
                 >
-                    <span class="truncate">{opt.label}</span>
+                    <span class="flex-1 whitespace-normal break-all line-clamp-3 overflow-hidden">{opt.label}</span>
                     {#if opt.value === value}
                         <div class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></div>
                     {/if}
