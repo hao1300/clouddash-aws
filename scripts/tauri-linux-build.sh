@@ -17,7 +17,8 @@ echo "Building CloudDash version $VERSION..."
 npm run tauri-build
 
 # Define paths
-RELEASE_DIR="/mnt/c/CS/aws-console-releases"
+RELEASE_ROOT="/mnt/c/CS/aws-console-releases"
+RELEASE_DIR="$RELEASE_ROOT/downloads/linux"
 BUNDLE_DIR="src-tauri/target/release/bundle"
 
 echo "Creating release directory: $RELEASE_DIR"
@@ -49,3 +50,4 @@ echo "--------------------------------------------------"
 echo "Build complete!"
 echo "Packages available in $RELEASE_DIR:"
 ls -lh "$RELEASE_DIR" | grep "$VERSION"
+
