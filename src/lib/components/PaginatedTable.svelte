@@ -194,10 +194,10 @@
         </div>
 
         <!-- Table Core -->
-        <div class="flex-1 overflow-auto bg-gray-950">
-            <table class="w-full text-left border-collapse text-sm">
-                <thead class="sticky top-0 bg-gray-900 shadow z-10">
-                    <tr>
+        <div class="flex-1 overflow-auto bg-gray-950 p-3 sm:p-0">
+            <table class="w-full text-left border-collapse text-sm block sm:table">
+                <thead class="sticky top-0 bg-gray-900 shadow z-10 hidden sm:table-header-group">
+                    <tr class="block sm:table-row">
                         {#each columns as col}
                             <th
                                 class="relative border-b border-gray-800 px-4 py-2 font-semibold text-gray-300 group {col.sortable !==
@@ -244,23 +244,23 @@
                         {/if}
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="block sm:table-row-group">
                     {#if loading && processedItems.length === 0}
-                        <tr>
+                        <tr class="block sm:table-row">
                             <td
                                 colspan={columns.length +
                                     (actionsSnippet ? 1 : 0)}
-                                class="p-8 text-center text-gray-500 italic"
+                                class="block sm:table-cell p-8 text-center text-gray-500 italic"
                             >
                                 Loading...
                             </td>
                         </tr>
                     {:else if processedItems.length === 0}
-                        <tr>
+                        <tr class="block sm:table-row">
                             <td
                                 colspan={columns.length +
                                     (actionsSnippet ? 1 : 0)}
-                                class="p-8 text-center text-gray-500"
+                                class="block sm:table-cell p-8 text-center text-gray-500"
                             >
                                 No results found.
                             </td>
@@ -268,8 +268,8 @@
                     {:else}
                         {#each processedItems as item}
                             <tr
-                                class="border-b border-gray-800/50 hover:bg-gray-900/30 transition-colors {onRowClick
-                                    ? 'cursor-pointer text-blue-400 hover:text-blue-300'
+                                class="flex flex-col sm:table-row border border-gray-800/80 sm:border-0 sm:border-b hover:bg-gray-800/50 transition-colors mb-3 sm:mb-0 rounded-lg sm:rounded-none bg-gray-900/40 sm:bg-transparent p-3 sm:p-0 {onRowClick
+                                    ? 'cursor-pointer text-blue-400 sm:text-inherit hover:text-blue-300'
                                     : 'text-gray-300'}"
                                 onclick={() => onRowClick && onRowClick(item)}
                                 onkeydown={(e) => {
@@ -280,56 +280,61 @@
                             >
                                 {#each columns as col}
                                     <td
-                                        class="px-4 py-2 truncate text-inherit {columnWidths[
+                                        class="flex sm:table-cell items-center px-1 sm:px-4 py-1.5 sm:py-2 text-inherit border-b border-gray-800/30 sm:border-0 last:border-0 {columnWidths[
                                             col.key
                                         ]
                                             ? ''
-                                            : 'max-w-xs'}"
+                                            : 'sm:max-w-xs'}"
                                         style={columnWidths[col.key]
                                             ? `width: ${columnWidths[col.key]}px; min-width: ${columnWidths[col.key]}px; max-width: ${columnWidths[col.key]}px;`
                                             : ""}
                                     >
-                                        {#if col.onClick}
-                                            <button
-                                                onclick={() =>
-                                                    col.onClick!(item)}
-                                                class="text-blue-400 hover:text-blue-300 hover:underline text-left font-medium transition-colors truncate max-w-full inline-block align-bottom"
-                                            >
-                                                {col.format
-                                                    ? col.format(
-                                                          (item as any)[
-                                                              col.key
-                                                          ],
-                                                          item,
-                                                      )
-                                                    : String(
-                                                          (item as any)[
-                                                              col.key
-                                                          ] ?? "-",
-                                                      )}
-                                            </button>
-                                        {:else if col.renderCell}
-                                            {@render col.renderCell((item as any)[col.key], item)}
-                                        {:else if cellSnippet}
-                                            {@render cellSnippet(
-                                                col.key,
-                                                (item as any)[col.key],
-                                                item,
-                                            )}
-                                        {:else if col.format}
-                                            {col.format(
-                                                (item as any)[col.key],
-                                                item,
-                                            )}
-                                        {:else}
-                                            {String(
-                                                (item as any)[col.key] ?? "-",
-                                            )}
-                                        {/if}
+                                        <span class="inline-block sm:hidden text-gray-500 text-xs font-semibold mr-3 w-1/3 shrink-0">{col.label}</span>
+                                        <div class="truncate flex-1">
+                                            {#if col.onClick}
+                                                <button
+                                                    onclick={(e) => {
+                                                        e.stopPropagation();
+                                                        col.onClick!(item);
+                                                    }}
+                                                    class="text-blue-400 hover:text-blue-300 hover:underline text-left font-medium transition-colors truncate max-w-full inline-block align-bottom"
+                                                >
+                                                    {col.format
+                                                        ? col.format(
+                                                              (item as any)[
+                                                                  col.key
+                                                              ],
+                                                              item,
+                                                          )
+                                                        : String(
+                                                              (item as any)[
+                                                                  col.key
+                                                              ] ?? "-",
+                                                          )}
+                                                </button>
+                                            {:else if col.renderCell}
+                                                {@render col.renderCell((item as any)[col.key], item)}
+                                            {:else if cellSnippet}
+                                                {@render cellSnippet(
+                                                    col.key,
+                                                    (item as any)[col.key],
+                                                    item,
+                                                )}
+                                            {:else if col.format}
+                                                {col.format(
+                                                    (item as any)[col.key],
+                                                    item,
+                                                )}
+                                            {:else}
+                                                {String(
+                                                    (item as any)[col.key] ?? "-",
+                                                )}
+                                            {/if}
+                                        </div>
                                     </td>
                                 {/each}
                                 {#if actionsSnippet}
-                                    <td class="px-4 py-2 text-right">
+                                    <td class="flex sm:table-cell justify-end px-1 sm:px-4 py-2 mt-2 sm:mt-0 border-t border-gray-800/50 sm:border-0 sm:text-right">
                                         {@render actionsSnippet(item)}
                                     </td>
                                 {/if}
