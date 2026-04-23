@@ -13,6 +13,7 @@
     "tauri-build": "tauri build",
     "tauri-android-dev": "tauri android dev --config src-tauri/tauri.dev.conf.json",
     "tauri-android-build": "tauri android build",
+    "tauri-linux-build": "bash scripts/tauri-linux-build.sh",
     "tauri": "tauri"
   },
   "license": "MIT",
