@@ -64,13 +64,13 @@
                 key: "UserName",
                 onClick: (item) => goto(`/iam/users/${item.UserName}`)
             },
-            { label: "User ID", key: "UserId" },
-            { label: "ARN", key: "Arn" },
             {
                 label: "Creation Date",
                 key: "CreateDate",
                 format: (v) => (v ? new Date(v).toLocaleString() : ""),
             },
+            { label: "User ID", key: "UserId" },
+            { label: "ARN", key: "Arn" },
         ]}
     />
 </div>

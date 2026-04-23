@@ -81,15 +81,15 @@
                 label: "ID",
                 onClick: (item) => goto(`/cloudfront/${encodeURIComponent(item.id)}`),
             },
-            { key: "domain", label: "Domain Name" },
             { key: "aliases", label: "Alternate Domain Names" },
+            { key: "comment", label: "Description", format: (v) => v || "-" },
+            { key: "domain", label: "Domain Name" },
             {
                 key: "enabled",
                 label: "State",
                 renderCell: stateCell,
             },
             { key: "status", label: "Status" },
-            { key: "comment", label: "Description", format: (v) => v || "-" },
         ]}
     />
 </div>

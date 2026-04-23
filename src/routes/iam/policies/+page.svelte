@@ -64,13 +64,13 @@
                 key: "PolicyName",
                 onClick: (item) => goto(`/iam/policies/${encodeURIComponent(item.Arn || "")}`)
             },
-            { label: "Policy ID", key: "PolicyId" },
-            { label: "ARN", key: "Arn" },
             {
                 label: "Update Date",
                 key: "UpdateDate",
                 format: (v) => (v ? new Date(v).toLocaleString() : ""),
             },
+            { label: "Policy ID", key: "PolicyId" },
+            { label: "ARN", key: "Arn" },
         ]}
     />
 </div>

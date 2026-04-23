@@ -103,14 +103,6 @@
                     ),
             },
             {
-                label: "Application",
-                key: "ApplicationName",
-                onClick: (item) =>
-                    goto(
-                        `/elasticbeanstalk/application/${encodeURIComponent(item.ApplicationName)}`,
-                    ),
-            },
-            {
                 label: "Status",
                 key: "Status",
                 renderCell: statusCell,
@@ -119,6 +111,14 @@
                 label: "Health",
                 key: "Health",
                 renderCell: healthCell,
+            },
+            {
+                label: "Application",
+                key: "ApplicationName",
+                onClick: (item) =>
+                    goto(
+                        `/elasticbeanstalk/application/${encodeURIComponent(item.ApplicationName)}`,
+                    ),
             },
         ]}
     />

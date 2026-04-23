@@ -71,13 +71,13 @@
                 key: "FunctionName",
                 onClick: (item) => handleSelectFn(item),
             },
-            { label: "Runtime", key: "Runtime" },
-            { label: "Memory (MB)", key: "MemorySize" },
             {
                 label: "Last Modified",
                 key: "LastModified",
                 format: (v) => (v ? new Date(v).toLocaleString() : ""),
             },
+            { label: "Runtime", key: "Runtime" },
+            { label: "Memory (MB)", key: "MemorySize" },
         ]}
     />
 </div>
