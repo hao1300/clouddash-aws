@@ -15,7 +15,7 @@
       name: "Windows",
       icon: MonitorIcon,
       type: "Desktop App",
-      link: "https://static.clouddash.dev/downloads/window/CloudDash%20AWS_0.8.1_x64-setup.exe",
+      link: "https://static.clouddash.dev/downloads/windows/clouddash-0.9.0-setup.exe",
       instructions:
         "Stable installer for Windows 10/11. Includes auto-updates and system tray support.",
     },
@@ -23,17 +23,25 @@
       name: "Android",
       icon: SmartphoneIcon,
       type: "Mobile APK",
-      link: "https://static.clouddash.dev/downloads/android/clouddash_0.8.2.apk",
+      link: "https://static.clouddash.dev/downloads/android/clouddash-0.9.0.apk",
       instructions:
         "Direct download for Android devices. Optimized for tablets and foldable phones.",
+    },
+    {
+      name: "Linux",
+      icon: MonitorIcon,
+      type: "AppImage",
+      link: "https://static.clouddash.dev/downloads/linux/clouddash-0.9.0.AppImage",
+      instructions:
+        "Universal Linux AppImage. Supports most distributions including Ubuntu, Fedora, and Debian.",
     },
   ];
 
   const upcoming = [
     { name: "MacOS", icon: MonitorIcon },
     { name: "iOS", icon: SmartphoneIcon },
-    { name: "Linux", icon: MonitorIcon },
   ];
+
 </script>
 
 <section class="download-header py-4 text-center">
