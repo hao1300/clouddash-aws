@@ -370,14 +370,14 @@
                                             : ""}
                                     >
                                         <span class="inline-block sm:hidden text-gray-500 text-xs font-semibold mr-3 w-1/3 shrink-0">{col.label}</span>
-                                        <div class="{col.wrap ? 'whitespace-normal break-all' : 'truncate'} flex-1">
+                                        <div class="flex-1 whitespace-normal break-all line-clamp-3 overflow-hidden">
                                             {#if col.onClick}
                                                 <button
                                                     onclick={(e) => {
                                                         e.stopPropagation();
                                                         col.onClick!(item);
                                                     }}
-                                                    class="text-blue-400 hover:text-blue-300 hover:underline text-left font-medium transition-colors truncate max-w-full inline-block align-bottom"
+                                                    class="text-blue-400 hover:text-blue-300 hover:underline text-left font-medium transition-colors w-full block whitespace-normal break-all line-clamp-3 overflow-hidden"
                                                 >
                                                     {col.format
                                                         ? col.format(

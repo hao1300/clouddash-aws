@@ -49,3 +49,10 @@
 .hljs-number { color: #fdba74; }
 .hljs-literal { color: #c4b5fd; }
 .hljs-punctuation { color: #6b7280; }
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;  
+  overflow: hidden;
+}
