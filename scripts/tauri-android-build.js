@@ -25,25 +25,24 @@ async function uploadIfExists(src, destPath) {
     return null;
 }
 
-async function findAndUpload(searchDir, pattern, destPath) {
-    if (!fs.existsSync(searchDir)) return null;
-    
-    const findFiles = (dir) => {
-        let results = [];
-        const list = fs.readdirSync(dir);
-        list.forEach(file => {
-            const filePath = path.join(dir, file);
-            const stat = fs.statSync(filePath);
-            if (stat && stat.isDirectory()) {
-                results = results.concat(findFiles(filePath));
-            } else if (file.includes(pattern)) {
-                results.push(filePath);
-            }
-        });
-        return results;
-    };
+function findFiles(dir, pattern) {
+    if (!fs.existsSync(dir)) return [];
+    let results = [];
+    const list = fs.readdirSync(dir);
+    list.forEach(file => {
+        const filePath = path.join(dir, file);
+        const stat = fs.statSync(filePath);
+        if (stat && stat.isDirectory()) {
+            results = results.concat(findFiles(filePath, pattern));
+        } else if (file.includes(pattern)) {
+            results.push(filePath);
+        }
+    });
+    return results;
+}
 
-    const files = findFiles(searchDir);
+async function findAndUpload(searchDir, pattern, destPath) {
+    const files = findFiles(searchDir, pattern);
     if (files.length > 0) {
         await uploadToR2(files[0], destPath);
         return files[0];
@@ -73,18 +72,18 @@ async function main() {
             }
         }
 
-        // Handle AAB
+        // Handle AAB (Skip upload to R2, just copy to root)
         const aabFileName = `clouddash-${version}.aab`;
-        const aabDestPath = `store/${aabFileName}`;
-        let foundAab = await uploadIfExists(AAB_PATH, aabDestPath);
+        let foundAab = fs.existsSync(AAB_PATH) ? AAB_PATH : null;
         if (!foundAab) {
             console.warn(`Warning: No AAB found at ${AAB_PATH}, searching for alternatives...`);
-            foundAab = await findAndUpload('src-tauri/gen/android', '-release.aab', aabDestPath);
+            const files = findFiles('src-tauri/gen/android', '-release.aab');
+            if (files.length > 0) foundAab = files[0];
         }
 
         if (foundAab) {
             fs.copyFileSync(foundAab, aabFileName);
-            console.log(`Copied AAB to root: ${aabFileName}`);
+            console.log(`Copied AAB to root: ${aabFileName} (Skipped R2 upload)`);
         } else {
             console.warn('Warning: Could not find any release AAB');
         }
