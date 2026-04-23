@@ -1,6 +1,7 @@
 <script lang="ts">
     import Icon from "$lib/components/Icon.svelte";
     import { mdiLoading, mdiCircle } from "@mdi/js";
+    import { COLORS } from "$lib/constants";
 
     import {
         DescribeApplicationVersionsCommand,
@@ -153,8 +154,8 @@
                         path={mdiCircle}
                         size={10}
                         color={version.Status === "Processed"
-                            ? "#22c55e"
-                            : "#eab308"}
+                            ? COLORS.SUCCESS
+                            : COLORS.CAUTION}
                     />
                     {version.Status}
                 </div>

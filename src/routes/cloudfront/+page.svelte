@@ -1,6 +1,7 @@
 <script lang="ts">
     import Icon from "$lib/components/Icon.svelte";
     import { mdiCircle } from "@mdi/js";
+    import { COLORS } from "$lib/constants";
 
     import { ListDistributionsCommand } from "@aws-sdk/client-cloudfront";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
@@ -51,7 +52,7 @@
 
 {#snippet stateCell(v: boolean)}
     <div class="flex items-center gap-1.5">
-        <Icon path={mdiCircle} size={10} color={v ? "#22c55e" : "#ef4444"} />
+        <Icon path={mdiCircle} size={10} color={v ? COLORS.SUCCESS : COLORS.ERROR} />
         <span>{v ? "Enabled" : "Disabled"}</span>
     </div>
 {/snippet}

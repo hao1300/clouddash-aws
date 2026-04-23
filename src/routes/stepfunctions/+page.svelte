@@ -1,6 +1,7 @@
 <script lang="ts">
     import Icon from "$lib/components/Icon.svelte";
     import { mdiCircle } from "@mdi/js";
+    import { COLORS } from "$lib/constants";
 
     import {
         ListStateMachinesCommand,
@@ -55,7 +56,7 @@
         <Icon
             path={mdiCircle}
             size={10}
-            color={v === "STANDARD" ? "#3b82f6" : "#f97316"}
+            color={v === "STANDARD" ? COLORS.INFO : COLORS.WARNING}
         />
         <span class="capitalize">{v.toLowerCase()}</span>
     </div>

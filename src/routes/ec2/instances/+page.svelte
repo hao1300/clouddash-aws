@@ -1,4 +1,8 @@
 <script lang="ts">
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiCircle } from "@mdi/js";
+    import { COLORS } from "$lib/constants";
+
     import {
         DescribeInstancesCommand,
         StartInstancesCommand,
@@ -91,6 +95,21 @@
     }
 </script>
 
+{#snippet stateCell(v: string)}
+    <div class="flex items-center gap-1.5">
+        <Icon
+            path={mdiCircle}
+            size={10}
+            color={v === "running"
+                ? COLORS.SUCCESS
+                : v === "stopped"
+                  ? COLORS.ERROR
+                  : COLORS.WARNING}
+        />
+        <span class="capitalize">{v}</span>
+    </div>
+{/snippet}
+
 <div class="h-full relative overflow-hidden flex flex-col">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
@@ -119,7 +138,7 @@
                 {
                     label: "State",
                     key: "state",
-                    format: (v) => v.toUpperCase(),
+                    renderCell: stateCell,
                 },
                 { label: "Public IP", key: "publicIp" },
                 { label: "Private IP", key: "privateIp" },
@@ -138,7 +157,7 @@
                             }
                         }}
                     >
-                        <option value="" disabled selected>Actions ▾</option>
+                        <option value="" disabled selected>Actions</option>
                         {#if item.state === "stopped"}
                             <option value="start">Start</option>
                         {:else if item.state === "running"}

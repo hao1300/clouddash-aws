@@ -1,6 +1,7 @@
 <script lang="ts">
     import Icon from "$lib/components/Icon.svelte";
     import { mdiCircle } from "@mdi/js";
+    import { COLORS } from "$lib/constants";
 
     import {
         DescribeEnvironmentsCommand,
@@ -48,7 +49,7 @@
         <Icon
             path={mdiCircle}
             size={10}
-            color={v === "Ready" ? "#22c55e" : "#f97316"}
+            color={v === "Ready" ? COLORS.SUCCESS : COLORS.WARNING}
         />
         <span>{v}</span>
     </div>
@@ -60,12 +61,12 @@
             path={mdiCircle}
             size={10}
             color={v === "Green"
-                ? "#22c55e"
+                ? COLORS.SUCCESS
                 : v === "Yellow"
-                  ? "#eab308"
+                  ? COLORS.CAUTION
                   : v === "Red"
-                    ? "#ef4444"
-                    : "#9ca3af"}
+                    ? COLORS.ERROR
+                    : COLORS.GRAY}
         />
         <span>{v || "Unknown"}</span>
     </div>

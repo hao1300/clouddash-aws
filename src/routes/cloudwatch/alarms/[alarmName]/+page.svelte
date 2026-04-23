@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { COLORS } from "$lib/constants";
+
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
@@ -294,10 +296,10 @@
                                     width="{segment.width}%"
                                     height="100%"
                                     fill={segment.state === "ALARM"
-                                        ? "#ef4444"
+                                        ? COLORS.ERROR
                                         : segment.state === "OK"
-                                          ? "#22c55e"
-                                          : "#6b7280"}
+                                          ? COLORS.SUCCESS
+                                          : COLORS.GRAY}
                                     opacity="0.8"
                                     class="transition-opacity hover:opacity-100"
                                 >

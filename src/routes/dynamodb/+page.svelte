@@ -14,6 +14,7 @@
     import { titleService } from "$lib/services/title.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiRefresh, mdiCircle } from "@mdi/js";
+    import { COLORS } from "$lib/constants";
 
     let error = $state("");
     let loading = $state(false);
@@ -216,7 +217,7 @@
 
 {#snippet statusCell(v: string)}
     <div class="flex items-center gap-1.5">
-        <Icon path={mdiCircle} size={10} class={v === "ACTIVE" ? "text-green-500" : "text-gray-500"} />
+        <Icon path={mdiCircle} size={10} color={v === "ACTIVE" ? COLORS.SUCCESS : COLORS.GRAY} />
         <span>{v}</span>
     </div>
 {/snippet}

@@ -8,6 +8,7 @@
     import { goto } from "$app/navigation";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiCircle } from "@mdi/js";
+    import { COLORS } from "$lib/constants";
 
     let stacks = $state<Stack[]>([]);
     let loading = $state(false);
@@ -52,10 +53,10 @@
             path={mdiCircle}
             size={10}
             color={v?.includes("COMPLETE")
-                ? "#22c55e"
+                ? COLORS.SUCCESS
                 : v?.includes("FAILED") || v?.includes("ROLLBACK")
-                  ? "#ef4444"
-                  : "#eab308"}
+                  ? COLORS.ERROR
+                  : COLORS.CAUTION}
         />
         <span>{v}</span>
     </div>
