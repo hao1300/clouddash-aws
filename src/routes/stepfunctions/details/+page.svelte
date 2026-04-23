@@ -12,6 +12,8 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiCircle } from "@mdi/js";
 
     let smArn = $derived($page.url.searchParams.get("id") || "");
 
@@ -124,6 +126,21 @@
     }
 </script>
 
+{#snippet statusCell(v: string)}
+    <div class="flex items-center gap-1.5">
+        <Icon
+            path={mdiCircle}
+            size={10}
+            color={v === "SUCCEEDED"
+                ? "#22c55e"
+                : v === "RUNNING"
+                  ? "#3b82f6"
+                  : "#ef4444"}
+        />
+        <span>{v}</span>
+    </div>
+{/snippet}
+
 <div class="h-full flex flex-col bg-gray-950 overflow-hidden relative">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
@@ -193,12 +210,7 @@
                         {
                             label: "Status",
                             key: "status",
-                            format: (v) =>
-                                v === "SUCCEEDED"
-                                    ? "🟢 SUCCEEDED"
-                                    : v === "RUNNING"
-                                      ? "🔵 RUNNING"
-                                      : "🔴 " + v,
+                            renderCell: statusCell,
                         },
                         {
                             label: "Start Date",

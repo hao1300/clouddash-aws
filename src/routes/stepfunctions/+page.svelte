@@ -1,4 +1,7 @@
 <script lang="ts">
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiCircle } from "@mdi/js";
+
     import {
         ListStateMachinesCommand,
         type StateMachineListItem,
@@ -47,6 +50,18 @@
     }
 </script>
 
+{#snippet typeCell(v: string)}
+    <div class="flex items-center gap-1.5">
+        <Icon
+            path={mdiCircle}
+            size={10}
+            color={v === "STANDARD" ? "#3b82f6" : "#f97316"}
+        />
+        <span class="capitalize">{v.toLowerCase()}</span>
+    </div>
+{/snippet}
+
+
 <div class="h-full relative overflow-hidden flex flex-col">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
@@ -78,7 +93,8 @@
                 label: "Type",
                 key: "type",
                 format: (v) =>
-                    v === "STANDARD" ? "🔵 Standard" : "🟠 Express",
+                    v === "STANDARD" ? "Standard" : "Express"
+,
             },
             {
                 label: "Creation Date",

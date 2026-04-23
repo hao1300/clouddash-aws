@@ -1,4 +1,7 @@
 <script lang="ts">
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiLoading, mdiCircle } from "@mdi/js";
+
     import {
         DescribeApplicationVersionsCommand,
         type ApplicationVersionDescription,
@@ -119,7 +122,7 @@
                     title={!version.SourceBundle ? "No source bundle available" : "Download Source Bundle from S3"}
                 >
                     {#if downloading}
-                        <span class="animate-spin mr-2">⟳</span>
+                        <Icon path={mdiLoading} size={14} class="animate-spin mr-2" />
                     {/if}
                     Download Source Bundle
                 </button>
@@ -142,10 +145,17 @@
                     Status
                 </div>
                 <div
-                    class="text-base font-bold {version.Status === 'Processed' || version.Status === 'Unprocessed'
+                    class="text-base font-bold flex items-center gap-1.5 {version.Status === 'Processed' || version.Status === 'Unprocessed'
                         ? 'text-green-400'
                         : 'text-yellow-400'}"
                 >
+                    <Icon
+                        path={mdiCircle}
+                        size={10}
+                        color={version.Status === "Processed"
+                            ? "#22c55e"
+                            : "#eab308"}
+                    />
                     {version.Status}
                 </div>
             </div>

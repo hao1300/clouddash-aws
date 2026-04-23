@@ -1,4 +1,7 @@
 <script lang="ts">
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiCircle } from "@mdi/js";
+
     import {
         DescribeEnvironmentsCommand,
         type EnvironmentDescription,
@@ -39,6 +42,34 @@
         }
     }
 </script>
+
+{#snippet statusCell(v: string)}
+    <div class="flex items-center gap-1.5">
+        <Icon
+            path={mdiCircle}
+            size={10}
+            color={v === "Ready" ? "#22c55e" : "#f97316"}
+        />
+        <span>{v}</span>
+    </div>
+{/snippet}
+
+{#snippet healthCell(v: string)}
+    <div class="flex items-center gap-1.5">
+        <Icon
+            path={mdiCircle}
+            size={10}
+            color={v === "Green"
+                ? "#22c55e"
+                : v === "Yellow"
+                  ? "#eab308"
+                  : v === "Red"
+                    ? "#ef4444"
+                    : "#9ca3af"}
+        />
+        <span>{v || "Unknown"}</span>
+    </div>
+{/snippet}
 
 <div class="h-full relative overflow-hidden flex flex-col">
     {#if error}<div
@@ -81,19 +112,12 @@
             {
                 label: "Status",
                 key: "Status",
-                format: (v) => (v === "Ready" ? "🟢 Ready" : "🟠 " + v),
+                renderCell: statusCell,
             },
             {
                 label: "Health",
                 key: "Health",
-                format: (v) =>
-                    v === "Green"
-                        ? "🟢 Green"
-                        : v === "Yellow"
-                          ? "🟡 Yellow"
-                          : v === "Red"
-                            ? "🔴 Red"
-                            : "⚪ " + (v || "Unknown"),
+                renderCell: healthCell,
             },
         ]}
     />

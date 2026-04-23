@@ -1,4 +1,7 @@
 <script lang="ts">
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiCircle } from "@mdi/js";
+
     import { ListDistributionsCommand } from "@aws-sdk/client-cloudfront";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
@@ -46,6 +49,13 @@
     }
 </script>
 
+{#snippet stateCell(v: boolean)}
+    <div class="flex items-center gap-1.5">
+        <Icon path={mdiCircle} size={10} color={v ? "#22c55e" : "#ef4444"} />
+        <span>{v ? "Enabled" : "Disabled"}</span>
+    </div>
+{/snippet}
+
 <div class="h-full relative overflow-hidden flex flex-col">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
@@ -75,7 +85,7 @@
             {
                 key: "enabled",
                 label: "State",
-                format: (v) => (v ? "🟢 Enabled" : "🔴 Disabled"),
+                renderCell: stateCell,
             },
             { key: "status", label: "Status" },
             { key: "comment", label: "Description", format: (v) => v || "-" },

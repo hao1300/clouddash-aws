@@ -1,4 +1,7 @@
 <script lang="ts">
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiLoading, mdiArrowUp, mdiArrowDown } from "@mdi/js";
+
     import {
         DescribeLogGroupsCommand,
         StartQueryCommand,
@@ -696,7 +699,9 @@
                     <div
                         class="h-64 flex flex-col items-center justify-center text-gray-400 text-sm"
                     >
-                        <div class="animate-spin text-2xl mb-4">⟳</div>
+                        <div class="flex flex-col items-center justify-center">
+                            <Icon path={mdiLoading} size={32} class="animate-spin mb-4 text-blue-500" />
+                        </div>
                         Executing Query... This may take a moment.
                     </div>
                 {:else if logResults.length > 0}
@@ -713,11 +718,7 @@
                                         <div class="flex items-center gap-1">
                                             {col}
                                             {#if sortColumn === col}
-                                                <span class="text-blue-400"
-                                                    >{sortDirection === "asc"
-                                                        ? "↑"
-                                                        : "↓"}</span
-                                                >
+                                                <Icon path={sortDirection === "asc" ? mdiArrowUp : mdiArrowDown} size={12} />
                                             {/if}
                                         </div>
                                     </th>

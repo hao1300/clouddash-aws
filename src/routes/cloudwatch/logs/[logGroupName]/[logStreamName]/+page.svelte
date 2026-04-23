@@ -7,7 +7,7 @@
     import { aws } from "$lib/services/aws.svelte";
     import { titleService } from "$lib/services/title.svelte";
     import Icon from "$lib/components/Icon.svelte";
-    import { mdiRefresh } from "@mdi/js";
+    import { mdiRefresh, mdiArrowUp, mdiArrowDown, mdiLoading } from "@mdi/js";
 
     import { untrack } from "svelte";
 
@@ -260,7 +260,7 @@
                     <div
                         class="h-40 flex items-center justify-center text-gray-400 text-sm animate-pulse"
                     >
-                        <Icon path={mdiRefresh} size={14} class="animate-spin mr-2" /> Loading events...
+                        <Icon path={mdiLoading} size={14} class="animate-spin mr-2" /> Loading events...
                     </div>
                 {:else if logEvents.length === 0}
                     <div
@@ -281,9 +281,9 @@
                             class="mb-2 text-xs font-bold text-blue-400 hover:text-blue-300 transition disabled:opacity-30 disabled:cursor-not-allowed bg-gray-900 border border-gray-800 rounded px-6 py-2 shadow-sm flex items-center gap-2"
                         >
                             {#if loadingDirection === "prev"}
-                                <Icon path={mdiRefresh} size={14} class="animate-spin" /> Loading...
+                                <Icon path={mdiLoading} size={14} class="animate-spin" /> Loading...
                             {:else}
-                                ↑ Load older events
+                                <Icon path={mdiArrowUp} size={14} /> Load older events
                             {/if}
                         </button>
 
@@ -313,9 +313,9 @@
                             class="mt-4 text-xs font-bold text-blue-400 hover:text-blue-300 transition disabled:opacity-30 disabled:cursor-not-allowed bg-gray-900 border border-gray-800 rounded px-6 py-2 shadow-sm flex items-center gap-2"
                         >
                             {#if loadingDirection === "next"}
-                                <Icon path={mdiRefresh} size={14} class="animate-spin" /> Loading...
+                                <Icon path={mdiLoading} size={14} class="animate-spin" /> Loading...
                             {:else}
-                                Load newer events ↓
+                                Load newer events <Icon path={mdiArrowDown} size={14} />
                             {/if}
                         </button>
                     </div>

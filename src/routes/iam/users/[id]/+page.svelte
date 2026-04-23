@@ -1,4 +1,7 @@
 <script lang="ts">
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiChevronRight } from "@mdi/js";
+
     import {
         GetUserCommand,
         ListGroupsForUserCommand,
@@ -187,7 +190,7 @@
                                 {#each inlinePolicies as p}
                                     <button onclick={() => { editInlineName = p; showInlineModal = true; }} class="text-left bg-gray-950/50 hover:bg-gray-800 border border-gray-800 hover:border-blue-500/50 p-3 rounded group transition flex justify-between items-center">
                                         <span class="text-sm text-blue-400 group-hover:text-blue-300 transition-colors font-medium">{p}</span>
-                                        <span class="text-xs text-gray-500 group-hover:text-gray-300">Edit ▸</span>
+                                        <span class="text-xs text-gray-500 group-hover:text-gray-300 flex items-center gap-1">Edit <Icon path={mdiChevronRight} size={12} /></span>
                                     </button>
                                 {/each}
                             </div>

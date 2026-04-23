@@ -1,4 +1,7 @@
 <script lang="ts">
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiLoading } from "@mdi/js";
+
     import {
         DescribeEnvironmentsCommand,
         RestartAppServerCommand,
@@ -329,7 +332,7 @@
                         Environment Metrics
                     </h3>
                     {#if metricsLoading}
-                        <span class="animate-spin text-gray-500 text-xs">⟳</span>
+                        <Icon path={mdiLoading} size={14} class="animate-spin text-gray-500" />
                     {/if}
                 </div>
                 <select

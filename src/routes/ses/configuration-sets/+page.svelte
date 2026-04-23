@@ -1,4 +1,7 @@
 <script lang="ts">
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiLoading } from "@mdi/js";
+
     import {
         ListConfigurationSetsCommand,
         CreateConfigurationSetCommand,
@@ -140,7 +143,7 @@
                 disabled={creating}
                 class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-bold transition flex items-center gap-2"
             >
-                {#if creating}<span class="animate-spin">⟳</span>{/if} Create
+                {#if creating}<span class="animate-spin"><Icon path={mdiLoading} class="animate-spin" size={14} /></span>{/if} Create
             </button>
         </div>
     </div>

@@ -1,4 +1,7 @@
 <script lang="ts">
+    import Icon from "$lib/components/Icon.svelte";
+    import { mdiLoading } from "@mdi/js";
+
     import {
         DescribeInstancesCommand,
         StartInstancesCommand,
@@ -211,7 +214,7 @@
                     }
                 }}
             >
-                <option value="" disabled selected>Actions ▾</option>
+                <option value="" disabled selected>Actions</option>
                 {#if instance.state === "stopped"}
                     <option value="start">Start</option>
                 {:else if instance.state === "running"}
@@ -330,7 +333,7 @@
                         CloudWatch Metrics
                     </h3>
                     {#if metricsLoading}
-                        <span class="animate-spin text-gray-500 text-xs">⟳</span>
+                        <Icon path={mdiLoading} size={14} class="animate-spin text-gray-500" />
                     {/if}
                 </div>
                 <select
