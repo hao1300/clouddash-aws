@@ -1,4 +1,5 @@
 <script lang="ts">
+    import TabBar from "$lib/components/TabBar.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiCircle } from "@mdi/js";
     import { COLORS } from "$lib/constants";
@@ -47,7 +48,16 @@
         }
     }
 </script>
-
+<div class="h-full flex flex-col overflow-hidden">
+<TabBar
+    tabs={[
+        { id: "environment", label: "Environments", href: "/elasticbeanstalk/environment" },
+        { id: "application", label: "Applications", href: "/elasticbeanstalk/application" },
+        { id: "versions", label: "Versions", href: "/elasticbeanstalk/versions" },
+    ]}
+    activeTab="environment"
+/>
+<div class="flex-1 overflow-hidden relative">
 {#snippet statusCell(v: string)}
     <div class="flex items-center gap-1.5">
         <Icon
@@ -126,4 +136,6 @@
             },
         ]}
     />
+</div>
+</div>
 </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import TabBar from "$lib/components/TabBar.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiLoading, mdiArrowUp, mdiArrowDown } from "@mdi/js";
 
@@ -355,6 +356,17 @@
     let fieldsCollapsed = $state(false);
 </script>
 
+<div class="h-full flex flex-col overflow-hidden">
+<TabBar
+    tabs={[
+        { id: "alarms", label: "Alarms", href: "/cloudwatch/alarms" },
+        { id: "metrics", label: "Metrics", href: "/cloudwatch/metrics" },
+        { id: "logs", label: "Log Groups", href: "/cloudwatch/logs" },
+        { id: "insights", label: "Logs Insights", href: "/cloudwatch/insights" },
+    ]}
+    activeTab="insights"
+/>
+<div class="flex-1 overflow-hidden relative">
 <DetailLayout
     title="Insights"
     hideTitle={true}
@@ -743,3 +755,5 @@
         </div>
     {/snippet}
 </DetailLayout>
+</div>
+</div>

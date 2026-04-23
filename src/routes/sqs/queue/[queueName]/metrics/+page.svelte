@@ -1,4 +1,5 @@
 <script lang="ts">
+    import TabBar from "$lib/components/TabBar.svelte";
     import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
     import MetricChart from "$lib/components/MetricChart.svelte";
     import { aws } from "$lib/services/aws.svelte";
@@ -10,6 +11,7 @@
     import { mdiClockOutline, mdiTrendingUp, mdiTrendingDown, mdiMinus } from "@mdi/js";
 
     let queueName = $derived($page.params.queueName || "");
+    let queueUrl = $derived($page.url.searchParams.get("url") || "");
 
     $effect(() => {
         titleService.setResource(queueName, undefined, $page.url.pathname);
@@ -115,8 +117,16 @@
     }
 </script>
 
+<div class="h-full flex flex-col overflow-hidden">
+    <TabBar
+        tabs={[
+            { id: "messages", label: "Messages", href: `/sqs/queue/${encodeURIComponent(queueName)}/messages?url=${encodeURIComponent(queueUrl)}` },
+            { id: "metrics", label: "Metrics", href: `/sqs/queue/${encodeURIComponent(queueName)}/metrics?url=${encodeURIComponent(queueUrl)}` },
+        ]}
+        activeTab="metrics"
+    />
 <div
-    class="h-full flex flex-col bg-gray-950 text-white overflow-hidden relative"
+    class="flex-1 flex flex-col bg-gray-950 text-white overflow-hidden relative"
 >
     <!-- Header with Time Selector -->
     <div
@@ -209,6 +219,7 @@
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <style>

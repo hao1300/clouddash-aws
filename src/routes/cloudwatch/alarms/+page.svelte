@@ -1,4 +1,5 @@
 <script lang="ts">
+    import TabBar from "$lib/components/TabBar.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
@@ -118,6 +119,17 @@
     </div>
 {/snippet}
 
+<div class="h-full flex flex-col overflow-hidden">
+<TabBar
+    tabs={[
+        { id: "alarms", label: "Alarms", href: "/cloudwatch/alarms" },
+        { id: "metrics", label: "Metrics", href: "/cloudwatch/metrics" },
+        { id: "logs", label: "Log Groups", href: "/cloudwatch/logs" },
+        { id: "insights", label: "Logs Insights", href: "/cloudwatch/insights" },
+    ]}
+    activeTab="alarms"
+/>
+<div class="flex-1 overflow-hidden relative">
 <PaginatedTable
     items={alarms}
     loading={alarmsLoading}
@@ -168,3 +180,5 @@
         >
     {/snippet}
 </PaginatedTable>
+</div>
+</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import TabBar from "$lib/components/TabBar.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
     import { aws } from "$lib/services/aws.svelte";
@@ -132,7 +133,15 @@
     }
 </script>
 
-<div class="h-full p-4 bg-gray-950 text-gray-300">
+<div class="h-full flex flex-col overflow-hidden">
+    <TabBar
+        tabs={[
+            { id: "objects", label: "Objects", href: `/s3/bucket/${encodeURIComponent(bucket)}/objects` },
+            { id: "details", label: "Details", href: `/s3/bucket/${encodeURIComponent(bucket)}/details` },
+        ]}
+        activeTab="details"
+    />
+<div class="flex-1 p-4 bg-gray-950 text-gray-300 overflow-auto">
     <div class="max-w-6xl mx-auto space-y-6">
         {#if error}
             <div class="bg-red-500/20 text-red-300 px-4 py-3 rounded border border-red-500/30 text-sm">
@@ -194,4 +203,5 @@
             </div>
         </div>
     </div>
+</div>
 </div>

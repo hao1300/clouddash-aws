@@ -9,8 +9,6 @@ export interface ServiceEntry {
     label: string;
     icon: string;
     tabs: Record<string, string>;
-    resourcePrefix?: string;
-    contextualTabs?: string[];
 }
 
 /**
@@ -39,8 +37,6 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
             "key-pairs": "Key Pairs",
             "elastic-ips": "Elastic IPs",
         },
-        resourcePrefix: "/instances",
-        contextualTabs: []
     },
     s3: {
         label: "S3",
@@ -49,8 +45,6 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
             objects: "Objects",
             details: "Details",
         },
-        resourcePrefix: "/bucket",
-        contextualTabs: ["objects", "details"]
     },
     dynamodb: {
         label: "DynamoDB",
@@ -59,8 +53,6 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
             "explore": "Explore",
             "details": "Details",
         },
-        resourcePrefix: "/table",
-        contextualTabs: ["explore", "details"]
     },
     sqs: {
         label: "SQS",
@@ -69,8 +61,6 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
             messages: "Messages",
             metrics: "Metrics",
         },
-        resourcePrefix: "/queue",
-        contextualTabs: ["messages", "metrics"]
     },
     cloudfront: {
         label: "CloudFront",

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import TabBar from "$lib/components/TabBar.svelte";
     import {
         DescribeApplicationsCommand,
         type ApplicationDescription,
@@ -33,7 +34,16 @@
         }
     }
 </script>
-
+<div class="h-full flex flex-col overflow-hidden">
+<TabBar
+    tabs={[
+        { id: "environment", label: "Environments", href: "/elasticbeanstalk/environment" },
+        { id: "application", label: "Applications", href: "/elasticbeanstalk/application" },
+        { id: "versions", label: "Versions", href: "/elasticbeanstalk/versions" },
+    ]}
+    activeTab="application"
+/>
+<div class="flex-1 overflow-hidden relative">
 <div class="h-full relative overflow-hidden flex flex-col">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
@@ -68,4 +78,6 @@
             },
         ]}
     />
+</div>
+</div>
 </div>

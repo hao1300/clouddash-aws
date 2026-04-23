@@ -1,4 +1,5 @@
 <script lang="ts">
+    import TabBar from "$lib/components/TabBar.svelte";
     import { goto } from "$app/navigation";
     import { ListMetricsCommand } from "@aws-sdk/client-cloudwatch";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
@@ -34,6 +35,17 @@
     }
 </script>
 
+<div class="h-full flex flex-col overflow-hidden">
+<TabBar
+    tabs={[
+        { id: "alarms", label: "Alarms", href: "/cloudwatch/alarms" },
+        { id: "metrics", label: "Metrics", href: "/cloudwatch/metrics" },
+        { id: "logs", label: "Log Groups", href: "/cloudwatch/logs" },
+        { id: "insights", label: "Logs Insights", href: "/cloudwatch/insights" },
+    ]}
+    activeTab="metrics"
+/>
+<div class="flex-1 overflow-hidden relative">
 <PaginatedTable
     items={namespaces}
     loading={metricsLoading}
@@ -55,3 +67,5 @@
         }
     ]}
 />
+</div>
+</div>

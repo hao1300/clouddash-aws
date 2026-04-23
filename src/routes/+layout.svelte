@@ -18,7 +18,7 @@
   import { titleService } from "$lib/services/title.svelte";
   import { settings } from "$lib/services/settings.svelte";
   import { SERVICE_MANIFEST } from "$lib/services/service-manifest";
-  import { transformTabsGeneric } from "$lib/services/tab-utils";
+
   import ServiceLayout from "$lib/components/ServiceLayout.svelte";
   import BackButton from "$lib/components/BackButton.svelte";
   import ToastContainer from "$lib/components/ToastContainer.svelte";
@@ -206,67 +206,16 @@
 
     if (Object.keys($page.params).length === 0) {
       const manifest = SERVICE_MANIFEST[activeId];
-      if (manifest && serviceActiveTab !== undefined) {
+      if (manifest) {
+        const pathTab = $page.url.pathname.split("/").slice(2).join("/") || "";
         const resourceName =
-          manifest.tabs[serviceActiveTab] ?? manifest.tabs[""];
+          manifest.tabs[pathTab] ?? manifest.tabs[""];
         if (resourceName) {
           titleService.setResource(resourceName, undefined, $page.url.pathname);
         }
       }
     }
   });
-  let serviceTabs = $derived.by(() => {
-    const manifest = SERVICE_MANIFEST[activeId];
-    if (!manifest) return $page.data.tabs || [];
-
-    // Convert Record<id, label> to Array<{id, label}>
-    let tabs = Object.entries(manifest.tabs).map(([id, label]) => ({
-      id,
-      label,
-    }));
-
-    // Transform tabs using generic manifest-driven logic
-    tabs = transformTabsGeneric(tabs, $page, manifest);
-
-    return tabs;
-  });
-
-  let sidebarTabs = $derived.by(() => {
-    const manifest = SERVICE_MANIFEST[activeId];
-    if (!manifest) return serviceTabs;
-    const contextual = manifest.contextualTabs || [];
-    return serviceTabs.filter((t) => {
-      const parts = t.id.split("/");
-      const lastPart = parts[parts.length - 1];
-      // If it's a landing page (empty string id), it might not be in contextual
-      // But we check the original id.
-      return !contextual.includes(lastPart);
-    });
-  });
-
-  let topTabs = $derived.by(() => {
-    const manifest = SERVICE_MANIFEST[activeId];
-    if (!manifest) return [];
-    const contextual = manifest.contextualTabs || [];
-    return serviceTabs.filter((t) => {
-      const parts = t.id.split("/");
-      const lastPart = parts[parts.length - 1];
-      return contextual.includes(lastPart);
-    });
-  });
-
-  let serviceActiveTab = $derived(
-    $page.data.activeTab ||
-      $page.url.pathname.split("/").slice(2).join("/") ||
-      "",
-  );
-
-  function handleServiceTabChange(tabId: string) {
-    const url = new URL($page.url);
-    // If it's a relative-like tab change within the service
-    url.pathname = `/${activeId}/${tabId}`;
-    goto(url.toString());
-  }
 
   function loadState() {
     try {
@@ -910,29 +859,7 @@
                         </button>
                       </div>
 
-                      {#if activeId === svc.id && sidebarTabs.length > 0}
-                        <div
-                          class="ml-4 flex flex-col border-l border-gray-800 bg-gray-900/30 rounded-r"
-                        >
-                          {#each sidebarTabs as tab}
-                            <button
-                              onclick={() => {
-                                handleServiceTabChange(tab.id);
-                                if (window.innerWidth < 640)
-                                  sideMenuOpen = false;
-                              }}
-                              class="w-full text-left px-4 py-2.5 text-[11px] transition {serviceActiveTab ===
-                                tab.id ||
-                              (tab.id &&
-                                serviceActiveTab.startsWith(tab.id + '/'))
-                                ? 'text-blue-400 font-bold bg-blue-500/10'
-                                : 'text-gray-300 hover:text-white hover:bg-gray-800'}"
-                            >
-                              {tab.label}
-                            </button>
-                          {/each}
-                        </div>
-                      {/if}
+
                     </div>
                   </div>
                 {/each}
@@ -1121,9 +1048,6 @@
         <div class="flex-1 overflow-hidden relative flex flex-col min-w-0">
           <ServiceLayout
             title={serviceTitle}
-            tabs={topTabs}
-            activeTab={serviceActiveTab}
-            onTabChange={handleServiceTabChange}
           >
             <div class="absolute inset-0">
               {#key refreshKey}
@@ -1170,7 +1094,8 @@
             <button
               onclick={() => {
                 let label = serviceTitle;
-                if (serviceActiveTab) label += ` - ${serviceActiveTab}`;
+                const pathTab = $page.url.pathname.split("/").slice(2).join("/") || "";
+                if (pathTab) label += ` - ${pathTab}`;
                 bookmarks.toggle(label);
               }}
               class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold transition shadow-lg shrink-0"

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import TabBar from "$lib/components/TabBar.svelte";
     import {
         DescribeLogGroupsCommand,
         CreateLogGroupCommand,
@@ -103,59 +104,86 @@
     }
 </script>
 
-<div class="h-full relative overflow-hidden flex flex-col">
-    {#if error}
-        <div class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30">
-            {error}
-        </div>
-    {/if}
-    {#if actionMsg}
-        <div class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30">
-            {actionMsg}
-        </div>
-    {/if}
+<div class="h-full flex flex-col overflow-hidden">
+    <TabBar
+        tabs={[
+            { id: "alarms", label: "Alarms", href: "/cloudwatch/alarms" },
+            { id: "metrics", label: "Metrics", href: "/cloudwatch/metrics" },
+            { id: "logs", label: "Log Groups", href: "/cloudwatch/logs" },
+            {
+                id: "insights",
+                label: "Logs Insights",
+                href: "/cloudwatch/insights",
+            },
+        ]}
+        activeTab="logs"
+    />
+    <div class="h-full relative overflow-hidden flex flex-col">
+        {#if error}
+            <div
+                class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
+            >
+                {error}
+            </div>
+        {/if}
+        {#if actionMsg}
+            <div
+                class="bg-blue-500/20 text-blue-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-blue-500/30"
+            >
+                {actionMsg}
+            </div>
+        {/if}
 
-    <div class="flex-1 flex flex-col min-h-0 {error || actionMsg ? 'pt-8' : ''}">
-        <PaginatedTable
-            items={logGroupsTable}
-            loading={logGroupsLoading}
-            hasNext={!!logGroupsCurrentToken}
-            hasPrev={logGroupsTokenMap.length > 0}
-            onNext={() => loadLogGroupsTable(logGroupsCurrentToken)}
-            onPrev={() => loadLogGroupsTable(popToken(logGroupsTokenMap))}
-            onRefresh={() => {
-                logGroupsTokenMap = [];
-                loadLogGroupsTable();
-            }}
-            columns={[
-                {
-                    key: "name",
-                    label: "Log Group Name",
-                    onClick: (item) => {
-                        goto(`/cloudwatch/logs/${encodeURIComponent(item.name)}`);
-                    },
-                },
-                { key: "retentionDays", label: "Retention" },
-                { key: "creationTime", label: "Creation Time" },
-            ]}
+        <div
+            class="flex-1 flex flex-col min-h-0 {error || actionMsg
+                ? 'pt-8'
+                : ''}"
         >
-            {#snippet headerActionsSnippet()}
-                <button
-                    onclick={createLogGroup}
-                    class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded transition font-bold shadow-sm"
-                >+ Create Log Group</button>
-            {/snippet}
-            {#snippet actionsSnippet(item)}
-                <div class="flex gap-1 justify-end">
+            <PaginatedTable
+                items={logGroupsTable}
+                loading={logGroupsLoading}
+                hasNext={!!logGroupsCurrentToken}
+                hasPrev={logGroupsTokenMap.length > 0}
+                onNext={() => loadLogGroupsTable(logGroupsCurrentToken)}
+                onPrev={() => loadLogGroupsTable(popToken(logGroupsTokenMap))}
+                onRefresh={() => {
+                    logGroupsTokenMap = [];
+                    loadLogGroupsTable();
+                }}
+                columns={[
+                    {
+                        key: "name",
+                        label: "Log Group Name",
+                        onClick: (item) => {
+                            goto(
+                                `/cloudwatch/logs/${encodeURIComponent(item.name)}`,
+                            );
+                        },
+                    },
+                    { key: "retentionDays", label: "Retention" },
+                    { key: "creationTime", label: "Creation Time" },
+                ]}
+            >
+                {#snippet headerActionsSnippet()}
                     <button
-                        onclick={(e) => {
-                            e.stopPropagation();
-                            deleteLogGroup(item.name);
-                        }}
-                        class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
-                    >Delete</button>
-                </div>
-            {/snippet}
-        </PaginatedTable>
+                        onclick={createLogGroup}
+                        class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded transition font-bold shadow-sm"
+                        >+ Create Log Group</button
+                    >
+                {/snippet}
+                {#snippet actionsSnippet(item)}
+                    <div class="flex gap-1 justify-end">
+                        <button
+                            onclick={(e) => {
+                                e.stopPropagation();
+                                deleteLogGroup(item.name);
+                            }}
+                            class="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded transition"
+                            >Delete</button
+                        >
+                    </div>
+                {/snippet}
+            </PaginatedTable>
+        </div>
     </div>
 </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import TabBar from "$lib/components/TabBar.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiLoading } from "@mdi/js";
 
@@ -88,7 +89,20 @@
         }
     }
 </script>
-
+<div class="h-full flex flex-col overflow-hidden">
+<TabBar
+    tabs={[
+        { id: "instances", label: "Instances", href: "/ec2/instances" },
+        { id: "amis", label: "AMIs", href: "/ec2/amis" },
+        { id: "volumes", label: "Volumes", href: "/ec2/volumes" },
+        { id: "snapshots", label: "Snapshots", href: "/ec2/snapshots" },
+        { id: "security-groups", label: "Security Groups", href: "/ec2/security-groups" },
+        { id: "key-pairs", label: "Key Pairs", href: "/ec2/key-pairs" },
+        { id: "elastic-ips", label: "Elastic IPs", href: "/ec2/elastic-ips" },
+    ]}
+    activeTab="security-groups"
+/>
+<div class="flex-1 overflow-hidden relative">
 <div class="h-full relative overflow-hidden flex flex-col">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
@@ -188,3 +202,5 @@
         </div>
     </div>
 </Modal>
+</div>
+</div>
