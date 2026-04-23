@@ -1,11 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
-import { updateWebVersion } from './utils.js';
+import { updateWebVersion, uploadToR2 } from './utils.js';
 
 const CONFIG_PATH = 'src-tauri/tauri.conf.json';
-const RELEASE_ROOT = 'c:/CS/aws-console-releases';
-const RELEASE_DIR = path.join(RELEASE_ROOT, 'downloads/windows');
 const NSIS_DIR = 'src-tauri/target/release/bundle/nsis';
 
 function getVersion() {
@@ -24,11 +22,6 @@ try {
 
     run('npx tauri build');
 
-    if (!fs.existsSync(RELEASE_DIR)) {
-        console.log(`Creating release directory: ${RELEASE_DIR}`);
-        fs.mkdirSync(RELEASE_DIR, { recursive: true });
-    }
-
     // Find the setup exe matching the version
     let setupExe = null;
     if (fs.existsSync(NSIS_DIR)) {
@@ -36,12 +29,11 @@ try {
         setupExe = files.find(f => f.includes(version) && f.endsWith('setup.exe'));
     }
 
-    const dest = path.join(RELEASE_DIR, `clouddash-${version}-setup.exe`);
+    const destPath = `downloads/windows/clouddash-${version}-setup.exe`;
 
     if (setupExe) {
         const src = path.join(NSIS_DIR, setupExe);
-        console.log(`Copying Windows Setup: ${src} -> ${dest}`);
-        fs.copyFileSync(src, dest);
+        uploadToR2(src, destPath);
     } else {
         console.warn(`Warning: No setup exe found in ${NSIS_DIR} matching version ${version}, searching in target/release...`);
         const releaseDir = 'src-tauri/target/release';
@@ -50,8 +42,7 @@ try {
             const altExe = files.find(f => f.endsWith('.exe'));
             if (altExe) {
                 const src = path.join(releaseDir, altExe);
-                console.log(`Copying alternative EXE: ${src} -> ${dest}`);
-                fs.copyFileSync(src, dest);
+                uploadToR2(src, destPath);
             } else {
                 console.error('Error: Could not find any release EXE');
                 process.exit(1);

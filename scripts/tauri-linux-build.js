@@ -1,11 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
-import { updateWebVersion } from './utils.js';
+import { updateWebVersion, uploadToR2 } from './utils.js';
 
 const CONFIG_PATH = 'src-tauri/tauri.conf.json';
-const RELEASE_ROOT = '/mnt/c/CS/aws-console-releases';
-const RELEASE_DIR = path.join(RELEASE_ROOT, 'downloads/linux');
 const BUNDLE_DIR = 'src-tauri/target/release/bundle';
 
 function getVersion() {
@@ -30,9 +28,8 @@ function copyBundle(ext, subdir, version) {
 
     if (targetFile) {
         const src = path.join(dir, targetFile);
-        const dest = path.join(RELEASE_DIR, `clouddash-${version}.${ext}`);
-        console.log(`Copying ${ext} bundle: ${src} -> ${dest}`);
-        fs.copyFileSync(src, dest);
+        const destPath = `downloads/linux/clouddash-${version}.${ext}`;
+        uploadToR2(src, destPath);
     } else {
         console.warn(`Warning: No ${ext} bundle found in ${dir}`);
     }
@@ -44,11 +41,6 @@ try {
 
     run('npm run tauri-build');
 
-    if (!fs.existsSync(RELEASE_DIR)) {
-        console.log(`Creating release directory: ${RELEASE_DIR}`);
-        fs.mkdirSync(RELEASE_DIR, { recursive: true });
-    }
-
     copyBundle('AppImage', 'appimage', version);
     copyBundle('deb', 'deb', version);
     copyBundle('rpm', 'rpm', version);
@@ -57,7 +49,6 @@ try {
 
     console.log('--------------------------------------------------');
     console.log('Build complete!');
-    console.log(`Packages available in ${RELEASE_DIR}`);
 } catch (error) {
     console.error('Error during build:', error.message);
     process.exit(1);

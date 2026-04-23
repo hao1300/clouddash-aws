@@ -1,12 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
-import { updateWebVersion } from './utils.js';
+import { updateWebVersion, uploadToR2 } from './utils.js';
 
 const CONFIG_PATH = 'src-tauri/tauri.conf.json';
-const RELEASE_ROOT = 'c:/CS/aws-console-releases';
-const RELEASE_DIR = path.join(RELEASE_ROOT, 'downloads/android');
-const STORE_DIR = path.join(RELEASE_ROOT, 'store');
 const APK_PATH = 'src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk';
 const AAB_PATH = 'src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab';
 
@@ -20,16 +17,15 @@ function run(command) {
     execSync(command, { stdio: 'inherit' });
 }
 
-function copyFile(src, dest) {
+function uploadIfExists(src, destPath) {
     if (fs.existsSync(src)) {
-        console.log(`Copying: ${src} -> ${dest}`);
-        fs.copyFileSync(src, dest);
+        uploadToR2(src, destPath);
         return true;
     }
     return false;
 }
 
-function findAndCopy(searchDir, pattern, dest) {
+function findAndUpload(searchDir, pattern, destPath) {
     if (!fs.existsSync(searchDir)) return false;
     
     const findFiles = (dir) => {
@@ -49,8 +45,7 @@ function findAndCopy(searchDir, pattern, dest) {
 
     const files = findFiles(searchDir);
     if (files.length > 0) {
-        console.log(`Copying alternative file: ${files[0]} -> ${dest}`);
-        fs.copyFileSync(files[0], dest);
+        uploadToR2(files[0], destPath);
         return true;
     }
     return false;
@@ -62,28 +57,21 @@ try {
 
     run('npx tauri android build');
 
-    [RELEASE_DIR, STORE_DIR].forEach(dir => {
-        if (!fs.existsSync(dir)) {
-            console.log(`Creating directory: ${dir}`);
-            fs.mkdirSync(dir, { recursive: true });
-        }
-    });
-
-    // Copy APK
-    const apkDest = path.join(RELEASE_DIR, `clouddash-${version}.apk`);
-    if (!copyFile(APK_PATH, apkDest)) {
+    // Upload APK
+    const apkDestPath = `downloads/android/clouddash-${version}.apk`;
+    if (!uploadIfExists(APK_PATH, apkDestPath)) {
         console.warn(`Warning: No APK found at ${APK_PATH}, searching for alternatives...`);
-        if (!findAndCopy('src-tauri/gen/android', '-release.apk', apkDest)) {
+        if (!findAndUpload('src-tauri/gen/android', '-release.apk', apkDestPath)) {
             console.error('Error: Could not find any release APK');
             process.exit(1);
         }
     }
 
-    // Copy AAB
-    const aabDest = path.join(STORE_DIR, `clouddash-${version}.aab`);
-    if (!copyFile(AAB_PATH, aabDest)) {
+    // Upload AAB
+    const aabDestPath = `store/clouddash-${version}.aab`;
+    if (!uploadIfExists(AAB_PATH, aabDestPath)) {
         console.warn(`Warning: No AAB found at ${AAB_PATH}, searching for alternatives...`);
-        findAndCopy('src-tauri/gen/android', '-release.aab', aabDest);
+        findAndUpload('src-tauri/gen/android', '-release.aab', aabDestPath);
     }
 
     updateWebVersion(version);
