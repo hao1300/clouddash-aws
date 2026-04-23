@@ -676,28 +676,19 @@
                             No service connections or triggers found for this function.
                         </div>
                     {:else}
-                        <div class="grid grid-cols-1 gap-3">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {#each connections as conn}
-                                <div class="bg-gray-950/50 border border-gray-800 rounded p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm hover:border-gray-700 transition">
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-center gap-2 mb-1">
-                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-900/30 text-blue-400 border border-blue-800/50 uppercase tracking-wider">
-                                                {conn.type}
-                                            </span>
-                                            {#if conn.description}
-                                                <span class="text-[10px] text-gray-500 uppercase tracking-wider">{conn.description}</span>
-                                            {/if}
-                                        </div>
-                                        <div class="text-xs text-gray-300 font-mono truncate" title={conn.arn}>
-                                            {conn.arn}
-                                        </div>
-                                    </div>
-                                    {#if conn.link}
-                                        <a href={conn.link} class="shrink-0 text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded transition border border-gray-700 shadow-sm whitespace-nowrap inline-flex items-center">
-                                            View Resource
-                                        </a>
-                                    {/if}
-                                </div>
+                                <InfoCard 
+                                    label={conn.type} 
+                                    value={conn.arn} 
+                                    href={conn.link}
+                                >
+                                    {#snippet children()}
+                                        {#if conn.description}
+                                            <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-2 font-bold">{conn.description}</div>
+                                        {/if}
+                                    {/snippet}
+                                </InfoCard>
                             {/each}
                         </div>
                     {/if}
