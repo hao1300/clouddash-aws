@@ -21,7 +21,12 @@ async function main() {
         const version = getVersion();
         console.log(`Building CloudDash Windows version ${version}...`);
 
-        run('npx tauri build');
+        const skipBuild = process.argv.includes('--skip-build');
+        if (!skipBuild) {
+            run('npx tauri build');
+        } else {
+            console.log('Skipping build step...');
+        }
 
         // Find the setup exe matching the version
         let setupExe = null;

@@ -40,7 +40,12 @@ async function main() {
         const version = getVersion();
         console.log(`Building CloudDash version ${version}...`);
 
-        run('npm run tauri-build');
+        const skipBuild = process.argv.includes('--skip-build');
+        if (!skipBuild) {
+            run('npm run tauri-build');
+        } else {
+            console.log('Skipping build step...');
+        }
 
         await copyBundle('AppImage', 'appimage', version);
         await copyBundle('deb', 'deb', version);

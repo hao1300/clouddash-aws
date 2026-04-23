@@ -56,7 +56,12 @@ async function main() {
         const version = getVersion();
         console.log(`Building CloudDash Android version ${version}...`);
 
-        run('npx tauri android build');
+        const skipBuild = process.argv.includes('--skip-build');
+        if (!skipBuild) {
+            run('npx tauri android build');
+        } else {
+            console.log('Skipping build step...');
+        }
 
         // Upload APK
         const apkDestPath = `downloads/android/clouddash-${version}.apk`;
