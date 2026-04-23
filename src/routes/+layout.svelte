@@ -103,7 +103,7 @@
   let currentLoginId = $state(0);
 
   // History tracking for mobile back button
-  afterNavigate(({ type, from }) => {
+  afterNavigate(({ type, from, to }) => {
     if (type === "popstate") {
       navigationHistory.pop();
     } else if (navigationHistory.isBackNavigation) {
@@ -112,6 +112,10 @@
       if (from.url.pathname !== "/") {
         navigationHistory.push(from.url.pathname + from.url.search);
       }
+    }
+
+    if (to && to.url.pathname !== "/") {
+      navigationHistory.setLastUrl(to.url.pathname + to.url.search);
     }
   });
 
@@ -200,10 +204,6 @@
         return;
     }
 
-    if ($page.url.pathname !== "/") {
-      localStorage.setItem("aws_console_last_url", $page.url.pathname + $page.url.search);
-    }
-
     if (Object.keys($page.params).length === 0) {
       const manifest = SERVICE_MANIFEST[activeId];
       if (manifest && serviceActiveTab !== undefined) {
@@ -274,7 +274,6 @@
         sessionToken,
         saveProfileChecked,
         saveProfileName,
-        activeId: activeId, // Save last active route to redirect later
         sideMenuOpen,
       }),
     );
@@ -674,7 +673,7 @@
 
       // Auto redirect to last saved service if we are at root
       if ($page.url.pathname === "/") {
-        let lastUrl = localStorage.getItem("aws_console_last_url");
+        let lastUrl = navigationHistory.lastUrl;
         if (!initialPath && lastUrl && lastUrl !== "/") {
           const svcId = lastUrl.split('/')[1];
           // ensure the reconstructed service tab is actually visible
@@ -684,8 +683,7 @@
           }
         }
 
-        let fallbackId = loadState()?.activeId;
-        let n = initialPath || fallbackId;
+        let n = initialPath;
         if (!n || !serviceVisible.has(n)) {
           const first = enabledServices[0];
           n = first ? first.id : "";
