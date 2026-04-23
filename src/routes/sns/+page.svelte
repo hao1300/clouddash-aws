@@ -144,7 +144,7 @@
             history.pop();
             loadTopics(history[history.length - 1]);
         }}
-        columns={[{ label: "Topic ARN", key: "TopicArn" }]}
+        columns={[{ label: "Topic Name", key: "TopicArn", format: (val) => val ? val.split(':').pop() : "-" }]}
     >
         {#snippet headerActionsSnippet()}
             <button

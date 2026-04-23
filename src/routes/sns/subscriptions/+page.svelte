@@ -138,10 +138,10 @@
             loadSubs(history[history.length - 1]);
         }}
         columns={[
-            { label: "Subscription ARN", key: "SubscriptionArn" },
+            { label: "Subscription Name", key: "SubscriptionArn", format: (val) => val === "PendingConfirmation" ? val : val ? val.split(':').pop() : "-" },
             { label: "Protocol", key: "Protocol" },
-            { label: "Endpoint", key: "Endpoint" },
-            { label: "Topic ARN", key: "TopicArn" },
+            { label: "Endpoint", key: "Endpoint", wrap: true },
+            { label: "Topic Name", key: "TopicArn", format: (val) => val ? val.split(':').pop() : "-" },
         ]}
     >
         {#snippet headerActionsSnippet()}
@@ -179,7 +179,7 @@
             >
                 <option value="" disabled>Select a Topic...</option>
                 {#each topics as t}
-                    <option value={t.TopicArn}>{t.TopicArn}</option>
+                    <option value={t.TopicArn}>{t.TopicArn ? t.TopicArn.split(':').pop() : ""}</option>
                 {/each}
             </select>
         </div>

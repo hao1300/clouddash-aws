@@ -28,6 +28,7 @@
             format?: (val: any, item: T) => string;
             renderCell?: Snippet<[any, T]>;
             onClick?: (item: T) => void;
+            wrap?: boolean;
         }[];
         loading?: boolean;
         hasNext?: boolean;
@@ -290,7 +291,7 @@
                                             : ""}
                                     >
                                         <span class="inline-block sm:hidden text-gray-500 text-xs font-semibold mr-3 w-1/3 shrink-0">{col.label}</span>
-                                        <div class="truncate flex-1">
+                                        <div class="{col.wrap ? 'whitespace-normal break-all' : 'truncate'} flex-1">
                                             {#if col.onClick}
                                                 <button
                                                     onclick={(e) => {
