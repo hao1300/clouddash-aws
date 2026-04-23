@@ -449,30 +449,18 @@
                         >Time Range</label
                     >
                     <div class="relative">
-                        <select
+                        <Select
                             id="time-range-select"
                             bind:value={timeRange}
-                            class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500 appearance-none"
-                        >
-                            <option value={900}>Last 15 minutes</option>
-                            <option value={3600}>Last 1 hour</option>
-                            <option value={10800}>Last 3 hours</option>
-                            <option value={43200}>Last 12 hours</option>
-                            <option value={86400}>Last 24 hours</option>
-                            <option value={604800}>Last 1 week</option>
-                        </select>
-                        <div
-                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"
-                        >
-                            <svg
-                                class="fill-current h-4 w-4"
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 20 20"
-                                ><path
-                                    d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
-                                /></svg
-                            >
-                        </div>
+                            options={[
+                                { value: 900, label: "Last 15 minutes" },
+                                { value: 3600, label: "Last 1 hour" },
+                                { value: 10800, label: "Last 3 hours" },
+                                { value: 43200, label: "Last 12 hours" },
+                                { value: 86400, label: "Last 24 hours" },
+                                { value: 604800, label: "Last 1 week" },
+                            ]}
+                        />
                     </div>
                 </div>
             </div>
@@ -488,10 +476,15 @@
                         </label>
                         <div class="flex gap-2">
                             <div class="relative flex-1">
-                                <select
+                                <Select
                                     id="saved-query-select"
+                                    placeholder="Select a saved query"
                                     bind:value={selectedSavedQueryId}
-                                    onchange={(e) => {
+                                    options={savedQueries.map((sq) => ({
+                                        value: sq.queryDefinitionId,
+                                        label: sq.name,
+                                    }))}
+                                    onchange={() => {
                                         const q = savedQueries.find(
                                             (sq) =>
                                                 sq.queryDefinitionId ===
@@ -508,29 +501,7 @@
                                             }
                                         }
                                     }}
-                                    class="w-full bg-gray-950/50 border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 outline-none focus:border-blue-500 appearance-none shadow-sm"
-                                >
-                                    <option value=""
-                                        >Select a saved query</option
-                                    >
-                                    {#each savedQueries as sq}
-                                        <option value={sq.queryDefinitionId}
-                                            >{sq.name}</option
-                                        >
-                                    {/each}
-                                </select>
-                                <div
-                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"
-                                >
-                                    <svg
-                                        class="fill-current h-4 w-4"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        viewBox="0 0 20 20"
-                                        ><path
-                                            d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
-                                        /></svg
-                                    >
-                                </div>
+                                />
                             </div>
                             <button
                                 onclick={saveQuery}
