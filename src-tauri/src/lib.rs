@@ -11,6 +11,11 @@ fn set_back_button_intercept(enabled: bool) {
     INTERCEPT_BACK.store(enabled, Ordering::Relaxed);
 }
 
+#[tauri::command]
+fn exit_app(app_handle: tauri::AppHandle) {
+    app_handle.exit(0);
+}
+
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub extern "C" fn Java_dev_clouddash_aws_MainActivity_shouldInterceptBack(
@@ -46,6 +51,7 @@ pub fn run() {
         .manage(state::SharedConfig::default())
         .invoke_handler(tauri::generate_handler![
             set_back_button_intercept,
+            exit_app,
             state::list_profiles,
             state::authenticate,
             state::get_credentials,

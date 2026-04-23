@@ -108,7 +108,9 @@
     } else if (navigationHistory.isBackNavigation) {
       navigationHistory.isBackNavigation = false;
     } else if (from && from.url.pathname !== window.location.pathname) {
-      navigationHistory.push(from.url.pathname + from.url.search);
+      if (from.url.pathname !== "/") {
+        navigationHistory.push(from.url.pathname + from.url.search);
+      }
     }
   });
 
@@ -294,8 +296,7 @@
           await navigationHistory.goBack();
         } else {
           try {
-            const w = await getCurrentWindow();
-            w.close();
+            await invoke("exit_app");
           } catch (e) {
             console.error("Failed to close window", e);
           }
