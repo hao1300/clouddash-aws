@@ -43,6 +43,7 @@ android {
     }
     buildTypes {
         getByName("debug") {
+            signingConfig = signingConfigs.getByName("release")
             manifestPlaceholders["usesCleartextTraffic"] = "true"
             manifestPlaceholders["appName"] = "[dev] CloudDash"
             manifestPlaceholders["activityTitle"] = "[dev] CloudDash"
