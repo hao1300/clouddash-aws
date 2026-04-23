@@ -7,6 +7,7 @@
     } from "@aws-sdk/client-sqs";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
+    import Select from "$lib/components/Select.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
@@ -264,13 +265,10 @@
                 <label class="block text-xs font-bold text-gray-400 mb-1"
                     >Type</label
                 >
-                <select
+                <Select
                     bind:value={createParams.Type}
-                    class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-                >
-                    <option value="Standard">Standard</option>
-                    <option value="FIFO">FIFO</option>
-                </select>
+                    options={["Standard", "FIFO"]}
+                />
             </div>
             <div>
                 <label class="block text-xs font-bold text-gray-400 mb-1"

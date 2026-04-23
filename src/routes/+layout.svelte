@@ -8,6 +8,7 @@
   import { page } from "$app/stores";
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
   import Login from "$lib/components/Login.svelte";
+  import Select from "$lib/components/Select.svelte";
   import { aws } from "$lib/services/aws.svelte";
   import { bookmarks } from "$lib/services/bookmarks.svelte";
   import { titleService } from "$lib/services/title.svelte";
@@ -887,10 +888,10 @@
               <div class="space-y-1">
                 <span class="text-[10px] text-gray-300 px-1">Profile</span>
                 {#if authType === "profile"}
-                  <select
+                  <Select
                     bind:value={selectedProfile}
-                    onchange={() => {
-                      if (selectedProfile === "__add_profile__") {
+                    onchange={(val) => {
+                      if (val === "__add_profile__") {
                         selectedProfile = visibleProfiles[0] || "default";
                         isAddingProfile = true;
                         authType = "manual";
@@ -901,15 +902,12 @@
                       login();
                       if (window.innerWidth < 640) sideMenuOpen = false;
                     }}
-                    class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
-                  >
-                    {#each visibleProfiles as p}<option value={p}>{p}</option
-                      >{/each}
-                    <option
-                      value="__add_profile__"
-                      class="font-bold text-green-400">+ Add Profile...</option
-                    >
-                  </select>
+                    options={[
+                      ...visibleProfiles.map(p => ({ value: p, label: p, fontMono: true })),
+                      { value: "__add_profile__", label: "+ Add Profile...", fontMono: false }
+                    ]}
+                    small
+                  />
                 {:else}
                   <div
                     class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono border border-gray-700 truncate flex items-center gap-1.5"
@@ -921,17 +919,15 @@
 
               <div class="space-y-1">
                 <span class="text-[10px] text-gray-300 px-1">Region</span>
-                <select
+                <Select
                   bind:value={region}
                   onchange={() => {
                     login();
                     if (window.innerWidth < 640) sideMenuOpen = false;
                   }}
-                  class="w-full bg-gray-800 text-[11px] p-2 rounded text-blue-400 font-mono outline-none border border-gray-700 focus:border-blue-500"
-                >
-                  {#each visibleRegions as r}<option value={r}>{r}</option
-                    >{/each}
-                </select>
+                  options={visibleRegions.map(r => ({ value: r, label: r, fontMono: true }))}
+                  small
+                />
               </div>
             </div>
 

@@ -14,6 +14,9 @@
     import { titleService } from "$lib/services/title.svelte";
     import JsonEditor from "$lib/components/JsonEditor.svelte";
     import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
+    import ServiceLayout from "$lib/components/ServiceLayout.svelte";
+    import BackButton from "$lib/components/BackButton.svelte";
+    import Select from "$lib/components/Select.svelte";
     import MetricChart from "$lib/components/MetricChart.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiRefresh, mdiClose, mdiInformation, mdiChevronRight } from "@mdi/js";
@@ -824,14 +827,16 @@
                         <Icon path={mdiRefresh} size={14} class="animate-spin text-gray-500" />
                     {/if}
                 </div>
-                <select
+                <Select
                     bind:value={metricPeriod}
-                    class="bg-gray-950 text-xs px-3 py-1.5 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 shadow-inner"
-                >
-                    <option value={3600}>Last 1 hour</option>
-                    <option value={86400}>Last 24 hours</option>
-                    <option value={604800}>Last 7 days</option>
-                </select>
+                    options={[
+                        { value: 3600, label: "Last 1 hour" },
+                        { value: 86400, label: "Last 24 hours" },
+                        { value: 604800, label: "Last 7 days" }
+                    ]}
+                    class="w-40"
+                    small
+                />
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="bg-gray-900 p-4 rounded-lg border border-gray-800">

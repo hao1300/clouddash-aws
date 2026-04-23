@@ -9,11 +9,13 @@
     import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
+    import Select from "$lib/components/Select.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
+    import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     import Icon from "$lib/components/Icon.svelte";
-    import { mdiRefresh } from "@mdi/js";
+    import { mdiRefresh, mdiCircle, mdiChevronDown } from "@mdi/js";
     import JsonEditor from "$lib/components/JsonEditor.svelte";
     import { slide } from "svelte/transition";
 
@@ -566,17 +568,16 @@
                             class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1"
                             >Select a table or index</span
                         >
-                        <select
+                        <Select
                             bind:value={queryIndex}
-                            class="w-full bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
-                        >
-                            <option value="">Table - {tableName}</option>
-                            {#each tableSchema?.GlobalSecondaryIndexes || [] as idx}
-                                <option value={idx.IndexName}
-                                    >Index - {idx.IndexName}</option
-                                >
-                            {/each}
-                        </select>
+                            options={[
+                                { value: "", label: `Table - ${tableName}` },
+                                ...(tableSchema?.GlobalSecondaryIndexes || []).map(idx => ({
+                                    value: idx.IndexName,
+                                    label: `Index - ${idx.IndexName}`
+                                }))
+                            ]}
+                        />
                     </label>
                 </div>
             </div>
@@ -650,15 +651,14 @@
                                     >Value</span
                                 >
                                 <div class="flex gap-2">
-                                    <select
+                                    <Select
                                         bind:value={sortKeyOp}
-                                        class="bg-gray-950 text-xs p-2 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none w-28"
-                                    >
-                                        <option value="=">Equal to</option>
-                                        <option value="begins_with"
-                                            >Begins with</option
-                                        >
-                                    </select>
+                                        options={[
+                                            { value: "=", label: "Equal to" },
+                                            { value: "begins_with", label: "Begins with" }
+                                        ]}
+                                        class="w-28"
+                                    />
                                     <input
                                         bind:value={sortKeyInput}
                                         placeholder="Enter attribute value"
@@ -719,22 +719,21 @@
                                         class="block text-[10px] text-gray-500 mb-1 ml-1"
                                         >Condition</span
                                     >
-                                    <select
+                                    <Select
                                         bind:value={filter.condition}
-                                        class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
-                                    >
-                                        <option>Equal to</option>
-                                        <option>Not equal to</option>
-                                        <option>Less than</option>
-                                        <option>Less than or equal to</option>
-                                        <option>Greater than</option>
-                                        <option>Greater than or equal to</option
-                                        >
-                                        <option>Begins with</option>
-                                        <option>Contains</option>
-                                        <option>Exists</option>
-                                        <option>Not exists</option>
-                                    </select>
+                                        options={[
+                                            "Equal to",
+                                            "Not equal to",
+                                            "Less than",
+                                            "Less than or equal to",
+                                            "Greater than",
+                                            "Greater than or equal to",
+                                            "Begins with",
+                                            "Contains",
+                                            "Exists",
+                                            "Not exists"
+                                        ]}
+                                    />
                                 </label>
                             </div>
                             <div class="w-48">
@@ -743,15 +742,10 @@
                                         class="block text-[10px] text-gray-500 mb-1 ml-1"
                                         >Type</span
                                     >
-                                    <select
+                                    <Select
                                         bind:value={filter.type}
-                                        class="w-full bg-gray-950 text-xs p-1.5 rounded border border-gray-700 text-gray-200 focus:border-blue-500 outline-none"
-                                    >
-                                        <option>String</option>
-                                        <option>Number</option>
-                                        <option>Boolean</option>
-                                        <option>Null</option>
-                                    </select>
+                                        options={["String", "Number", "Boolean", "Null"]}
+                                    />
                                 </label>
                             </div>
                             <div class="flex-1">

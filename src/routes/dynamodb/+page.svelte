@@ -7,6 +7,7 @@
     } from "@aws-sdk/client-dynamodb";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
+    import Select from "$lib/components/Select.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
@@ -306,14 +307,15 @@
                     class="flex-1 bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
                     placeholder="PK Attribute Name"
                 />
-                <select
+                <Select
                     bind:value={newPkType}
-                    class="bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 w-24"
-                >
-                    <option value="S">String</option>
-                    <option value="N">Number</option>
-                    <option value="B">Binary</option>
-                </select>
+                    options={[
+                        { value: "S", label: "String" },
+                        { value: "N", label: "Number" },
+                        { value: "B", label: "Binary" }
+                    ]}
+                    class="w-24"
+                />
             </div>
         </div>
         <div>
@@ -334,14 +336,15 @@
                         class="flex-1 bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
                         placeholder="SK Attribute Name"
                     />
-                    <select
+                    <Select
                         bind:value={newSkType}
-                        class="bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 w-24"
-                    >
-                        <option value="S">String</option>
-                        <option value="N">Number</option>
-                        <option value="B">Binary</option>
-                    </select>
+                        options={[
+                            { value: "S", label: "String" },
+                            { value: "N", label: "Number" },
+                            { value: "B", label: "Binary" }
+                        ]}
+                        class="w-24"
+                    />
                 </div>
             {/if}
         </div>
@@ -349,31 +352,25 @@
             <label class="block text-xs font-bold text-gray-400 mb-1"
                 >Capacity Mode</label
             >
-            <select
+            <Select
                 bind:value={billingMode}
-                class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-            >
-                <option value="PAY_PER_REQUEST"
-                    >On-demand (PAY_PER_REQUEST)</option
-                >
-                <option value="PROVISIONED"
-                    >Provisioned (5 RCU / 5 WCU default)</option
-                >
-            </select>
+                options={[
+                    { value: "PAY_PER_REQUEST", label: "On-demand (PAY_PER_REQUEST)" },
+                    { value: "PROVISIONED", label: "Provisioned (5 RCU / 5 WCU default)" }
+                ]}
+            />
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-400 mb-1"
                 >Table Class</label
             >
-            <select
+            <Select
                 bind:value={newTableClass}
-                class="w-full bg-black text-xs p-2 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500"
-            >
-                <option value="STANDARD">Standard</option>
-                <option value="STANDARD_INFREQUENT_ACCESS"
-                    >Standard-Infrequent Access</option
-                >
-            </select>
+                options={[
+                    { value: "STANDARD", label: "Standard" },
+                    { value: "STANDARD_INFREQUENT_ACCESS", label: "Standard-Infrequent Access" }
+                ]}
+            />
         </div>
         <div>
             <label

@@ -4,6 +4,7 @@
     import { listen, type UnlistenFn } from "@tauri-apps/api/event";
     import * as fflate from "fflate";
     import Modal from "./Modal.svelte";
+    import Select from "./Select.svelte";
     import Icon from "./Icon.svelte";
     import { mdiClose } from "@mdi/js";
 
@@ -364,15 +365,11 @@
                         class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
                         >Profile</label
                     >
-                    <select
+                    <Select
                         id="profileSelect"
                         bind:value={selectedProfile}
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500"
-                    >
-                        {#each visibleProfiles as p}<option value={p}
-                                >{p}</option
-                            >{/each}
-                    </select>
+                        options={visibleProfiles}
+                    />
                 </div>
             {:else if authType === "manual"}
                 <div
@@ -484,15 +481,11 @@
                         class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
                         >Source Profile</label
                     >
-                    <select
+                    <Select
                         id="sourceProfileInput"
                         bind:value={sourceProfile}
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500"
-                    >
-                        {#each visibleProfiles as p}<option value={p}
-                                >{p}</option
-                            >{/each}
-                    </select>
+                        options={visibleProfiles}
+                    />
                 </div>
                 <div class="mt-2 mb-2 border-t border-gray-800 pt-3">
                     <label
