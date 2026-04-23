@@ -1,7 +1,7 @@
 <script lang="ts" generics="T">
     import type { Snippet } from "svelte";
     import Icon from "$lib/components/Icon.svelte";
-    import { mdiMagnify, mdiClose, mdiArrowUp, mdiArrowDown, mdiChevronLeft, mdiChevronRight } from "@mdi/js";
+    import { mdiMagnify, mdiClose, mdiArrowUp, mdiArrowDown, mdiChevronLeft, mdiChevronRight, mdiSort } from "@mdi/js";
 
     let {
         items = [],
@@ -47,6 +47,7 @@
 
     // Local state
     let filterText = $state("");
+    let showMobileSearch = $state(false);
     let sortKey = $state<string | null>(null);
     let sortAsc = $state(true);
 
@@ -163,10 +164,47 @@
     >
         <!-- Toolbar -->
         <div
-            class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 border-b border-gray-800 bg-gray-900/50 shrink-0 gap-3"
+            class="flex flex-row items-center justify-between p-3 border-b border-gray-800 bg-gray-900/50 shrink-0 gap-3"
         >
-            <!-- Filter -->
-            <div class="relative w-full sm:w-64 shrink-0">
+            <!-- Mobile Actions (Left) -->
+            <div class="flex items-center gap-2 sm:hidden">
+                <button
+                    onclick={() => showMobileSearch = !showMobileSearch}
+                    class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 transition-colors {showMobileSearch || filterText ? 'text-blue-400 border-blue-500/50 bg-blue-500/10' : ''}"
+                >
+                    <Icon path={mdiMagnify} size={18} />
+                </button>
+                
+                <div class="relative">
+                    <button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 transition-colors {sortKey ? 'text-blue-400 border-blue-500/50 bg-blue-500/10' : ''}">
+                        <Icon path={mdiSort} size={18} />
+                    </button>
+                    <select
+                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        onchange={(e) => {
+                            const val = (e.target as HTMLSelectElement).value;
+                            if (!val) {
+                                sortKey = null;
+                            } else {
+                                const [k, d] = val.split(":");
+                                sortKey = k;
+                                sortAsc = d === "asc";
+                            }
+                        }}
+                    >
+                        <option value="">Default Sort</option>
+                        {#each columns as col}
+                            {#if col.sortable !== false}
+                                <option value="{col.key}:asc" selected={sortKey === col.key && sortAsc}>{col.label} (Asc)</option>
+                                <option value="{col.key}:desc" selected={sortKey === col.key && !sortAsc}>{col.label} (Desc)</option>
+                            {/if}
+                        {/each}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Desktop Filter -->
+            <div class="relative w-full sm:w-64 shrink-0 hidden sm:block">
                 <span
                     class="absolute inset-y-0 left-2.5 flex items-center text-gray-500"
                     ><Icon path={mdiMagnify} size={14} /></span
@@ -186,13 +224,36 @@
                 {/if}
             </div>
 
-            <!-- Right Actions -->
-            <div class="flex items-center gap-2 justify-end">
+            <!-- Right Actions Snippet -->
+            <div class="flex items-center gap-2 justify-end ml-auto">
                 {#if headerActionsSnippet}
                     {@render headerActionsSnippet()}
                 {/if}
             </div>
         </div>
+
+        <!-- Mobile Search Expansion -->
+        {#if showMobileSearch}
+            <div class="p-3 border-b border-gray-800 bg-gray-900 sm:hidden flex gap-2 items-center">
+                <div class="relative w-full">
+                    <span class="absolute inset-y-0 left-2.5 flex items-center text-gray-500"><Icon path={mdiMagnify} size={14} /></span>
+                    <input
+                        type="text"
+                        bind:value={filterText}
+                        placeholder="Search..."
+                        class="w-full bg-gray-950 border border-gray-700 rounded pl-8 pr-3 py-1.5 text-sm outline-none focus:border-blue-500 text-gray-200 transition-colors"
+                        autofocus
+                    />
+                    {#if filterText}
+                        <button
+                            onclick={() => (filterText = "")}
+                            class="absolute inset-y-0 right-2 flex items-center text-gray-500 hover:text-gray-300"
+                        ><Icon path={mdiClose} size={14} /></button>
+                    {/if}
+                </div>
+                <button onclick={() => { showMobileSearch = false; filterText = ''; }} class="text-xs font-semibold text-gray-400 hover:text-white px-2">Cancel</button>
+            </div>
+        {/if}
 
         <!-- Table Core -->
         <div class="flex-1 overflow-auto bg-gray-950 p-3 sm:p-0">
