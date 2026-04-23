@@ -8,6 +8,7 @@
   import { page } from "$app/stores";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { navigationHistory } from "$lib/services/navigation.svelte";
   import { mobileState } from "$lib/services/mobile";
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
   import Login from "$lib/components/Login.svelte";
@@ -101,12 +102,13 @@
   let currentLoginId = $state(0);
 
   // History tracking for mobile back button
-  let historyStack: string[] = [];
   afterNavigate(({ type, from }) => {
     if (type === "popstate") {
-      historyStack.pop();
+      navigationHistory.pop();
+    } else if (navigationHistory.isBackNavigation) {
+      navigationHistory.isBackNavigation = false;
     } else if (from && from.url.pathname !== window.location.pathname) {
-      historyStack.push(from.url.pathname + from.url.search);
+      navigationHistory.push(from.url.pathname + from.url.search);
     }
   });
 
@@ -288,8 +290,8 @@
       backUnlisten = await listen("tauri://back-button", async () => {
         if (mobileState.preventGlobalBack) return;
 
-        if (historyStack.length > 0) {
-          window.history.back();
+        if (navigationHistory.canGoBack) {
+          await navigationHistory.goBack();
         } else {
           try {
             const w = await getCurrentWindow();

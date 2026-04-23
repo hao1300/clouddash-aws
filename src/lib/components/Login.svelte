@@ -108,7 +108,6 @@
         }
         return () => {
             if (unlisten) unlisten();
-            if (os === "android") invoke("set_back_button_intercept", { enabled: false });
         };
     });
 

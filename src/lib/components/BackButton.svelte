@@ -12,27 +12,7 @@
         children?: any;
     } = $props();
 
-    let canGoBack = $state(true);
-
-    function updateVisibility() {
-        if (typeof window !== "undefined" && window.history) {
-            const index = window.history.state?.["sveltekit:index"];
-            if (index !== undefined) {
-                canGoBack = index > 0;
-            } else {
-                // Fallback if sveltekit:index is not available
-                canGoBack = window.history.length > 1;
-            }
-        }
-    }
-
-    onMount(() => {
-        updateVisibility();
-    });
-
-    afterNavigate(() => {
-        updateVisibility();
-    });
+    import { navigationHistory } from "$lib/services/navigation.svelte";
 
     function handleClick(e: MouseEvent) {
         if (onclick) {
@@ -40,12 +20,12 @@
         } else if (href) {
             goto(href);
         } else {
-            window.history.back();
+            navigationHistory.goBack();
         }
     }
 </script>
 
-{#if canGoBack || href || onclick}
+{#if navigationHistory.canGoBack || href || onclick}
     <button
         class="text-white hover:text-gray-200 transition shrink-0 flex items-center gap-1.5"
         onclick={handleClick}
