@@ -16,7 +16,7 @@ function run(command) {
     execSync(command, { stdio: 'inherit' });
 }
 
-function copyBundle(ext, subdir, version) {
+async function copyBundle(ext, subdir, version) {
     const dir = path.join(BUNDLE_DIR, subdir);
     if (!fs.existsSync(dir)) {
         console.warn(`Warning: Directory not found: ${dir}`);
@@ -29,27 +29,31 @@ function copyBundle(ext, subdir, version) {
     if (targetFile) {
         const src = path.join(dir, targetFile);
         const destPath = `downloads/linux/clouddash-${version}.${ext}`;
-        uploadToR2(src, destPath);
+        await uploadToR2(src, destPath);
     } else {
         console.warn(`Warning: No ${ext} bundle found in ${dir}`);
     }
 }
 
-try {
-    const version = getVersion();
-    console.log(`Building CloudDash version ${version}...`);
+async function main() {
+    try {
+        const version = getVersion();
+        console.log(`Building CloudDash version ${version}...`);
 
-    run('npm run tauri-build');
+        run('npm run tauri-build');
 
-    copyBundle('AppImage', 'appimage', version);
-    copyBundle('deb', 'deb', version);
-    copyBundle('rpm', 'rpm', version);
+        await copyBundle('AppImage', 'appimage', version);
+        await copyBundle('deb', 'deb', version);
+        await copyBundle('rpm', 'rpm', version);
 
-    updateWebVersion(version);
+        updateWebVersion(version);
 
-    console.log('--------------------------------------------------');
-    console.log('Build complete!');
-} catch (error) {
-    console.error('Error during build:', error.message);
-    process.exit(1);
+        console.log('--------------------------------------------------');
+        console.log('Build complete!');
+    } catch (error) {
+        console.error('Error during build:', error.message);
+        process.exit(1);
+    }
 }
+
+main();

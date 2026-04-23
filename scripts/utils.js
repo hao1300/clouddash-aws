@@ -1,5 +1,6 @@
 import fs from 'fs';
-import { execSync } from 'child_process';
+import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { fromIni } from '@aws-sdk/credential-provider-ini';
 
 export function updateWebVersion(version) {
     const webPath = 'clouddash-web/src/routes/download/+page.svelte';
@@ -19,16 +20,44 @@ export function updateWebVersion(version) {
     console.log(`Updated ${webPath} to version ${version}`);
 }
 
-export function uploadToR2(src, destPath) {
+export async function uploadToR2(src, destPath) {
     const bucket = "static-clouddash-dev";
     const endpoint = "https://9e5d25b88e77c04686ef4f03124ee940.r2.cloudflarestorage.com";
     const profile = "chromestatsr2";
     
-    const command = `aws --profile ${profile} --region=auto s3 cp "${src}" "s3://${bucket}/${destPath}" --checksum-algorithm CRC32 --endpoint-url=${endpoint}`;
+    console.log(`Uploading to R2: ${src} -> s3://${bucket}/${destPath}`);
     
-    console.log(`Uploading to R2: ${command}`);
+    const client = new S3Client({
+        region: "auto",
+        endpoint: endpoint,
+        credentials: fromIni({ profile: profile }),
+    });
+
     try {
-        execSync(command, { stdio: 'inherit' });
+        // Check if file already exists
+        try {
+            await client.send(new HeadObjectCommand({
+                Bucket: bucket,
+                Key: destPath,
+            }));
+            console.error(`Error: File already exists at s3://${bucket}/${destPath}`);
+            process.exit(1);
+        } catch (error) {
+            if (error.name !== 'NotFound' && error.$metadata?.httpStatusCode !== 404) {
+                throw error;
+            }
+            // File does not exist, proceed with upload
+        }
+
+        const fileStream = fs.createReadStream(src);
+        await client.send(new PutObjectCommand({
+            Bucket: bucket,
+            Key: destPath,
+            Body: fileStream,
+            ChecksumAlgorithm: "CRC32",
+        }));
+        
+        console.log(`Successfully uploaded to R2: s3://${bucket}/${destPath}`);
     } catch (error) {
         console.error(`Failed to upload to R2: ${error.message}`);
         process.exit(1);

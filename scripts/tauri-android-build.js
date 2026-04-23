@@ -17,15 +17,15 @@ function run(command) {
     execSync(command, { stdio: 'inherit' });
 }
 
-function uploadIfExists(src, destPath) {
+async function uploadIfExists(src, destPath) {
     if (fs.existsSync(src)) {
-        uploadToR2(src, destPath);
+        await uploadToR2(src, destPath);
         return src;
     }
     return null;
 }
 
-function findAndUpload(searchDir, pattern, destPath) {
+async function findAndUpload(searchDir, pattern, destPath) {
     if (!fs.existsSync(searchDir)) return null;
     
     const findFiles = (dir) => {
@@ -45,49 +45,53 @@ function findAndUpload(searchDir, pattern, destPath) {
 
     const files = findFiles(searchDir);
     if (files.length > 0) {
-        uploadToR2(files[0], destPath);
+        await uploadToR2(files[0], destPath);
         return files[0];
     }
     return null;
 }
 
-try {
-    const version = getVersion();
-    console.log(`Building CloudDash Android version ${version}...`);
+async function main() {
+    try {
+        const version = getVersion();
+        console.log(`Building CloudDash Android version ${version}...`);
 
-    run('npx tauri android build');
+        run('npx tauri android build');
 
-    // Upload APK
-    const apkDestPath = `downloads/android/clouddash-${version}.apk`;
-    if (!uploadIfExists(APK_PATH, apkDestPath)) {
-        console.warn(`Warning: No APK found at ${APK_PATH}, searching for alternatives...`);
-        if (!findAndUpload('src-tauri/gen/android', '-release.apk', apkDestPath)) {
-            console.error('Error: Could not find any release APK');
-            process.exit(1);
+        // Upload APK
+        const apkDestPath = `downloads/android/clouddash-${version}.apk`;
+        if (!await uploadIfExists(APK_PATH, apkDestPath)) {
+            console.warn(`Warning: No APK found at ${APK_PATH}, searching for alternatives...`);
+            if (!await findAndUpload('src-tauri/gen/android', '-release.apk', apkDestPath)) {
+                console.error('Error: Could not find any release APK');
+                process.exit(1);
+            }
         }
+
+        // Handle AAB
+        const aabFileName = `clouddash-${version}.aab`;
+        const aabDestPath = `store/${aabFileName}`;
+        let foundAab = await uploadIfExists(AAB_PATH, aabDestPath);
+        if (!foundAab) {
+            console.warn(`Warning: No AAB found at ${AAB_PATH}, searching for alternatives...`);
+            foundAab = await findAndUpload('src-tauri/gen/android', '-release.aab', aabDestPath);
+        }
+
+        if (foundAab) {
+            fs.copyFileSync(foundAab, aabFileName);
+            console.log(`Copied AAB to root: ${aabFileName}`);
+        } else {
+            console.warn('Warning: Could not find any release AAB');
+        }
+
+        updateWebVersion(version);
+
+        console.log('--------------------------------------------------');
+        console.log('Build complete!');
+    } catch (error) {
+        console.error('Error during build:', error.message);
+        process.exit(1);
     }
-
-    // Handle AAB
-    const aabFileName = `clouddash-${version}.aab`;
-    const aabDestPath = `store/${aabFileName}`;
-    let foundAab = uploadIfExists(AAB_PATH, aabDestPath);
-    if (!foundAab) {
-        console.warn(`Warning: No AAB found at ${AAB_PATH}, searching for alternatives...`);
-        foundAab = findAndUpload('src-tauri/gen/android', '-release.aab', aabDestPath);
-    }
-
-    if (foundAab) {
-        fs.copyFileSync(foundAab, aabFileName);
-        console.log(`Copied AAB to root: ${aabFileName}`);
-    } else {
-        console.warn('Warning: Could not find any release AAB');
-    }
-
-    updateWebVersion(version);
-
-    console.log('--------------------------------------------------');
-    console.log('Build complete!');
-} catch (error) {
-    console.error('Error during build:', error.message);
-    process.exit(1);
 }
+
+main();
