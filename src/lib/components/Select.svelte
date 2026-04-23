@@ -11,6 +11,7 @@
         onchange,
         mono = false,
         small = false,
+        primary = false,
     }: {
         value: any;
         options: (string | { value: any; label: string; color?: string; fontMono?: boolean })[];
@@ -19,6 +20,7 @@
         onchange?: (val: any) => void;
         mono?: boolean;
         small?: boolean;
+        primary?: boolean;
     } = $props();
 
     let isOpen = $state(false);
@@ -70,10 +72,10 @@
         onclick={toggle}
         class="w-full flex items-center justify-between gap-2 bg-gray-800 rounded border border-gray-700 hover:border-gray-600 transition-all text-left {small ? 'p-1.5 text-[10px]' : 'p-2 text-sm'} {mono || selectedOption?.fontMono ? 'font-mono' : ''}"
     >
-        <span class="truncate {selectedOption ? 'text-blue-400' : 'text-gray-500'}">
+        <span class="truncate {selectedOption || primary ? 'text-blue-400' : 'text-gray-500'}">
             {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <Icon path={mdiChevronDown} size={small ? 14 : 16} class="text-gray-500 shrink-0 transition-transform {isOpen ? 'rotate-180' : ''}" />
+        <Icon path={mdiChevronDown} size={small ? 14 : 16} class="{selectedOption || primary ? 'text-blue-400' : 'text-gray-500'} shrink-0 transition-transform {isOpen ? 'rotate-180' : ''}" />
     </button>
 
     {#if isOpen}

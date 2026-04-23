@@ -1,5 +1,6 @@
 <script lang="ts">
     import Icon from "$lib/components/Icon.svelte";
+    import Select from "$lib/components/Select.svelte";
     import { mdiCircle } from "@mdi/js";
     import { COLORS } from "$lib/constants";
 
@@ -146,26 +147,21 @@
             ]}
         >
             {#snippet actionsSnippet(item)}
-                <div class="flex gap-2 justify-end">
-                    <select
-                        class="bg-gray-800 text-xs px-2 py-1 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 shadow cursor-pointer appearance-none text-center"
-                        onchange={(e) => {
-                            const action = e.currentTarget.value;
-                            if (action) {
-                                handleAction(action as any, item.id);
-                                e.currentTarget.value = "";
-                            }
+                <div class="flex gap-2 justify-end w-32 ml-auto">
+                    <Select
+                        value=""
+                        placeholder="Actions"
+                        primary={true}
+                        small={true}
+                        options={[
+                            ...(item.state === 'stopped' ? [{value: 'start', label: 'Start'}] : []),
+                            ...(item.state === 'running' ? [{value: 'stop', label: 'Stop'}, {value: 'reboot', label: 'Reboot'}] : []),
+                            {value: 'terminate', label: 'Terminate'}
+                        ]}
+                        onchange={(action) => {
+                            if (action) handleAction(action as any, item.id);
                         }}
-                    >
-                        <option value="" disabled selected>Actions</option>
-                        {#if item.state === "stopped"}
-                            <option value="start">Start</option>
-                        {:else if item.state === "running"}
-                            <option value="stop">Stop</option>
-                            <option value="reboot">Reboot</option>
-                        {/if}
-                        <option value="terminate">Terminate</option>
-                    </select>
+                    />
                 </div>
             {/snippet}
         </PaginatedTable>

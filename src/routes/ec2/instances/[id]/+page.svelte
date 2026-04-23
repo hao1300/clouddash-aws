@@ -1,5 +1,6 @@
 <script lang="ts">
     import Icon from "$lib/components/Icon.svelte";
+    import Select from "$lib/components/Select.svelte";
     import { mdiLoading } from "@mdi/js";
 
     import {
@@ -204,25 +205,22 @@
         </div>
     {:else if instance}
         <div class="flex justify-end mb-4">
-            <select
-                class="bg-gray-800 text-xs px-3 py-1.5 rounded border border-gray-700 text-gray-300 outline-none focus:border-blue-500 shadow cursor-pointer appearance-none text-center font-bold uppercase tracking-wider"
-                onchange={(e) => {
-                    const action = e.currentTarget.value;
-                    if (action) {
-                        handleAction(action as any);
-                        e.currentTarget.value = "";
-                    }
-                }}
-            >
-                <option value="" disabled selected>Actions</option>
-                {#if instance.state === "stopped"}
-                    <option value="start">Start</option>
-                {:else if instance.state === "running"}
-                    <option value="stop">Stop</option>
-                    <option value="reboot">Reboot</option>
-                {/if}
-                <option value="terminate">Terminate</option>
-            </select>
+            <div class="w-40">
+                <Select
+                    value=""
+                    placeholder="Actions"
+                    primary={true}
+                    class="font-bold uppercase tracking-wider"
+                    options={[
+                        ...(instance.state === 'stopped' ? [{value: 'start', label: 'Start'}] : []),
+                        ...(instance.state === 'running' ? [{value: 'stop', label: 'Stop'}, {value: 'reboot', label: 'Reboot'}] : []),
+                        {value: 'terminate', label: 'Terminate'}
+                    ]}
+                    onchange={(action) => {
+                        if (action) handleAction(action as any);
+                    }}
+                />
+            </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
