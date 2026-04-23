@@ -48,6 +48,7 @@
     // Local state
     let filterText = $state("");
     let showMobileSearch = $state(false);
+    let showMobileSort = $state(false);
     let sortKey = $state<string | null>(null);
     let sortAsc = $state(true);
 
@@ -176,30 +177,47 @@
                 </button>
                 
                 <div class="relative">
-                    <button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 transition-colors {sortKey ? 'text-blue-400 border-blue-500/50 bg-blue-500/10' : ''}">
+                    <button
+                        onclick={() => showMobileSort = !showMobileSort}
+                        class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 transition-colors {sortKey ? 'text-blue-400 border-blue-500/50 bg-blue-500/10' : ''}"
+                    >
                         <Icon path={mdiSort} size={18} />
                     </button>
-                    <select
-                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        onchange={(e) => {
-                            const val = (e.target as HTMLSelectElement).value;
-                            if (!val) {
-                                sortKey = null;
-                            } else {
-                                const [k, d] = val.split(":");
-                                sortKey = k;
-                                sortAsc = d === "asc";
-                            }
-                        }}
-                    >
-                        <option value="">Default Sort</option>
-                        {#each columns as col}
-                            {#if col.sortable !== false}
-                                <option value="{col.key}:asc" selected={sortKey === col.key && sortAsc}>{col.label} (Asc)</option>
-                                <option value="{col.key}:desc" selected={sortKey === col.key && !sortAsc}>{col.label} (Desc)</option>
-                            {/if}
-                        {/each}
-                    </select>
+                    
+                    {#if showMobileSort}
+                        <!-- Click-away overlay -->
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <div class="fixed inset-0 z-40" onclick={() => showMobileSort = false}></div>
+                        
+                        <div class="absolute left-0 top-full mt-1 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 py-1 overflow-hidden">
+                            <button
+                                type="button"
+                                onclick={() => { sortKey = null; showMobileSort = false; }}
+                                class="w-full text-left px-3 py-2 text-xs hover:bg-blue-600/20 hover:text-blue-400 transition-colors {!sortKey ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-300'}"
+                            >
+                                Default Sort
+                            </button>
+                            {#each columns as col}
+                                {#if col.sortable !== false}
+                                    <button
+                                        type="button"
+                                        onclick={() => { sortKey = col.key; sortAsc = true; showMobileSort = false; }}
+                                        class="w-full text-left px-3 py-2 text-xs hover:bg-blue-600/20 hover:text-blue-400 transition-colors {sortKey === col.key && sortAsc ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-300'}"
+                                    >
+                                        {col.label} (Asc)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onclick={() => { sortKey = col.key; sortAsc = false; showMobileSort = false; }}
+                                        class="w-full text-left px-3 py-2 text-xs hover:bg-blue-600/20 hover:text-blue-400 transition-colors {sortKey === col.key && !sortAsc ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-300'}"
+                                    >
+                                        {col.label} (Desc)
+                                    </button>
+                                {/if}
+                            {/each}
+                        </div>
+                    {/if}
                 </div>
             </div>
 
