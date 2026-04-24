@@ -1,7 +1,6 @@
 <script lang="ts">
     import {
         ListTablesCommand,
-        DescribeTableCommand,
         CreateTableCommand,
         DeleteTableCommand,
     } from "@aws-sdk/client-dynamodb";
@@ -13,8 +12,7 @@
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     import Icon from "$lib/components/Icon.svelte";
-    import { mdiRefresh, mdiCircle } from "@mdi/js";
-    import { COLORS } from "$lib/constants";
+    import { mdiRefresh } from "@mdi/js";
 
     let error = $state("");
     let loading = $state(false);
@@ -87,32 +85,7 @@
                     ExclusiveStartTableName: token,
                 }),
             );
-            const names = resp.TableNames ?? [];
-            const details: any[] = [];
-            for (const name of names) {
-                try {
-                    const desc = await aws.dynamodb.send(
-                        new DescribeTableCommand({ TableName: name }),
-                    );
-                    const t = desc.Table;
-                    if (t) {
-                        details.push({
-                            name: t.TableName ?? name,
-                            status: t.TableStatus ?? "UNKNOWN",
-                            item_count: t.ItemCount ?? 0,
-                            size_bytes: t.TableSizeBytes ?? 0,
-                        });
-                    }
-                } catch {
-                    details.push({
-                        name,
-                        status: "ERROR",
-                        item_count: 0,
-                        size_bytes: 0,
-                    });
-                }
-            }
-            tables = details;
+            tables = (resp.TableNames ?? []).map((name) => ({ name }));
             pushToken(tablesTokenMap, resp.LastEvaluatedTableName);
             tablesCurrentToken = resp.LastEvaluatedTableName;
         } catch (e) {
@@ -201,26 +174,14 @@
         }
     }
 
-    function formatBytes(b: number | string) {
-        const num = Number(b);
-        if (num === 0 || isNaN(num)) return "0 B";
-        const k = 1024;
-        const s = ["B", "KB", "MB", "GB", "TB"];
-        const i = Math.floor(Math.log(num) / Math.log(k));
-        return parseFloat((num / Math.pow(k, i)).toFixed(1)) + " " + s[i];
-    }
+
 
     function handleSelectTable(name: string) {
         goto(`/dynamodb/table/${encodeURIComponent(name)}/explore`);
     }
 </script>
 
-{#snippet statusCell(v: string)}
-    <div class="flex items-center gap-1.5">
-        <Icon path={mdiCircle} size={10} color={v === "ACTIVE" ? COLORS.SUCCESS : COLORS.GRAY} />
-        <span>{v}</span>
-    </div>
-{/snippet}
+
 
 <div class="h-full relative overflow-hidden flex flex-col">
     {#if error}<div
@@ -252,17 +213,6 @@
                     label: "Table Name",
                     onClick: (item) => handleSelectTable(item.name),
                 },
-                {
-                    key: "status",
-                    label: "Status",
-                    renderCell: statusCell,
-                },
-                {
-                    key: "item_count",
-                    label: "Item Count",
-                    format: (v) => Number(v).toLocaleString(),
-                },
-                { key: "size_bytes", label: "Size", format: formatBytes },
             ]}
         >
             {#snippet headerActionsSnippet()}
