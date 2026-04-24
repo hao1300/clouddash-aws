@@ -1,9 +1,11 @@
 <script>
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
 
   let { children } = $props();
 
   let scrolled = $state(false);
+  let isOpen = $state(false);
 
   onMount(() => {
     const handleScroll = () => {
@@ -12,40 +14,49 @@
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   });
+
+  $effect(() => {
+    // Close menu when navigating to a new page
+    $page.url.pathname;
+    isOpen = false;
+  });
 </script>
 
 <nav
   class="navbar navbar-expand-lg py-3 sticky-top {scrolled ? 'glass border-bottom shadow-sm' : ''}"
 >
   <div class="container container-max">
-    <a class="navbar-brand d-flex align-items-center" href="/">
-      <div class="me-2 rounded-3 d-flex align-items-center justify-content-center">
-        <img src="/favicon-96x96.png" alt="CloudDash" width="32" height="32" />
-      </div>
-      <span class="fw-bold text-white h4 mb-0 font-outfit">CloudDash</span>
-    </a>
+    <div class="d-flex align-items-center">
+      <button
+        class="navbar-toggler border-0 text-white me-2"
+        type="button"
+        onclick={() => (isOpen = !isOpen)}
+        aria-label="Toggle navigation"
+      >
+        <span class="navbar-toggler-icon shadow-none" style="filter: invert(1);"></span>
+      </button>
 
-    <button
-      class="navbar-toggler border-0 text-white"
-      type="button"
-      data-bs-toggle="collapse"
-      data-bs-target="#navbarNav"
-      aria-label="Toggle navigation"
-    >
-      <span class="navbar-toggler-icon shadow-none" style="filter: invert(1);"></span>
-    </button>
+      <a class="navbar-brand d-flex align-items-center m-0" href="/">
+        <div class="me-2 rounded-3 d-flex align-items-center justify-content-center">
+          <img src="/favicon-96x96.png" alt="CloudDash" width="32" height="32" />
+        </div>
+        <span class="fw-bold text-white h4 mb-0 font-outfit">CloudDash</span>
+      </a>
+    </div>
 
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto gap-lg-3 mt-3 mt-lg-0 align-items-lg-center">
+    <div class="collapse navbar-collapse {isOpen ? 'show' : ''}" id="navbarNav">
+      <ul class="navbar-nav ms-auto gap-lg-3 mt-3 mt-lg-0 align-items-start align-items-lg-center text-start">
         <li class="nav-item">
-          <a class="nav-link fw-medium" href="/#features">Features</a>
+          <a class="nav-link fw-medium" href="/#features" onclick={() => (isOpen = false)}>Features</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link fw-medium" href="/pricing">Pricing</a>
+          <a class="nav-link fw-medium" href="/pricing" onclick={() => (isOpen = false)}>Pricing</a>
         </li>
         <li class="nav-item">
-          <a class="btn btn-primary rounded-pill px-4 ms-lg-2 shadow-sm fw-bold" href="/download"
-            >Download</a
+          <a
+            class="btn btn-primary rounded-pill px-4 ms-lg-2 shadow-sm fw-bold"
+            href="/download"
+            onclick={() => (isOpen = false)}>Download</a
           >
         </li>
       </ul>
@@ -136,5 +147,44 @@
 
   .border-gray {
     border-color: var(--border-gray) !important;
+  }
+
+  @media (max-width: 991.98px) {
+    .navbar-collapse {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      width: 100%;
+      background-color: var(--bg-950);
+      border-bottom: 1px solid var(--border-gray);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      display: grid !important;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.3s ease-in-out, opacity 0.3s ease-in-out;
+      opacity: 0;
+      visibility: hidden;
+      z-index: 1050;
+    }
+
+    .navbar-collapse.show {
+      grid-template-rows: 1fr;
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .navbar-collapse > ul {
+      min-height: 0;
+      overflow: hidden;
+      margin: 0 !important;
+      padding: 0 1rem;
+    }
+
+    .navbar-collapse > ul > li:first-child {
+      margin-top: 1rem;
+    }
+
+    .navbar-collapse > ul > li:last-child {
+      margin-bottom: 1.5rem;
+    }
   }
 </style>
