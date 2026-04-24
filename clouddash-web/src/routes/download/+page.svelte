@@ -15,7 +15,7 @@
       name: "Windows",
       icon: MonitorIcon,
       type: "Desktop App",
-      link: "https://static.clouddash.dev/downloads/windows/clouddash-0.9.0-setup.exe",
+      link: "https://static.clouddash.dev/downloads/windows/clouddash-0.9.1-setup.exe",
       instructions:
         "Stable installer for Windows 10/11. Includes auto-updates and system tray support.",
     },
@@ -23,7 +23,7 @@
       name: "Android",
       icon: SmartphoneIcon,
       type: "Mobile APK",
-      link: "https://static.clouddash.dev/downloads/android/clouddash-0.9.0.apk",
+      link: "https://static.clouddash.dev/downloads/android/clouddash-0.9.1.apk",
       instructions:
         "Direct download for Android devices. Optimized for tablets and foldable phones.",
     },
@@ -31,7 +31,7 @@
       name: "Linux",
       icon: MonitorIcon,
       type: "AppImage",
-      link: "https://static.clouddash.dev/downloads/linux/clouddash-0.9.0.AppImage",
+      link: "https://static.clouddash.dev/downloads/linux/clouddash-0.9.1.AppImage",
       instructions:
         "Universal Linux AppImage. Supports most distributions including Ubuntu, Fedora, and Debian.",
     },
