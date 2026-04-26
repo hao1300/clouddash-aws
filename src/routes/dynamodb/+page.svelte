@@ -164,7 +164,7 @@
                 new DeleteTableCommand({ TableName: tableToDelete }),
             );
             actionMsg = `Successfully deleted table ${tableToDelete}.`;
-            tableToDelete = null;
+            showDeleteModal = false;
             tablesTokenMap = [];
             loadTables();
         } catch (e) {
@@ -362,7 +362,7 @@
         </p>
         <div class="flex justify-end gap-2 mt-4">
             <button
-                onclick={() => (tableToDelete = null)}
+                onclick={() => (showDeleteModal = false)}
                 class="px-4 py-2 rounded text-sm text-gray-400 hover:text-gray-200 transition"
                 >Cancel</button
             >
