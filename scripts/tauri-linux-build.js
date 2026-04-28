@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
-import { updateWebVersion, uploadToR2 } from './utils.js';
+import { updateWebVersion, uploadToR2, generateUpdateMetadata } from './utils.js';
 
 const CONFIG_PATH = 'src-tauri/tauri.conf.json';
 const BUNDLE_DIR = 'src-tauri/target/release/bundle';
@@ -55,6 +55,17 @@ async function main() {
         await copyBundle('rpm', 'rpm', version);
 
         updateWebVersion(version, 'linux');
+
+        // Generate update metadata for Linux (AppImage)
+        const appImageDir = path.join(BUNDLE_DIR, 'appimage');
+        if (fs.existsSync(appImageDir)) {
+            const files = fs.readdirSync(appImageDir);
+            const sigFile = files.find(f => f.endsWith('.AppImage.sig'));
+            if (sigFile) {
+                const signaturePath = path.join(appImageDir, sigFile);
+                generateUpdateMetadata('linux', version, signaturePath, `https://static.clouddash.dev/downloads/linux/clouddash-${version}.AppImage`);
+            }
+        }
 
         console.log('--------------------------------------------------');
         console.log('Build complete!');

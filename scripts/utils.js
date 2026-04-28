@@ -27,6 +27,36 @@ export function updateWebVersion(version, platform = null) {
     console.log(`Updated ${webPath} (${platform || 'all platforms'}) to version ${version}`);
 }
 
+export function generateUpdateMetadata(platform, version, signaturePath, downloadUrl) {
+    if (!fs.existsSync(signaturePath)) {
+        console.warn(`Warning: Signature file not found at ${signaturePath}, skipping metadata generation.`);
+        return;
+    }
+
+    const pubDate = new Date().toISOString();
+    const signature = fs.readFileSync(signaturePath, 'utf8').trim();
+    
+    const metadata = {
+        version: version,
+        pub_date: pubDate,
+        url: downloadUrl,
+        signature: signature,
+        notes: `Version ${version} release.`
+    };
+
+    const target = platform; // 'windows' or 'linux'
+    const arch = 'x86_64';
+    
+    const outputDir = `clouddash-web/static/updates/${target}/${arch}`;
+    if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+    }
+    
+    const outputPath = path.join(outputDir, `${version}.json`);
+    fs.writeFileSync(outputPath, JSON.stringify(metadata, null, 2));
+    console.log(`Generated update metadata at ${outputPath}`);
+}
+
 function getMimeType(filePath) {
     const ext = path.extname(filePath).toLowerCase();
     const mimeTypes = {

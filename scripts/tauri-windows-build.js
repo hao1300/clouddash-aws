@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
-import { updateWebVersion, uploadToR2 } from './utils.js';
+import { updateWebVersion, uploadToR2, generateUpdateMetadata } from './utils.js';
 
 const CONFIG_PATH = 'src-tauri/tauri.conf.json';
 const NSIS_DIR = 'src-tauri/target/release/bundle/nsis';
@@ -33,8 +33,9 @@ async function main() {
 
         // Find the setup exe matching the version
         let setupExe = null;
+        let files = [];
         if (fs.existsSync(NSIS_DIR)) {
-            const files = fs.readdirSync(NSIS_DIR);
+            files = fs.readdirSync(NSIS_DIR);
             setupExe = files.find(f => f.includes(version) && f.endsWith('setup.exe'));
         }
 
@@ -63,6 +64,15 @@ async function main() {
         }
 
         updateWebVersion(version, 'windows');
+        
+        // Generate update metadata for Tauri updater
+        const signatureFile = files?.find(f => f.includes(version) && f.endsWith('setup.exe.sig'));
+        if (signatureFile) {
+            const signaturePath = path.join(NSIS_DIR, signatureFile);
+            generateUpdateMetadata('windows', version, signaturePath, `https://static.clouddash.dev/${destPath}`);
+        } else {
+            console.warn('Warning: Could not find signature file for metadata generation.');
+        }
 
         console.log('--------------------------------------------------');
         console.log('Build complete!');
