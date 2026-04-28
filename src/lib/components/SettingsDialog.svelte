@@ -4,6 +4,7 @@
     import Icon from "$lib/components/Icon.svelte";
     import { mdiClose, mdiChevronLeft, mdiChevronRight } from "@mdi/js";
     import { invoke } from "@tauri-apps/api/core";
+    import { getVersion } from "@tauri-apps/api/app";
     import { open as openDialog } from "@tauri-apps/plugin-dialog";
     import {
         settings,
@@ -33,10 +34,12 @@
     }
 
     let os = $state("windows");
+    let version = $state("0.0.0");
 
     onMount(async () => {
         try {
             os = await invoke("get_os");
+            version = await getVersion();
             if (!settings.downloadFolder) {
                 settings.downloadFolder = await invoke(
                     "get_default_download_directory",
@@ -77,7 +80,7 @@
     } = $props();
 
     let settingsTab = $state<
-        "general" | "profiles" | "regions" | "services" | "qrcode" | "pro"
+        "general" | "profiles" | "regions" | "services" | "qrcode" | "pro" | "about"
     >("general");
 
     let qrCodeDataUrl = $state("");
@@ -279,7 +282,7 @@
                 ? 'w-full flex-row border-b'
                 : 'w-32 flex-col border-r'} bg-gray-950 border-gray-800 flex py-2 shrink-0 overflow-x-auto"
         >
-            {#each [["general", "General"], ["profiles", "Profiles"], ["regions", "Regions"], ["qrcode", "Export Keys"], ["pro", "Pro License"]] as const as [key, label]}
+            {#each [["general", "General"], ["profiles", "Profiles"], ["regions", "Regions"], ["qrcode", "Export Keys"], ["pro", "Pro License"], ["about", "About"]] as const as [key, label]}
                 <button
                     onclick={() => (settingsTab = key)}
                     class="px-4 py-2.5 text-xs font-semibold transition whitespace-nowrap
@@ -868,6 +871,53 @@
                             >
                         </div>
                     </div>
+                </div>
+            {:else if settingsTab === "about"}
+                <div class="flex flex-col items-center justify-center h-full text-center px-4">
+                    <div class="mb-6">
+                        <div class="w-20 h-20 rounded-2xl bg-gray-900 flex items-center justify-center shadow-xl shadow-blue-500/20 mx-auto mb-4 overflow-hidden border border-gray-800">
+                            <img src="/logo.png" alt="CloudDash Logo" class="w-full h-full object-cover" />
+                        </div>
+                        <h2 class="text-xl font-bold text-white tracking-tight">CloudDash</h2>
+                        <p class="text-xs text-gray-500 mt-1">AWS Console Client</p>
+                    </div>
+
+                    <div class="w-full max-w-xs space-y-2 mb-6">
+                        <div class="flex items-center justify-between bg-gray-900/60 border border-gray-800 rounded-lg px-4 py-2.5">
+                            <span class="text-xs text-gray-400">Version</span>
+                            <span class="text-xs font-mono text-gray-200">{version}</span>
+                        </div>
+                        <div class="flex items-center justify-between bg-gray-900/60 border border-gray-800 rounded-lg px-4 py-2.5">
+                            <span class="text-xs text-gray-400">License</span>
+                            <span class="text-xs font-mono text-gray-200">MIT</span>
+                        </div>
+                        <div class="flex items-center justify-between bg-gray-900/60 border border-gray-800 rounded-lg px-4 py-2.5">
+                            <span class="text-xs text-gray-400">Platform</span>
+                            <span class="text-xs font-mono text-gray-200 capitalize">{os}</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2 w-full max-w-xs">
+                        <a
+                            href="https://clouddash.dev"
+                            target="_blank"
+                            class="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white px-4 py-2.5 rounded-lg text-xs font-semibold transition border border-gray-700"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"></path></svg>
+                            clouddash.dev
+                        </a>
+                        <a
+                            href="mailto:support@clouddash.dev"
+                            class="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white px-4 py-2.5 rounded-lg text-xs font-semibold transition border border-gray-700"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                            support@clouddash.dev
+                        </a>
+                    </div>
+
+                    <p class="text-[10px] text-gray-600 mt-6">
+                        &copy; {new Date().getFullYear()} CloudDash. All rights reserved.
+                    </p>
                 </div>
             {/if}
         </div>
