@@ -1009,7 +1009,8 @@
                     ? 'hidden sm:inline text-gray-500 font-medium'
                     : ''}"
                   onclick={(e) => {
-                    if (!part.href) e.preventDefault();
+                    e.preventDefault();
+                    if (part.href) goto(part.href);
                   }}
                 >
                   {part.label}
