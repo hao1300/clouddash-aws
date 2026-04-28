@@ -71,7 +71,7 @@
   let allProfiles = $state<string[]>([]);
   let selectedProfile = $state("default");
   let region = $state("us-east-1");
-  let authType = $state<"profile" | "manual" | "assume" | "qr">("profile");
+  let authType = $state<"profile" | "manual" | "assume" | "qr">("manual");
 
   // Custom API Keys
   let os = $state("");
@@ -186,7 +186,7 @@
       .filter(Boolean),
   );
   const enabledServices = $derived(
-    orderedServices.filter((s) => serviceVisible.has(s.id))
+    orderedServices.filter((s) => serviceVisible.has(s.id)),
   );
 
   // To highlight active tab on top
@@ -199,17 +199,22 @@
     titleService.updateFromUrl($page.url.pathname);
     bookmarks.currentUrl = $page.url.pathname + $page.url.search;
 
-    if (!settings.isPro && activeId && activeId !== "settings" && activeId !== "upgrade" && !["cloudwatch", "s3", "dynamodb"].includes(activeId)) {
-        goto("/upgrade", { replaceState: true });
-        return;
+    if (
+      !settings.isPro &&
+      activeId &&
+      activeId !== "settings" &&
+      activeId !== "upgrade" &&
+      !["cloudwatch", "s3", "dynamodb"].includes(activeId)
+    ) {
+      goto("/upgrade", { replaceState: true });
+      return;
     }
 
     if (Object.keys($page.params).length === 0) {
       const manifest = SERVICE_MANIFEST[activeId];
       if (manifest) {
         const pathTab = $page.url.pathname.split("/").slice(2).join("/") || "";
-        const resourceName =
-          manifest.tabs[pathTab] ?? manifest.tabs[""];
+        const resourceName = manifest.tabs[pathTab] ?? manifest.tabs[""];
         if (resourceName) {
           titleService.setResource(resourceName, undefined, $page.url.pathname);
         }
@@ -261,7 +266,9 @@
     }
 
     if (os === "android") {
-      invoke("set_back_button_intercept", { enabled: true }).catch(console.error);
+      invoke("set_back_button_intercept", { enabled: true }).catch(
+        console.error,
+      );
       backUnlisten = await listen("tauri://back-button", async () => {
         if (mobileState.preventGlobalBack) return;
 
@@ -339,6 +346,8 @@
 
     if (saved?.authType) {
       authType = saved.authType;
+    } else if (!saved && allProfiles.length > 0) {
+      authType = "profile";
     } else if (isMobile && noRealProfiles) {
       authType = "qr";
     }
@@ -357,7 +366,6 @@
     } else if (window.innerWidth < 640) {
       sideMenuOpen = false;
     }
-
 
     // Apply initial state from environment variables (forked process)
     if (initialState.profile && allProfiles.includes(initialState.profile)) {
@@ -383,7 +391,8 @@
       if (
         selectedProfile !== "default" ||
         saved?.profile === "default" ||
-        initialState.profile
+        initialState.profile ||
+        !saved
       ) {
         shouldAutoConnect = true;
       }
@@ -402,7 +411,11 @@
     error = "";
   }
 
-  async function login(silent = false, initialPath: string | null = null, forceProfileRegion = false) {
+  async function login(
+    silent = false,
+    initialPath: string | null = null,
+    forceProfileRegion = false,
+  ) {
     const loginId = ++currentLoginId;
     try {
       loading = true;
@@ -422,8 +435,7 @@
         properties["aws_secret_access_key"] = secretAccessKey.trim();
         if (sessionToken.trim())
           properties["aws_session_token"] = sessionToken.trim();
-        if (mfaSerial.trim())
-          properties["mfa_serial"] = mfaSerial.trim();
+        if (mfaSerial.trim()) properties["mfa_serial"] = mfaSerial.trim();
 
         await invoke("save_profile", {
           name: saveProfileName.trim(),
@@ -457,8 +469,7 @@
         properties["role_arn"] =
           `arn:aws:iam::${accountId.trim()}:role/${roleName.trim()}`;
         properties["source_profile"] = sourceProfile.trim();
-        if (mfaSerial.trim())
-          properties["mfa_serial"] = mfaSerial.trim();
+        if (mfaSerial.trim()) properties["mfa_serial"] = mfaSerial.trim();
 
         await invoke("save_profile", {
           name: saveProfileName.trim(),
@@ -530,7 +541,10 @@
           });
 
           let res;
-          console.log("[Auth] Attempting AssumeRole without MFA for", target.role_arn);
+          console.log(
+            "[Auth] Attempting AssumeRole without MFA for",
+            target.role_arn,
+          );
           try {
             res = await sts.send(
               new AssumeRoleCommand({
@@ -540,11 +554,26 @@
             );
             console.log("[Auth] AssumeRole without MFA successful");
           } catch (err: any) {
-            console.log("[Auth] AssumeRole failed:", err, "Target MFA Serial:", target.mfa_serial);
+            console.log(
+              "[Auth] AssumeRole failed:",
+              err,
+              "Target MFA Serial:",
+              target.mfa_serial,
+            );
             // Check if failure might be due to MFA, and if we have mfa_serial
-            if (target.mfa_serial && (err.name === 'AccessDenied' || err.name === 'AccessDeniedException' || err.message?.toLowerCase().includes('mfa') || err.message?.toLowerCase().includes('multifactorauthentication'))) {
+            if (
+              target.mfa_serial &&
+              (err.name === "AccessDenied" ||
+                err.name === "AccessDeniedException" ||
+                err.message?.toLowerCase().includes("mfa") ||
+                err.message
+                  ?.toLowerCase()
+                  .includes("multifactorauthentication"))
+            ) {
               console.log("[Auth] Prompting for MFA token...");
-              const mfaToken = window.prompt(`MFA token code required for profile ${selectedProfile}:`);
+              const mfaToken = window.prompt(
+                `MFA token code required for profile ${selectedProfile}:`,
+              );
               if (!mfaToken) {
                 console.warn("[Auth] MFA token prompt cancelled or empty");
                 throw new Error("MFA token is required to assume this role.");
@@ -576,10 +605,17 @@
           if (!target.aws_access_key_id)
             throw new Error("Profile has no access keys");
 
-          console.log("[Auth] Using standard access keys. mfa_serial:", target.mfa_serial, "session_token exists:", !!target.aws_session_token);
+          console.log(
+            "[Auth] Using standard access keys. mfa_serial:",
+            target.mfa_serial,
+            "session_token exists:",
+            !!target.aws_session_token,
+          );
 
           if (target.mfa_serial && !target.aws_session_token) {
-            console.log("[Auth] Setting up GetSessionToken for MFA requirement...");
+            console.log(
+              "[Auth] Setting up GetSessionToken for MFA requirement...",
+            );
             const { STSClient, GetSessionTokenCommand } = await import(
               "@aws-sdk/client-sts"
             );
@@ -587,7 +623,9 @@
               "$lib/services/aws.svelte"
             );
 
-            const mfaToken = window.prompt(`MFA token code required for profile ${selectedProfile}:`);
+            const mfaToken = window.prompt(
+              `MFA token code required for profile ${selectedProfile}:`,
+            );
             if (!mfaToken) {
               throw new Error("MFA token is required for this profile.");
             }
@@ -608,7 +646,7 @@
                 new GetSessionTokenCommand({
                   SerialNumber: target.mfa_serial,
                   TokenCode: mfaToken,
-                })
+                }),
               );
               console.log("[Auth] GetSessionToken successful");
             } catch (err) {
@@ -616,7 +654,8 @@
               throw err;
             }
 
-            if (!res.Credentials) throw new Error("STS returned no credentials");
+            if (!res.Credentials)
+              throw new Error("STS returned no credentials");
 
             finalCreds = {
               access_key_id: res.Credentials.AccessKeyId!,
@@ -648,9 +687,9 @@
       if ($page.url.pathname === "/") {
         let lastUrl = navigationHistory.lastUrl;
         if (!initialPath && lastUrl && lastUrl !== "/") {
-          const svcId = lastUrl.split('/')[1];
+          const svcId = lastUrl.split("/")[1];
           // ensure the reconstructed service tab is actually visible
-          if (svcId && serviceVisible.has(svcId.split('?')[0])) {
+          if (svcId && serviceVisible.has(svcId.split("?")[0])) {
             goto(lastUrl);
             return;
           }
@@ -711,19 +750,25 @@
       visibleProfiles={allProfiles
         .filter((p) => profileVisible.has(p))
         .sort((a, b) => profileOrder.indexOf(a) - profileOrder.indexOf(b))}
+      allProfiles={allProfiles}
       visibleRegions={ALL_REGIONS.filter((r) => regionVisible.has(r)).sort(
         (a, b) => regionOrder.indexOf(a) - regionOrder.indexOf(b),
       )}
-      isAddingProfile={isAddingProfile}
+      {isAddingProfile}
       onCancel={() => {
         isAddingProfile = false;
         isAuthenticated = true;
         authType = "profile";
       }}
       {loading}
-      bind:error={error}
+      bind:error
       onLogin={() => login(false, null, true)}
       onSwitchAuthType={switchAuthType}
+      onSelectProfile={(profile) => {
+        selectedProfile = profile;
+        authType = "profile";
+        login(false, null, true);
+      }}
       onProfilesSaved={async () => {
         try {
           allProfiles = await invoke("list_profiles");
@@ -767,7 +812,10 @@
               >CloudDash for AWS</span
             >
             {#if settings.isPro}
-              <span class="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 text-[10px] font-black rounded border border-blue-500/30 uppercase tracking-tighter">Pro</span>
+              <span
+                class="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 text-[10px] font-black rounded border border-blue-500/30 uppercase tracking-tighter"
+                >Pro</span
+              >
             {/if}
           </div>
           <button
@@ -789,9 +837,9 @@
                   <a
                     href="/upgrade"
                     onclick={(e) => {
-                         e.preventDefault();
-                         goto("/upgrade");
-                         if (window.innerWidth < 640) sideMenuOpen = false;
+                      e.preventDefault();
+                      goto("/upgrade");
+                      if (window.innerWidth < 640) sideMenuOpen = false;
                     }}
                     class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-[11px] font-bold py-2 rounded flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all border border-blue-500/50"
                   >
@@ -828,10 +876,13 @@
                       >
                         <button
                           onclick={() => {
-                            if (!settings.isPro && !["cloudwatch", "s3", "dynamodb"].includes(svc.id)) {
-                                goto("/upgrade");
-                                if (window.innerWidth < 640) sideMenuOpen = false;
-                                return;
+                            if (
+                              !settings.isPro &&
+                              !["cloudwatch", "s3", "dynamodb"].includes(svc.id)
+                            ) {
+                              goto("/upgrade");
+                              if (window.innerWidth < 640) sideMenuOpen = false;
+                              return;
                             }
                             switchTab(svc.id);
                             if (window.innerWidth < 640) sideMenuOpen = false;
@@ -839,11 +890,22 @@
                           class="flex-1 px-2 py-3 text-xs font-semibold text-left flex items-center gap-2"
                         >
                           {#if svc.icon}
-                            <Icon path={svc.icon} size={18} class={activeId === svc.id ? "text-blue-400" : "text-gray-400 group-hover:text-gray-300"} />
+                            <Icon
+                              path={svc.icon}
+                              size={18}
+                              class={activeId === svc.id
+                                ? "text-blue-400"
+                                : "text-gray-400 group-hover:text-gray-300"}
+                            />
                           {/if}
                           {svc.label}
                           {#if !settings.isPro && !["cloudwatch", "s3", "dynamodb"].includes(svc.id)}
-                            <Icon path={mdiCrown} size={12} color="rgb(234 179 8)" class="ml-1" />
+                            <Icon
+                              path={mdiCrown}
+                              size={12}
+                              color="rgb(234 179 8)"
+                              class="ml-1"
+                            />
                           {/if}
                           {#if activeId === svc.id}
                             <div class="w-1 h-1 rounded-full bg-blue-500"></div>
@@ -855,11 +917,12 @@
                             : 'text-gray-700 hover:text-gray-500'}"
                           onclick={(e) => toggleStar(svc.id, e)}
                         >
-                          <Icon path={svc.isStarred ? mdiStar : mdiStarOutline} size={14} />
+                          <Icon
+                            path={svc.isStarred ? mdiStar : mdiStarOutline}
+                            size={14}
+                          />
                         </button>
                       </div>
-
-
                     </div>
                   </div>
                 {/each}
@@ -900,8 +963,16 @@
                       if (window.innerWidth < 640) sideMenuOpen = false;
                     }}
                     options={[
-                      ...visibleProfiles.map(p => ({ value: p, label: p, fontMono: true })),
-                      { value: "__add_profile__", label: "+ Add Profile...", fontMono: false }
+                      ...visibleProfiles.map((p) => ({
+                        value: p,
+                        label: p,
+                        fontMono: true,
+                      })),
+                      {
+                        value: "__add_profile__",
+                        label: "+ Add Profile...",
+                        fontMono: false,
+                      },
                     ]}
                     small
                   />
@@ -922,7 +993,11 @@
                     login();
                     if (window.innerWidth < 640) sideMenuOpen = false;
                   }}
-                  options={visibleRegions.map(r => ({ value: r, label: r, fontMono: true }))}
+                  options={visibleRegions.map((r) => ({
+                    value: r,
+                    label: r,
+                    fontMono: true,
+                  }))}
                   small
                 />
               </div>
@@ -951,7 +1026,7 @@
                 <Icon path={mdiCog} size={14} />
               </button>
               {#if !isMobile}
-                  <button
+                <button
                   onclick={() => {
                     invoke("fork_process", {
                       path: activeId,
@@ -1027,9 +1102,37 @@
             title="Bookmarks"
           >
             {#if bookmarks.isBookmarked}
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-bookmark"
+                ><path
+                  d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"
+                /></svg
+              >
             {:else}
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-bookmark"
+                ><path
+                  d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"
+                /></svg
+              >
             {/if}
           </button>
         </header>
@@ -1043,9 +1146,7 @@
         {/if}
 
         <div class="flex-1 overflow-hidden relative flex flex-col min-w-0">
-          <ServiceLayout
-            title={serviceTitle}
-          >
+          <ServiceLayout title={serviceTitle}>
             <div class="absolute inset-0">
               {#key refreshKey}
                 <div class="contents">
@@ -1076,7 +1177,21 @@
             class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950/50"
           >
             <h2 class="font-bold text-gray-100 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark text-yellow-400"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-bookmark text-yellow-400"
+                ><path
+                  d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"
+                /></svg
+              >
               Bookmarks
             </h2>
             <button
@@ -1091,7 +1206,8 @@
             <button
               onclick={() => {
                 let label = serviceTitle;
-                const pathTab = $page.url.pathname.split("/").slice(2).join("/") || "";
+                const pathTab =
+                  $page.url.pathname.split("/").slice(2).join("/") || "";
                 if (pathTab) label += ` - ${pathTab}`;
                 bookmarks.toggle(label);
               }}
@@ -1099,9 +1215,37 @@
             >
               <span class={bookmarks.isBookmarked ? "text-yellow-300" : ""}>
                 {#if bookmarks.isBookmarked}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="lucide lucide-bookmark"
+                    ><path
+                      d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"
+                    /></svg
+                  >
                 {:else}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="lucide lucide-bookmark"
+                    ><path
+                      d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"
+                    /></svg
+                  >
                 {/if}
               </span>
               <span>

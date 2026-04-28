@@ -6,12 +6,17 @@
     import Modal from "./Modal.svelte";
     import Select from "./Select.svelte";
     import Icon from "./Icon.svelte";
-    import { mdiClose } from "@mdi/js";
+    import {
+        mdiClose,
+        mdiAccountCircle,
+        mdiPlus,
+        mdiChevronRight,
+    } from "@mdi/js";
     import { mobileState } from "$lib/services/mobile";
 
     let {
         os = "",
-        authType = $bindable("profile"),
+        authType = $bindable("manual"),
         accountId = $bindable(""),
         roleName = $bindable(""),
         sourceProfile = $bindable("default"),
@@ -23,6 +28,7 @@
         saveProfileName = $bindable(""),
         region = $bindable("us-east-1"),
         visibleProfiles = [],
+        allProfiles: allProfilesList = [],
         visibleRegions = [],
         isAddingProfile = false,
         loading = false,
@@ -31,6 +37,7 @@
         onLogin,
         onSwitchAuthType,
         onProfilesSaved,
+        onSelectProfile,
     }: {
         os?: string;
         authType: "profile" | "manual" | "assume" | "qr";
@@ -45,6 +52,7 @@
         saveProfileName: string;
         region: string;
         visibleProfiles: string[];
+        allProfiles?: string[];
         visibleRegions: string[];
         isAddingProfile?: boolean;
         loading: boolean;
@@ -55,6 +63,7 @@
             type: "profile" | "manual" | "assume" | "qr",
         ) => void;
         onProfilesSaved?: () => void;
+        onSelectProfile?: (profile: string) => void;
     } = $props();
 
     let importQueue = $state<any[]>([]);
@@ -65,6 +74,12 @@
     );
     let importSummary = $state("");
     let importSummaryTimeout: any = null;
+    let showProfilePicker = $state(false);
+
+    let hasProfiles = $derived(
+        allProfilesList.length > 0 &&
+            !(allProfilesList.length === 1 && allProfilesList[0] === "default"),
+    );
 
     function areProfilesEqual(p1: any, p2: any) {
         const keysToCompare = [
@@ -89,6 +104,7 @@
     $effect(() => {
         authType; // track dependency
         _cameraActive = false;
+        showProfilePicker = false;
     });
 
     // Handle Android back button intercept state
@@ -104,7 +120,7 @@
             listen("tauri://back-button", () => {
                 _cameraActive = false;
                 cancel().catch(console.error);
-            }).then(u => unlisten = u);
+            }).then((u) => (unlisten = u));
         }
         return () => {
             if (unlisten) unlisten();
@@ -147,7 +163,7 @@
 
         importQueue = [];
 
-        onSwitchAuthType("profile");
+        onSwitchAuthType("manual");
 
         if (importSummaryTimeout) clearTimeout(importSummaryTimeout);
         importSummaryTimeout = setTimeout(() => (importSummary = ""), 5000);
@@ -256,11 +272,12 @@
     let isConnectDisabled = $derived.by(() => {
         if (loading) return true;
 
-        let mfaInvalid = !!(mfaSerial && !/^(arn:aws[-a-z]*:iam::\d{12}:mfa\/[\w+=,.@-]+|[A-Za-z0-9]+)$/.test(mfaSerial));
-
-        if (authType === "profile") {
-            return !selectedProfile || selectedProfile.trim() === "";
-        }
+        let mfaInvalid = !!(
+            mfaSerial &&
+            !/^(arn:aws[-a-z]*:iam::\d{12}:mfa\/[\w+=,.@-]+|[A-Za-z0-9]+)$/.test(
+                mfaSerial,
+            )
+        );
 
         if (authType === "manual") {
             if (!saveProfileName.trim()) return true;
@@ -296,289 +313,377 @@
     <div
         class="relative w-full max-w-sm bg-gray-900 p-6 rounded-xl shadow-2xl border border-gray-800"
     >
-        {#if isAddingProfile && onCancel}
-            <button onclick={onCancel} class="absolute top-4 right-4 p-1.5 rounded-full text-gray-500 hover:text-white hover:bg-gray-800 transition">
-                <Icon path={mdiClose} size={20} />
-            </button>
-        {/if}
-        <h1 class="text-xl font-bold mb-4 text-blue-400">CloudDash for AWS</h1>
-        {#if importSummary}
-            <div
-                class="bg-green-500/20 border border-green-500/30 text-green-400 p-2.5 rounded mb-4 text-sm font-medium transition-opacity"
-            >
-                {importSummary}
-            </div>
-        {/if}
-        {#if error}
-            <div class="bg-red-500/20 text-red-300 p-2 rounded mb-3 text-xs">
-                {error}
-            </div>
-        {/if}
-        <div class="space-y-3">
-            <div>
-                <div
-                    class="flex border-b border-gray-800 mb-4"
-                    role="tablist"
-                    aria-label="Login Method"
-                >
-                    {#if !isMobileAndEmpty && !isAddingProfile}
-                        <button
-                            onclick={() => onSwitchAuthType("profile")}
-                            class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
-                            'profile'
-                                ? 'text-blue-400 border-blue-500'
-                                : 'text-gray-500 border-transparent hover:text-gray-300'}"
-                            >Profile</button
+        {#if showProfilePicker}
+            <h1 class="text-xl font-bold mb-4 text-blue-400">Select Profile</h1>
+            <p class="text-xs text-gray-500 mb-4">
+                Choose an existing AWS profile to connect with.
+            </p>
+            <div class="space-y-1.5 max-h-64 overflow-y-auto mb-4">
+                {#each allProfilesList as profile}
+                    <button
+                        onclick={() => {
+                            if (onSelectProfile) {
+                                selectedProfile = profile;
+                                onSelectProfile(profile);
+                            }
+                        }}
+                        class="w-full flex items-center gap-3 px-3 py-2.5 rounded bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-blue-500/50 transition group text-left"
+                    >
+                        <Icon
+                            path={mdiAccountCircle}
+                            size={20}
+                            class="text-gray-500 group-hover:text-blue-400 transition shrink-0"
+                        />
+                        <span
+                            class="flex-1 text-sm font-mono text-gray-200 group-hover:text-white transition truncate"
+                            >{profile}</span
                         >
-                    {/if}
-                    <button
-                        onclick={() => onSwitchAuthType("manual")}
-                        class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
-                        'manual'
-                            ? 'text-blue-400 border-blue-500'
-                            : 'text-gray-500 border-transparent hover:text-gray-300'}"
-                        >API Keys</button
-                    >
-                    <button
-                        onclick={() => onSwitchAuthType("assume")}
-                        class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
-                        'assume'
-                            ? 'text-blue-400 border-blue-500'
-                            : 'text-gray-500 border-transparent hover:text-gray-300'}"
-                        >Assume Role</button
-                    >
-                    <button
-                        onclick={() => onSwitchAuthType("qr")}
-                        class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
-                        'qr'
-                            ? 'text-blue-400 border-blue-500'
-                            : 'text-gray-500 border-transparent hover:text-gray-300'}"
-                        >QR Code</button
-                    >
-                </div>
+                        <Icon
+                            path={mdiChevronRight}
+                            size={16}
+                            class="text-gray-600 group-hover:text-blue-400 transition shrink-0"
+                        />
+                    </button>
+                {/each}
             </div>
-
-            {#if authType === "profile"}
-                <div>
-                    <label
-                        for="profileSelect"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Profile</label
-                    >
-                    <Select
-                        id="profileSelect"
-                        bind:value={selectedProfile}
-                        options={visibleProfiles}
-                    />
-                </div>
-            {:else if authType === "manual"}
-                <div
-                    class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
-                >
-                    <strong>API Keys:</strong> To get your Access Key ID and Secret Access Key, follow the <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html" target="_blank" class="underline hover:text-blue-200" rel="noopener noreferrer">official AWS guide</a>.
-                </div>
-
-                <div>
-                    <label
-                        for="akInput"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Access Key ID</label
-                    >
-                    <input
-                        id="akInput"
-                        type="text"
-                        bind:value={accessKeyId}
-                        placeholder="AKIAIOS..."
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                    />
-                </div>
-                <div>
-                    <label
-                        for="skInput"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Secret Access Key</label
-                    >
-                    <input
-                        id="skInput"
-                        type="password"
-                        bind:value={secretAccessKey}
-                        placeholder="wJalrXUtnFEMI/K7MDENG..."
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                    />
-                </div>
-
-                <div class="mt-2 mb-2 border-t border-gray-800 pt-3">
-                    <label
-                        for="mfaInputManual"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >MFA Serial ARN <span class="text-[10px] opacity-70"
-                            >(Optional)</span
-                        ></label
-                    >
-                    <input
-                        id="mfaInputManual"
-                        type="text"
-                        bind:value={mfaSerial}
-                        placeholder="arn:aws:iam::123456789012:mfa/user"
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                    />
-                    {#if mfaSerial && !/^(arn:aws[-a-z]*:iam::\d{12}:mfa\/[\w+=,.@-]+|[A-Za-z0-9]+)$/.test(mfaSerial)}
-                        <span class="text-[10px] text-red-400 mt-1 block">Expected ARN format or hardware serial</span>
-                    {/if}
-                </div>
-                <div class="mt-4 border-t border-gray-800 pt-3">
-                    <label
-                        for="profileNameInput"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Save As Profile Name</label
-                    >
-                    <input
-                        id="profileNameInput"
-                        type="text"
-                        bind:value={saveProfileName}
-                        placeholder="e.g. prod-admin"
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                    />
-                </div>
-            {:else if authType === "assume"}
-                <div
-                    class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
-                >
-                    <strong>Assume Role:</strong> You need an IAM Role with a Trust Policy that allows your Source Profile to switch to it. See <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_permissions-to-switch.html" target="_blank" class="underline hover:text-blue-200" rel="noopener noreferrer">AWS documentation</a>.
-                </div>
-
-                <div>
-                    <label
-                        for="accountIdInput"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Account ID</label
-                    >
-                    <input
-                        id="accountIdInput"
-                        type="text"
-                        bind:value={accountId}
-                        placeholder="123456789012"
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                    />
-                </div>
-                <div class="mt-2">
-                    <label
-                        for="roleNameInput"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Role Name</label
-                    >
-                    <input
-                        id="roleNameInput"
-                        type="text"
-                        bind:value={roleName}
-                        placeholder="OrganizationAccountAccessRole"
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                    />
-                </div>
-                <div class="mt-2">
-                    <label
-                        for="sourceProfileInput"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Source Profile</label
-                    >
-                    <Select
-                        id="sourceProfileInput"
-                        bind:value={sourceProfile}
-                        options={visibleProfiles}
-                    />
-                </div>
-                <div class="mt-2 mb-2 border-t border-gray-800 pt-3">
-                    <label
-                        for="mfaInputAssume"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >MFA Serial ARN <span class="text-[10px] opacity-70"
-                            >(Optional)</span
-                        ></label
-                    >
-                    <input
-                        id="mfaInputAssume"
-                        type="text"
-                        bind:value={mfaSerial}
-                        placeholder="arn:aws:iam::123456789012:mfa/user"
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                    />
-                    {#if mfaSerial && !/^(arn:aws[-a-z]*:iam::\d{12}:mfa\/[\w+=,.@-]+|[A-Za-z0-9]+)$/.test(mfaSerial)}
-                        <span class="text-[10px] text-red-400 mt-1 block">Expected ARN format or hardware serial</span>
-                    {/if}
-                </div>
-                <div class="mt-4 border-t border-gray-800 pt-3">
-                    <label
-                        for="profileNameInput"
-                        class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
-                        >Save As Profile Name</label
-                    >
-                    <input
-                        id="profileNameInput"
-                        type="text"
-                        bind:value={saveProfileName}
-                        placeholder="e.g. prod-admin"
-                        class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
-                    />
-                </div>
-            {:else if authType === "qr"}
-                <div
-                    class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
-                >
-                    <strong>QR Scan:</strong> Scan the credentials QR code from your
-                    other device to securely transfer them here.
-                </div>
-                <div class="space-y-4">
-                    {#if !_cameraActive}
-                        <div class="flex flex-col gap-3 py-4">
-                            <button
-                                onclick={() => (_cameraActive = true)}
-                                class="w-full bg-blue-600 hover:bg-blue-500 text-white p-3 rounded font-bold text-sm shadow-lg transition flex items-center justify-center gap-2"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                                Launch QR Scanner
-                            </button>
-                        </div>
-                    {:else}
-                        <div class="flex flex-col items-center py-2">
-                            <QRScanner 
-                                onSuccess={(text) => onScanSuccess(text, null)}
-                                onError={onScanFailure}
-                            />
-                            
-                            <button
-                                onclick={() => {
-                                    _cameraActive = false;
-                                }}
-                                class="mt-6 text-red-400 hover:text-red-300 text-xs font-bold uppercase tracking-widest transition flex items-center gap-2"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                                Stop Scanner
-                            </button>
-                        </div>
-                    {/if}
-                </div>
-            {/if}
-            {#if authType !== 'qr'}
+            <button
+                onclick={() => (showProfilePicker = false)}
+                class="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white p-2.5 rounded font-bold text-sm transition border border-gray-700 flex items-center justify-center gap-2"
+            >
+                <Icon path={mdiPlus} size={18} />
+                Add New Profile
+            </button>
+        {:else}
+            {#if isAddingProfile && onCancel}
                 <button
-                    onclick={onLogin}
-                    disabled={isConnectDisabled}
-                    class="w-full {isConnectDisabled
-                        ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-500 text-white'} p-2.5 rounded font-bold text-sm shadow-lg transition"
+                    onclick={onCancel}
+                    class="absolute top-4 right-4 p-1.5 rounded-full text-gray-500 hover:text-white hover:bg-gray-800 transition"
                 >
-                    {loading ? "Connecting..." : "Connect"}
+                    <Icon path={mdiClose} size={20} />
                 </button>
             {/if}
+            <h1 class="text-xl font-bold mb-4 text-blue-400">
+                CloudDash for AWS
+            </h1>
+            {#if importSummary}
+                <div
+                    class="bg-green-500/20 border border-green-500/30 text-green-400 p-2.5 rounded mb-4 text-sm font-medium transition-opacity"
+                >
+                    {importSummary}
+                </div>
+            {/if}
+            {#if error}
+                <div
+                    class="bg-red-500/20 text-red-300 p-2 rounded mb-3 text-xs"
+                >
+                    {error}
+                </div>
+            {/if}
+            <div class="space-y-3">
+                <div>
+                    <div
+                        class="flex border-b border-gray-800 mb-4"
+                        role="tablist"
+                        aria-label="Login Method"
+                    >
+                        <button
+                            onclick={() => onSwitchAuthType("manual")}
+                            class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
+                            'manual'
+                                ? 'text-blue-400 border-blue-500'
+                                : 'text-gray-500 border-transparent hover:text-gray-300'}"
+                            >API Keys</button
+                        >
+                        <button
+                            onclick={() => onSwitchAuthType("assume")}
+                            class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
+                            'assume'
+                                ? 'text-blue-400 border-blue-500'
+                                : 'text-gray-500 border-transparent hover:text-gray-300'}"
+                            >Assume Role</button
+                        >
+                        <button
+                            onclick={() => onSwitchAuthType("qr")}
+                            class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
+                            'qr'
+                                ? 'text-blue-400 border-blue-500'
+                                : 'text-gray-500 border-transparent hover:text-gray-300'}"
+                            >QR Code</button
+                        >
+                    </div>
+                </div>
 
-            <div class="mt-4 pt-4 border-t border-gray-800 text-center">
-                <a href="https://portal.aws.amazon.com/gp/aws/developer/registration/index.html" target="_blank" class="text-[10px] text-gray-500 hover:text-blue-400 underline transition uppercase tracking-widest font-bold" rel="noopener noreferrer">
-                    Don't have an AWS account? Create one here
-                </a>
+                {#if authType === "manual"}
+                    <div
+                        class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
+                    >
+                        <strong>API Keys:</strong> To get your Access Key ID and
+                        Secret Access Key, follow the
+                        <a
+                            href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html"
+                            target="_blank"
+                            class="underline hover:text-blue-200"
+                            rel="noopener noreferrer">official AWS guide</a
+                        >.
+                    </div>
+
+                    <div>
+                        <label
+                            for="akInput"
+                            class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                            >Access Key ID</label
+                        >
+                        <input
+                            id="akInput"
+                            type="text"
+                            bind:value={accessKeyId}
+                            placeholder="AKIAIOS..."
+                            class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                        />
+                    </div>
+                    <div>
+                        <label
+                            for="skInput"
+                            class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                            >Secret Access Key</label
+                        >
+                        <input
+                            id="skInput"
+                            type="password"
+                            bind:value={secretAccessKey}
+                            placeholder="wJalrXUtnFEMI/K7MDENG..."
+                            class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                        />
+                    </div>
+
+                    <div class="mt-2 mb-2 border-t border-gray-800 pt-3">
+                        <label
+                            for="mfaInputManual"
+                            class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                            >MFA Serial ARN <span class="text-[10px] opacity-70"
+                                >(Optional)</span
+                            ></label
+                        >
+                        <input
+                            id="mfaInputManual"
+                            type="text"
+                            bind:value={mfaSerial}
+                            placeholder="arn:aws:iam::123456789012:mfa/user"
+                            class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                        />
+                        {#if mfaSerial && !/^(arn:aws[-a-z]*:iam::\d{12}:mfa\/[\w+=,.@-]+|[A-Za-z0-9]+)$/.test(mfaSerial)}
+                            <span class="text-[10px] text-red-400 mt-1 block"
+                                >Expected ARN format or hardware serial</span
+                            >
+                        {/if}
+                    </div>
+                    <div class="mt-4 border-t border-gray-800 pt-3">
+                        <label
+                            for="profileNameInput"
+                            class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                            >Save As Profile Name</label
+                        >
+                        <input
+                            id="profileNameInput"
+                            type="text"
+                            bind:value={saveProfileName}
+                            placeholder="e.g. prod-admin"
+                            class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                        />
+                    </div>
+                {:else if authType === "assume"}
+                    <div
+                        class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
+                    >
+                        <strong>Assume Role:</strong> You need an IAM Role with
+                        a Trust Policy that allows your Source Profile to switch
+                        to it. See
+                        <a
+                            href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_permissions-to-switch.html"
+                            target="_blank"
+                            class="underline hover:text-blue-200"
+                            rel="noopener noreferrer">AWS documentation</a
+                        >.
+                    </div>
+
+                    <div>
+                        <label
+                            for="accountIdInput"
+                            class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                            >Account ID</label
+                        >
+                        <input
+                            id="accountIdInput"
+                            type="text"
+                            bind:value={accountId}
+                            placeholder="123456789012"
+                            class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                        />
+                    </div>
+                    <div class="mt-2">
+                        <label
+                            for="roleNameInput"
+                            class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                            >Role Name</label
+                        >
+                        <input
+                            id="roleNameInput"
+                            type="text"
+                            bind:value={roleName}
+                            placeholder="OrganizationAccountAccessRole"
+                            class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                        />
+                    </div>
+                    <div class="mt-2">
+                        <label
+                            for="sourceProfileInput"
+                            class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                            >Source Profile</label
+                        >
+                        <Select
+                            id="sourceProfileInput"
+                            bind:value={sourceProfile}
+                            options={visibleProfiles}
+                        />
+                    </div>
+                    <div class="mt-2 mb-2 border-t border-gray-800 pt-3">
+                        <label
+                            for="mfaInputAssume"
+                            class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                            >MFA Serial ARN <span class="text-[10px] opacity-70"
+                                >(Optional)</span
+                            ></label
+                        >
+                        <input
+                            id="mfaInputAssume"
+                            type="text"
+                            bind:value={mfaSerial}
+                            placeholder="arn:aws:iam::123456789012:mfa/user"
+                            class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                        />
+                        {#if mfaSerial && !/^(arn:aws[-a-z]*:iam::\d{12}:mfa\/[\w+=,.@-]+|[A-Za-z0-9]+)$/.test(mfaSerial)}
+                            <span class="text-[10px] text-red-400 mt-1 block"
+                                >Expected ARN format or hardware serial</span
+                            >
+                        {/if}
+                    </div>
+                    <div class="mt-4 border-t border-gray-800 pt-3">
+                        <label
+                            for="profileNameInput"
+                            class="block text-xs text-gray-500 mb-1 uppercase tracking-wider"
+                            >Save As Profile Name</label
+                        >
+                        <input
+                            id="profileNameInput"
+                            type="text"
+                            bind:value={saveProfileName}
+                            placeholder="e.g. prod-admin"
+                            class="w-full bg-gray-800 p-2 rounded text-sm text-white outline-none border border-gray-700 focus:border-blue-500 placeholder-gray-600 font-mono"
+                        />
+                    </div>
+                {:else if authType === "qr"}
+                    <div
+                        class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
+                    >
+                        <strong>QR Scan:</strong> Scan the credentials QR code from
+                        your other device to securely transfer them here.
+                    </div>
+                    <div class="space-y-4">
+                        {#if !_cameraActive}
+                            <div class="flex flex-col gap-3 py-4">
+                                <button
+                                    onclick={() => (_cameraActive = true)}
+                                    class="w-full bg-blue-600 hover:bg-blue-500 text-white p-3 rounded font-bold text-sm shadow-lg transition flex items-center justify-center gap-2"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        class="w-5 h-5"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        ><path
+                                            d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
+                                        /><circle cx="12" cy="13" r="4" /></svg
+                                    >
+                                    Launch QR Scanner
+                                </button>
+                            </div>
+                        {:else}
+                            <div class="flex flex-col items-center py-2">
+                                <QRScanner
+                                    onSuccess={(text) =>
+                                        onScanSuccess(text, null)}
+                                    onError={onScanFailure}
+                                />
+
+                                <button
+                                    onclick={() => {
+                                        _cameraActive = false;
+                                    }}
+                                    class="mt-6 text-red-400 hover:text-red-300 text-xs font-bold uppercase tracking-widest transition flex items-center gap-2"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        class="w-4 h-4"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        ><line x1="18" y1="6" x2="6" y2="18"
+                                        ></line><line
+                                            x1="6"
+                                            y1="6"
+                                            x2="18"
+                                            y2="18"
+                                        ></line></svg
+                                    >
+                                    Stop Scanner
+                                </button>
+                            </div>
+                        {/if}
+                    </div>
+                {/if}
+                {#if authType !== "qr"}
+                    <button
+                        onclick={onLogin}
+                        disabled={isConnectDisabled}
+                        class="w-full {isConnectDisabled
+                            ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-500 text-white'} p-2.5 rounded font-bold text-sm shadow-lg transition"
+                    >
+                        {loading ? "Connecting..." : "Connect"}
+                    </button>
+                {/if}
+
+                {#if hasProfiles && onSelectProfile}
+                    <button
+                        onclick={() => (showProfilePicker = true)}
+                        class="w-full mt-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white p-2.5 rounded font-bold text-sm transition border border-gray-700 flex items-center justify-center gap-2"
+                    >
+                        <Icon path={mdiAccountCircle} size={18} />
+                        Use Existing Profile
+                    </button>
+                {/if}
+
+                <div class="mt-4 pt-4 border-t border-gray-800 text-center">
+                    <a
+                        href="https://portal.aws.amazon.com/gp/aws/developer/registration/index.html"
+                        target="_blank"
+                        class="text-[10px] text-gray-500 hover:text-blue-400 underline transition uppercase tracking-widest font-bold"
+                        rel="noopener noreferrer"
+                    >
+                        Don't have an AWS account? Create one here
+                    </a>
+                </div>
             </div>
-        </div>
+        {/if}
     </div>
 </div>
-
 
 <Modal bind:open={showConflictModal} title="Profile Conflict">
     {#if activeConflict}
@@ -685,5 +790,3 @@
         {/if}
     {/if}
 </Modal>
-
-
