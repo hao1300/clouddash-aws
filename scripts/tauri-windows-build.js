@@ -21,6 +21,12 @@ async function main() {
         const version = getVersion();
         console.log(`Building CloudDash Windows version ${version}...`);
 
+        // Set signing environment variables
+        if (!process.env.TAURI_SIGNING_PRIVATE_KEY_PATH) {
+            process.env.TAURI_SIGNING_PRIVATE_KEY_PATH = path.join(process.cwd(), '~', '.tauri', 'clouddash.key');
+        }
+        // TAURI_SIGNING_PRIVATE_KEY_PASSWORD is now loaded via node --env-file
+
         const skipBuild = process.argv.includes('--skip-build');
         if (!skipBuild) {
             run('npx tauri build');

@@ -2,17 +2,23 @@ use aws_config::meta::region::RegionProviderChain;
 use aws_config::Region;
 use serde::Deserialize;
 use std::sync::Arc;
+use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
-use tauri::{Manager, Emitter};
 
 fn get_aws_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
-        Ok(app_handle.path().app_data_dir().map_err(|e| e.to_string())?.join(".aws"))
+        Ok(app_handle
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?
+            .join(".aws"))
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        Ok(dirs::home_dir().ok_or("Could not find home directory")?.join(".aws"))
+        Ok(dirs::home_dir()
+            .ok_or("Could not find home directory")?
+            .join(".aws"))
     }
 }
 
@@ -20,12 +26,16 @@ fn get_aws_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, Stri
 pub fn get_default_download_directory(app_handle: tauri::AppHandle) -> Result<String, String> {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
-        let path = app_handle.path().document_dir().map_err(|e| e.to_string())?;
+        let path = app_handle
+            .path()
+            .document_dir()
+            .map_err(|e| e.to_string())?;
         Ok(path.to_string_lossy().to_string())
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        let path = dirs::download_dir().unwrap_or_else(|| dirs::home_dir().unwrap().join("Downloads"));
+        let path =
+            dirs::download_dir().unwrap_or_else(|| dirs::home_dir().unwrap().join("Downloads"));
         Ok(path.to_string_lossy().to_string())
     }
 }
@@ -118,7 +128,7 @@ pub async fn authenticate(
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
     let _ = app_handle.emit("auth_progress", "Starting authentication...");
-    
+
     std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
 
     #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -128,23 +138,30 @@ pub async fn authenticate(
             std::env::set_var("AWS_CONFIG_FILE", aws_dir.join("config"));
         }
     }
-    let _ = app_handle.emit("auth_progress", format!("Resolving region: {}...", payload.region));
+    let _ = app_handle.emit(
+        "auth_progress",
+        format!("Resolving region: {}...", payload.region),
+    );
     let region_provider = RegionProviderChain::first_try(Region::new(payload.region))
         .or_default_provider()
         .or_else(Region::new("us-east-1"));
 
-    let mut config_loader = aws_config::defaults(aws_config::BehaviorVersion::latest())
-        .region(region_provider);
+    let mut config_loader =
+        aws_config::defaults(aws_config::BehaviorVersion::latest()).region(region_provider);
 
     if payload.auth_type.as_deref() == Some("manual") {
         let _ = app_handle.emit("auth_progress", "Using manual API keys...");
-        let ak = payload.access_key_id.filter(|s| !s.is_empty()).ok_or("Access Key ID is required for manual login")?;
-        let sk = payload.secret_access_key.filter(|s| !s.is_empty()).ok_or("Secret Access Key is required for manual login")?;
+        let ak = payload
+            .access_key_id
+            .filter(|s| !s.is_empty())
+            .ok_or("Access Key ID is required for manual login")?;
+        let sk = payload
+            .secret_access_key
+            .filter(|s| !s.is_empty())
+            .ok_or("Secret Access Key is required for manual login")?;
         let token = payload.session_token.filter(|s| !s.is_empty());
 
-        let creds = aws_credential_types::Credentials::new(
-            ak, sk, token, None, "manual"
-        );
+        let creds = aws_credential_types::Credentials::new(ak, sk, token, None, "manual");
         config_loader = config_loader.credentials_provider(creds);
     } else {
         if let Some(prof) = payload.profile {
@@ -155,8 +172,16 @@ pub async fn authenticate(
         }
     }
 
-    let _ = app_handle.emit("auth_progress", "Loading AWS config... (with 10-second timeout)");
-    let sdk_config = match tokio::time::timeout(std::time::Duration::from_secs(10), config_loader.load()).await {
+    let _ = app_handle.emit(
+        "auth_progress",
+        "Loading AWS config... (with 10-second timeout)",
+    );
+    let sdk_config = match tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        config_loader.load(),
+    )
+    .await
+    {
         Ok(cfg) => cfg,
         Err(_) => {
             let _ = app_handle.emit("auth_progress", "ERROR: AWS configuration loading timed out after 10 seconds. Check your network or credentials setup.");
@@ -164,7 +189,10 @@ pub async fn authenticate(
         }
     };
 
-    let _ = app_handle.emit("auth_progress", "AWS configuration loaded. Updating state...");
+    let _ = app_handle.emit(
+        "auth_progress",
+        "AWS configuration loaded. Updating state...",
+    );
     let mut cfg = state.0.write().await;
     *cfg = Some(sdk_config);
 
@@ -198,7 +226,11 @@ pub async fn get_credentials(
 }
 
 #[tauri::command]
-pub fn save_profile(app_handle: tauri::AppHandle, name: String, properties: std::collections::HashMap<String, String>) -> Result<(), String> {
+pub fn save_profile(
+    app_handle: tauri::AppHandle,
+    name: String,
+    properties: std::collections::HashMap<String, String>,
+) -> Result<(), String> {
     use std::fs::OpenOptions;
     use std::io::Write;
 
@@ -210,13 +242,13 @@ pub fn save_profile(app_handle: tauri::AppHandle, name: String, properties: std:
 
     let cred_path = aws_dir.join("credentials");
     let cfg_path = aws_dir.join("config");
-    
+
     let cred_header = if name == "default" {
         "[default]".to_string()
     } else {
         format!("[{}]", name)
     };
-    
+
     let cfg_header = if name == "default" {
         "[default]".to_string()
     } else {
@@ -233,12 +265,20 @@ pub fn save_profile(app_handle: tauri::AppHandle, name: String, properties: std:
     let mut has_cfg = false;
 
     let is_cred_key = |k: &str| {
-        k == "aws_access_key_id" || k == "aws_secret_access_key" || k == "aws_session_token" || k == "credential_process" || k == "credential_source"
+        k == "aws_access_key_id"
+            || k == "aws_secret_access_key"
+            || k == "aws_session_token"
+            || k == "credential_process"
+            || k == "credential_source"
     };
 
     for (k, v) in properties.iter() {
-        if k == "profile" { continue; }
-        if v.is_empty() { continue; }
+        if k == "profile" {
+            continue;
+        }
+        if v.is_empty() {
+            continue;
+        }
         if is_cred_key(k) {
             cred_buf.push_str(&format!("{} = {}\n", k, v));
             has_cred = true;
@@ -254,7 +294,8 @@ pub fn save_profile(app_handle: tauri::AppHandle, name: String, properties: std:
             .append(true)
             .open(&cred_path)
             .map_err(|e| e.to_string())?;
-        file.write_all(cred_buf.as_bytes()).map_err(|e| e.to_string())?;
+        file.write_all(cred_buf.as_bytes())
+            .map_err(|e| e.to_string())?;
     }
 
     if has_cfg {
@@ -263,7 +304,8 @@ pub fn save_profile(app_handle: tauri::AppHandle, name: String, properties: std:
             .append(true)
             .open(&cfg_path)
             .map_err(|e| e.to_string())?;
-        file.write_all(cfg_buf.as_bytes()).map_err(|e| e.to_string())?;
+        file.write_all(cfg_buf.as_bytes())
+            .map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -277,10 +319,14 @@ pub struct InitialState {
 }
 
 #[tauri::command]
-pub fn fork_process(path: Option<String>, region: Option<String>, profile: Option<String>) -> Result<(), String> {
+pub fn fork_process(
+    path: Option<String>,
+    region: Option<String>,
+    profile: Option<String>,
+) -> Result<(), String> {
     let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let mut cmd = std::process::Command::new(current_exe);
-    
+
     if let Some(p) = path {
         cmd.env("CLOUDDASH_INITIAL_PATH", p);
     }
@@ -290,7 +336,7 @@ pub fn fork_process(path: Option<String>, region: Option<String>, profile: Optio
     if let Some(p) = profile {
         cmd.env("CLOUDDASH_INITIAL_PROFILE", p);
     }
-    
+
     cmd.spawn().map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -304,20 +350,23 @@ pub fn get_initial_state() -> InitialState {
     }
 }
 
-fn parse_ini(path: &std::path::Path) -> std::collections::HashMap<String, std::collections::HashMap<String, String>> {
+fn parse_ini(
+    path: &std::path::Path,
+) -> std::collections::HashMap<String, std::collections::HashMap<String, String>> {
     let mut map = std::collections::HashMap::new();
     let mut current_section = String::new();
     if let Ok(content) = std::fs::read_to_string(path) {
         for line in content.lines() {
             let line = line.trim();
             if line.starts_with('[') && line.ends_with(']') {
-                let name = &line[1..line.len()-1];
+                let name = &line[1..line.len() - 1];
                 let mut name_clean = name.trim();
                 if name_clean.starts_with("profile ") {
                     name_clean = name_clean["profile ".len()..].trim();
                 }
                 current_section = name_clean.to_string();
-                map.entry(current_section.clone()).or_insert_with(std::collections::HashMap::new);
+                map.entry(current_section.clone())
+                    .or_insert_with(std::collections::HashMap::new);
             } else if !line.is_empty() && !line.starts_with('#') {
                 if let Some((k, v)) = line.split_once('=') {
                     if !current_section.is_empty() {
@@ -357,7 +406,10 @@ pub fn get_all_profiles(app_handle: tauri::AppHandle) -> Result<Vec<serde_json::
 
         if !props.is_empty() {
             let mut val = serde_json::to_value(props).map_err(|e| e.to_string())?;
-            val.as_object_mut().unwrap().insert("profile".to_string(), serde_json::Value::String(name.clone()));
+            val.as_object_mut().unwrap().insert(
+                "profile".to_string(),
+                serde_json::Value::String(name.clone()),
+            );
             profiles.push(val);
         }
     }
@@ -400,9 +452,7 @@ pub async fn open_folder(path: String) -> Result<(), String> {
     }
     #[cfg(target_os = "linux")]
     {
-        let _ = std::process::Command::new("xdg-open")
-            .arg(path)
-            .spawn();
+        let _ = std::process::Command::new("xdg-open").arg(path).spawn();
     }
     Ok(())
 }
