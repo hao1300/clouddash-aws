@@ -14,7 +14,10 @@ function getVersion() {
 
 function run(command) {
     console.log(`Running: ${command}`);
-    execSync(command, { stdio: 'inherit' });
+    execSync(command, { 
+        stdio: 'inherit',
+        env: process.env
+    });
 }
 
 async function uploadIfExists(src, destPath) {
@@ -88,7 +91,7 @@ async function main() {
             console.warn('Warning: Could not find any release AAB');
         }
 
-        updateWebVersion(version);
+        updateWebVersion(version, 'android');
 
         console.log('--------------------------------------------------');
         console.log('Build complete!');

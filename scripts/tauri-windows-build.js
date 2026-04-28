@@ -13,19 +13,16 @@ function getVersion() {
 
 function run(command) {
     console.log(`Running: ${command}`);
-    execSync(command, { stdio: 'inherit' });
+    execSync(command, {
+        stdio: 'inherit',
+        env: process.env
+    });
 }
 
 async function main() {
     try {
         const version = getVersion();
         console.log(`Building CloudDash Windows version ${version}...`);
-
-        // Set signing environment variables
-        if (!process.env.TAURI_SIGNING_PRIVATE_KEY_PATH) {
-            process.env.TAURI_SIGNING_PRIVATE_KEY_PATH = path.join(process.cwd(), '~', '.tauri', 'clouddash.key');
-        }
-        // TAURI_SIGNING_PRIVATE_KEY_PASSWORD is now loaded via node --env-file
 
         const skipBuild = process.argv.includes('--skip-build');
         if (!skipBuild) {
@@ -65,7 +62,7 @@ async function main() {
             }
         }
 
-        updateWebVersion(version);
+        updateWebVersion(version, 'windows');
 
         console.log('--------------------------------------------------');
         console.log('Build complete!');

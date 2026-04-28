@@ -13,7 +13,10 @@ function getVersion() {
 
 function run(command) {
     console.log(`Running: ${command}`);
-    execSync(command, { stdio: 'inherit' });
+    execSync(command, { 
+        stdio: 'inherit',
+        env: process.env
+    });
 }
 
 async function copyBundle(ext, subdir, version) {
@@ -51,7 +54,7 @@ async function main() {
         await copyBundle('deb', 'deb', version);
         await copyBundle('rpm', 'rpm', version);
 
-        updateWebVersion(version);
+        updateWebVersion(version, 'linux');
 
         console.log('--------------------------------------------------');
         console.log('Build complete!');
