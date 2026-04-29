@@ -23,7 +23,7 @@
       name: "Android",
       icon: SmartphoneIcon,
       type: "Mobile APK",
-      link: "https://static.clouddash.dev/downloads/android/clouddash-0.9.1.apk",
+      link: "https://static.clouddash.dev/downloads/android/clouddash-0.9.3.apk",
       instructions:
         "Direct download for Android devices. Optimized for tablets and foldable phones.",
     },
