@@ -8,6 +8,7 @@
         ListAttachedUserPoliciesCommand,
         ListUserPoliciesCommand,
         DeleteUserCommand,
+        RemoveUserFromGroupCommand,
         type User,
         type Group,
         type AttachedPolicy
@@ -39,6 +40,10 @@
 
     let showDeleteModal = $state(false);
     let deleting = $state(false);
+
+    let groupToRemove = $state<string | null>(null);
+    let showRemoveGroupModal = $state(false);
+    let removingGroup = $state(false);
 
     $effect(() => {
         if (aws.iam && userName) {
@@ -81,6 +86,26 @@
             showDeleteModal = false;
         } finally {
             deleting = false;
+        }
+    }
+
+    function promptRemoveGroup(groupNameToRemove: string) {
+        groupToRemove = groupNameToRemove;
+        showRemoveGroupModal = true;
+    }
+
+    async function confirmRemoveGroup() {
+        if (!aws.iam || !userName || !groupToRemove) return;
+        try {
+            removingGroup = true;
+            await aws.iam.send(new RemoveUserFromGroupCommand({ GroupName: groupToRemove, UserName: userName }));
+            loadDetails(); // Refresh
+            showRemoveGroupModal = false;
+        } catch(e: any) {
+            error = e.message || String(e);
+            showRemoveGroupModal = false;
+        } finally {
+            removingGroup = false;
         }
     }
 </script>
@@ -154,10 +179,16 @@
             </div>
         {:else if detailTab === "groups"}
             <div class="h-full bg-gray-900 border border-gray-800 rounded-lg overflow-hidden flex flex-col">
+                {#snippet actionsSnippet(item: any)}
+                    <button onclick={() => promptRemoveGroup(item.GroupName)} class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1 rounded shadow-sm transition border border-red-800/50">
+                        Remove
+                    </button>
+                {/snippet}
                 <PaginatedTable
                     items={groups}
                     {loading}
                     onRefresh={loadDetails}
+                    {actionsSnippet}
                     columns={[
                         {
                             label: "Group Name",
@@ -226,4 +257,7 @@
         {/if}
     </div>
     <DeleteConfirmModal bind:show={showDeleteModal} resourceName={userName} onConfirm={deleteUser} loading={deleting} {error} />
+    {#if groupToRemove}
+        <DeleteConfirmModal bind:show={showRemoveGroupModal} title="Remove Group from User" resourceName={groupToRemove} onConfirm={confirmRemoveGroup} loading={removingGroup} />
+    {/if}
 </div>
