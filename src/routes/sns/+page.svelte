@@ -12,6 +12,7 @@
     import { aws } from "$lib/services/aws.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiRefresh } from "@mdi/js";
+    import { goto } from "$app/navigation";
 
     let topics = $state<Topic[]>([]);
     let loading = $state(false);
@@ -153,7 +154,12 @@
             history.pop();
             loadTopics(history[history.length - 1]);
         }}
-        columns={[{ label: "Topic Name", key: "TopicArn", format: (val) => val ? val.split(':').pop() : "-" }]}
+        columns={[{ 
+            label: "Topic Name", 
+            key: "TopicArn", 
+            format: (val) => val ? val.split(':').pop() : "-",
+            onClick: (item) => goto(`/sns/topic/${encodeURIComponent(item.TopicArn!.split(':').pop()!)}?arn=${encodeURIComponent(item.TopicArn!)}`)
+        }]}
     >
         {#snippet headerActionsSnippet()}
             <button
