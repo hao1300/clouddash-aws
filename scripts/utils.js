@@ -11,7 +11,7 @@ export function updateWebVersion(version, platform = null) {
     }
 
     let content = fs.readFileSync(webPath, 'utf8');
-    
+
     // Update versions in links
     if (!platform || platform === 'windows') {
         content = content.replace(/downloads\/windows\/clouddash-[\d.]+-setup\.exe/g, `downloads/windows/clouddash-${version}-setup.exe`);
@@ -22,7 +22,7 @@ export function updateWebVersion(version, platform = null) {
     if (!platform || platform === 'linux') {
         content = content.replace(/downloads\/linux\/clouddash-[\d.]+\.AppImage/g, `downloads/linux/clouddash-${version}.AppImage`);
     }
-    
+
     fs.writeFileSync(webPath, content);
     console.log(`Updated ${webPath} (${platform || 'all platforms'}) to version ${version}`);
 }
@@ -35,7 +35,7 @@ export function generateUpdateMetadata(platform, version, signaturePath, downloa
 
     const pubDate = new Date().toISOString();
     const signature = fs.readFileSync(signaturePath, 'utf8').trim();
-    
+
     const metadata = {
         version: version,
         pub_date: pubDate,
@@ -46,12 +46,12 @@ export function generateUpdateMetadata(platform, version, signaturePath, downloa
 
     const target = platform; // 'windows' or 'linux'
     const arch = 'x86_64';
-    
-    const outputDir = `clouddash-web/static/updates/${target}/${arch}`;
+
+    const outputDir = `clouddash-web/static/versions/${target}/${arch}`;
     if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
     }
-    
+
     const outputPath = path.join(outputDir, `${version}.json`);
     fs.writeFileSync(outputPath, JSON.stringify(metadata, null, 2));
     console.log(`Generated update metadata at ${outputPath}`);
@@ -83,11 +83,11 @@ export async function uploadToR2(src, destPath, contentType = null) {
     const bucket = "static-clouddash-dev";
     const endpoint = "https://9e5d25b88e77c04686ef4f03124ee940.r2.cloudflarestorage.com";
     const profile = "chromestatsr2";
-    
+
     const finalContentType = contentType || getMimeType(src);
-    
+
     console.log(`Uploading to R2: ${src} -> s3://${bucket}/${destPath} (${finalContentType})`);
-    
+
     const client = new S3Client({
         region: "auto",
         endpoint: endpoint,
@@ -118,7 +118,7 @@ export async function uploadToR2(src, destPath, contentType = null) {
             ContentType: finalContentType,
             ChecksumAlgorithm: "CRC32",
         }));
-        
+
         console.log(`Successfully uploaded to R2: s3://${bucket}/${destPath}`);
     } catch (error) {
         console.error(`Failed to upload to R2: ${error.message}`);
