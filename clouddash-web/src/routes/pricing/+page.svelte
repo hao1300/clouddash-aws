@@ -134,8 +134,16 @@
         Frequently Asked Questions
       </h2>
     </div>
-    <div class="row g-4">
-      <div class="col-md-6">
+    <div class="row g-4 justify-content-center">
+      <div class="col-md-4">
+        <div class="p-4 glass rounded-4 h-100">
+          <h5 class="fw-bold mb-3 text-white">Is the app secure to use?</h5>
+          <p class="text-secondary mb-0">
+            Absolutely! You login directly using your own IAM access key and secret. To minimize risk, you can create a dedicated IAM user with limited read-only access. Your credentials are fully managed locally and never sent to any external servers.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-4">
         <div class="p-4 glass rounded-4 h-100">
           <h5 class="fw-bold mb-3 text-white">Does Pro work on all devices?</h5>
           <p class="text-secondary mb-0">
@@ -144,7 +152,7 @@
           </p>
         </div>
       </div>
-      <div class="col-md-6">
+      <div class="col-md-4">
         <div class="p-4 glass rounded-4 h-100">
           <h5 class="fw-bold mb-3 text-white">How do I receive my license?</h5>
           <p class="text-secondary mb-0">

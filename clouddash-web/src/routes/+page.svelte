@@ -239,6 +239,44 @@
     </div>
   </div>
 </section>
+<!-- FAQ Section -->
+<section id="faq" class="faq py-4">
+  <div class="container container-max">
+    <div class="text-center mb-4">
+      <h2 class="display-5 fw-bold font-outfit mb-3 text-white">
+        Frequently Asked Questions
+      </h2>
+    </div>
+
+    <div class="row g-4 pt-2 justify-content-center">
+      <div class="col-md-4">
+        <div class="feature-card p-4 rounded-4 h-100 transition-up">
+          <h5 class="fw-bold mb-3 text-white">Is the app secure to use?</h5>
+          <p class="text-secondary mb-0">
+            Absolutely! You login directly using your own IAM access key and secret. To minimize risk, you can create a dedicated IAM user with limited read-only access. Your credentials are fully managed locally and never sent to any external servers.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="feature-card p-4 rounded-4 h-100 transition-up">
+          <h5 class="fw-bold mb-3 text-white">Why should I trust CloudDash?</h5>
+          <p class="text-secondary mb-0">
+            CloudDash is designed with a local-first architecture. It communicates directly with AWS APIs from your device. We have no middle-man servers intercepting your traffic, meaning we physically cannot access your AWS infrastructure or data.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="feature-card p-4 rounded-4 h-100 transition-up">
+          <h5 class="fw-bold mb-3 text-white">Why isn't it open source?</h5>
+          <p class="text-secondary mb-0">
+            While we love open source, CloudDash is a commercial product. Keeping it closed source allows us to maintain a sustainable business model and continue delivering a polished, high-performance experience with dedicated support.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- CTA Section -->
 <section class="cta py-4">
   <div class="container container-max">
