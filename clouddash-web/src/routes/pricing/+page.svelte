@@ -4,7 +4,7 @@
   const freeFeatures = [
     "Unlimited AWS Accounts",
     "Read-only: S3, DynamoDB, CloudWatch",
-    "Community Support",
+    "Best Effort Support",
   ];
 
   const proFeatures = [
