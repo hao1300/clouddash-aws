@@ -4,12 +4,14 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { goto } from "$app/navigation";
+    import CreateGroupModal from "$lib/components/iam/CreateGroupModal.svelte";
 
     let groups = $state<Group[]>([]);
     let loading = $state(false);
     let error = $state("");
     let marker = $state<string | undefined>(undefined);
     let history = $state<string[]>([]);
+    let showCreateModal = $state(false);
 
     let __initLoaded = false;
     $effect(() => {
@@ -55,6 +57,13 @@
             {error}
         </div>{/if}
 
+    <div class="px-6 py-3 border-b border-gray-800 bg-gray-900/50 flex justify-between items-center shrink-0 {error ? 'mt-8' : ''}">
+        <h2 class="text-sm font-bold text-gray-300 uppercase tracking-widest">IAM Groups</h2>
+        <button onclick={() => showCreateModal = true} class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded text-xs font-bold transition shadow-sm">
+            Create Group
+        </button>
+    </div>
+
     <PaginatedTable
         items={groups}
         {loading}
@@ -84,6 +93,7 @@
             },
         ]}
     />
+    <CreateGroupModal bind:show={showCreateModal} onSaved={() => { history = []; loadGroups(); }} />
 </div>
 </div>
 </div>
