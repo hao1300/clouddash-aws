@@ -2,6 +2,8 @@ import { json } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
 import tauriConf from '../../../../../../../src-tauri/tauri.conf.json';
 
+export const prerender = false;
+
 // Simple semver comparison
 function compareVersions(v1: string, v2: string) {
     const p1 = v1.split('.').map(Number);
@@ -15,20 +17,27 @@ function compareVersions(v1: string, v2: string) {
     return 0;
 }
 
-export async function GET({ params, fetch }: RequestEvent) {
+export async function GET({ params }: RequestEvent) {
     const { target, arch, current_version } = params;
     const latestVersion = tauriConf.version;
 
     // Compare version
     if (compareVersions(latestVersion, current_version) > 0) {
         // There is an update
-        // Fetch the update metadata
-        // On Cloudflare, we can fetch the static asset
-        const res = await fetch(`/updates/${target}/${arch}/${latestVersion}.json`);
-        
-        if (res.ok) {
-            const data = await res.json();
-            return json(data);
+        // We use import.meta.glob to embed the JSON files into the worker
+        const allMetadata = import.meta.glob('../../../../../../static/versions/*/*/*.json', { eager: true });
+
+        // Find the matching metadata
+        const metadataPath = `../../../../../../static/versions/${target}/${arch}/${latestVersion}.json`;
+        const data = allMetadata[metadataPath];
+
+        if (data) {
+            // The imported JSON might have a default export or just be the object itself
+            return json(data.default || data);
+        } else {
+            return json({
+                error: "Metadata not found"
+            }, { status: 404 });
         }
     }
 

@@ -3,8 +3,10 @@
   "name": "clouddash",
   "account_id": "9e5d25b88e77c04686ef4f03124ee940",
   "compatibility_date": "2025-10-24",
+  "main": ".svelte-kit/cloudflare/_worker.js",
   "assets": {
-    "directory": "./build"
+    "directory": "./build",
+    "binding": "ASSETS"
   },
   "observability": {
     "enabled": true
