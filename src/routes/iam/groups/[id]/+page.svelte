@@ -8,6 +8,7 @@
         ListAttachedGroupPoliciesCommand,
         DeleteGroupCommand,
         RemoveUserFromGroupCommand,
+        DetachGroupPolicyCommand,
         type Group,
         type AttachedPolicy,
         type User
@@ -20,6 +21,7 @@
     import InlinePolicyModal from "$lib/components/InlinePolicyModal.svelte";
     import AddUserToGroupModal from "$lib/components/iam/AddUserToGroupModal.svelte";
     import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
+    import ConfirmModal from "$lib/components/iam/ConfirmModal.svelte";
     import AttachPolicyModal from "$lib/components/iam/AttachPolicyModal.svelte";
 
     let groupName = $derived($page.params.id || "");
@@ -47,6 +49,10 @@
     let userToRemove = $state<string | null>(null);
     let showRemoveUserModal = $state(false);
     let removingUser = $state(false);
+
+    let policyToDetach = $state<{ arn: string, name: string } | null>(null);
+    let showDetachPolicyModal = $state(false);
+    let detachingPolicy = $state(false);
 
     $effect(() => {
         if (aws.iam && groupName) {
@@ -107,6 +113,27 @@
             showRemoveUserModal = false;
         } finally {
             removingUser = false;
+        }
+    }
+
+    function promptDetachPolicy(arn: string, name: string) {
+        policyToDetach = { arn, name };
+        showDetachPolicyModal = true;
+    }
+
+    async function confirmDetachPolicy() {
+        if (!aws.iam || !groupName || !policyToDetach) return;
+        try {
+            detachingPolicy = true;
+            await aws.iam.send(new DetachGroupPolicyCommand({ GroupName: groupName, PolicyArn: policyToDetach.arn }));
+            loadDetails(); // Refresh
+            showDetachPolicyModal = false;
+            policyToDetach = null;
+        } catch(e: any) {
+            error = e.message || String(e);
+            showDetachPolicyModal = false;
+        } finally {
+            detachingPolicy = false;
         }
     }
 </script>
@@ -219,10 +246,16 @@
                         </button>
                     </div>
                     <div class="flex-1 overflow-auto">
+                        {#snippet policyActionsSnippet(item: any)}
+                            <button onclick={() => promptDetachPolicy(item.PolicyArn, item.PolicyName)} class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1 rounded shadow-sm transition border border-red-800/50">
+                                Detach
+                            </button>
+                        {/snippet}
                         <PaginatedTable
                             items={attachedPolicies}
                             {loading}
                             onRefresh={loadDetails}
+                            actionsSnippet={policyActionsSnippet}
                             columns={[
                                 {
                                     label: "Policy Name",
@@ -265,7 +298,10 @@
     <AddUserToGroupModal bind:show={showAddUserModal} {groupName} onSaved={loadDetails} />
     <DeleteConfirmModal bind:show={showDeleteModal} resourceName={groupName} onConfirm={deleteGroup} loading={deleting} {error} />
     {#if userToRemove}
-        <DeleteConfirmModal bind:show={showRemoveUserModal} title="Remove User from Group" resourceName={userToRemove} onConfirm={confirmRemoveUser} loading={removingUser} />
+        <ConfirmModal bind:show={showRemoveUserModal} title="Remove User from Group" message="Are you sure you want to remove {userToRemove} from {groupName}?" confirmText="Remove" onConfirm={confirmRemoveUser} loading={removingUser} />
+    {/if}
+    {#if policyToDetach}
+        <ConfirmModal bind:show={showDetachPolicyModal} title="Detach Policy" message="Are you sure you want to detach the policy '{policyToDetach.name}' from {groupName}?" confirmText="Detach" onConfirm={confirmDetachPolicy} loading={detachingPolicy} />
     {/if}
     <AttachPolicyModal bind:show={showAttachPolicyModal} entityType="Group" entityName={groupName} onSaved={loadDetails} />
 </div>

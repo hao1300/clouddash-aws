@@ -8,6 +8,7 @@
         ListRolePoliciesCommand,
         UpdateAssumeRolePolicyCommand,
         DeleteRoleCommand,
+        DetachRolePolicyCommand,
         type Role,
         type AttachedPolicy
     } from "@aws-sdk/client-iam";
@@ -19,6 +20,7 @@
     import JsonEditor from "$lib/components/JsonEditor.svelte";
     import InlinePolicyModal from "$lib/components/InlinePolicyModal.svelte";
     import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
+    import ConfirmModal from "$lib/components/iam/ConfirmModal.svelte";
     import AttachPolicyModal from "$lib/components/iam/AttachPolicyModal.svelte";
 
     let roleName = $derived($page.params.id || "");
@@ -41,6 +43,10 @@
     let showDeleteModal = $state(false);
     let deleting = $state(false);
     let showAttachPolicyModal = $state(false);
+
+    let policyToDetach = $state<{ arn: string, name: string } | null>(null);
+    let showDetachPolicyModal = $state(false);
+    let detachingPolicy = $state(false);
 
     $effect(() => {
         if (aws.iam && roleName) {
@@ -114,6 +120,27 @@
             showDeleteModal = false;
         } finally {
             deleting = false;
+        }
+    }
+
+    function promptDetachPolicy(arn: string, name: string) {
+        policyToDetach = { arn, name };
+        showDetachPolicyModal = true;
+    }
+
+    async function confirmDetachPolicy() {
+        if (!aws.iam || !roleName || !policyToDetach) return;
+        try {
+            detachingPolicy = true;
+            await aws.iam.send(new DetachRolePolicyCommand({ RoleName: roleName, PolicyArn: policyToDetach.arn }));
+            loadDetails(); // Refresh
+            showDetachPolicyModal = false;
+            policyToDetach = null;
+        } catch(e: any) {
+            error = e.message || String(e);
+            showDetachPolicyModal = false;
+        } finally {
+            detachingPolicy = false;
         }
     }
 </script>
@@ -217,10 +244,16 @@
                         </button>
                     </div>
                     <div class="flex-1 overflow-auto">
+                        {#snippet policyActionsSnippet(item: any)}
+                            <button onclick={() => promptDetachPolicy(item.PolicyArn, item.PolicyName)} class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1 rounded shadow-sm transition border border-red-800/50">
+                                Detach
+                            </button>
+                        {/snippet}
                         <PaginatedTable
                             items={attachedPolicies}
                             {loading}
                             onRefresh={loadDetails}
+                            actionsSnippet={policyActionsSnippet}
                             columns={[
                                 {
                                     label: "Policy Name",
@@ -261,5 +294,8 @@
         {/if}
     </div>
     <DeleteConfirmModal bind:show={showDeleteModal} resourceName={roleName} onConfirm={deleteRole} loading={deleting} {error} />
+    {#if policyToDetach}
+        <ConfirmModal bind:show={showDetachPolicyModal} title="Detach Policy" message="Are you sure you want to detach the policy '{policyToDetach.name}' from {roleName}?" confirmText="Detach" onConfirm={confirmDetachPolicy} loading={detachingPolicy} />
+    {/if}
     <AttachPolicyModal bind:show={showAttachPolicyModal} entityType="Role" entityName={roleName} onSaved={loadDetails} />
 </div>
