@@ -19,6 +19,7 @@
     import JsonEditor from "$lib/components/JsonEditor.svelte";
     import InlinePolicyModal from "$lib/components/InlinePolicyModal.svelte";
     import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
+    import AttachPolicyModal from "$lib/components/iam/AttachPolicyModal.svelte";
 
     let roleName = $derived($page.params.id || "");
 
@@ -39,6 +40,7 @@
 
     let showDeleteModal = $state(false);
     let deleting = $state(false);
+    let showAttachPolicyModal = $state(false);
 
     $effect(() => {
         if (aws.iam && roleName) {
@@ -208,8 +210,11 @@
             <div class="flex flex-col gap-6 h-full">
                 <!-- Attached Policies -->
                 <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
-                    <div class="p-4 border-b border-gray-800 bg-gray-900/50">
+                    <div class="p-4 border-b border-gray-800 bg-gray-900/50 flex justify-between items-center">
                         <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Attached Policies</h3>
+                        <button onclick={() => showAttachPolicyModal = true} class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded shadow-sm transition">
+                            Attach Policy
+                        </button>
                     </div>
                     <div class="flex-1 overflow-auto">
                         <PaginatedTable
@@ -256,4 +261,5 @@
         {/if}
     </div>
     <DeleteConfirmModal bind:show={showDeleteModal} resourceName={roleName} onConfirm={deleteRole} loading={deleting} {error} />
+    <AttachPolicyModal bind:show={showAttachPolicyModal} entityType="Role" entityName={roleName} onSaved={loadDetails} />
 </div>

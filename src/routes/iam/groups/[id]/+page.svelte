@@ -20,6 +20,7 @@
     import InlinePolicyModal from "$lib/components/InlinePolicyModal.svelte";
     import AddUserToGroupModal from "$lib/components/iam/AddUserToGroupModal.svelte";
     import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
+    import AttachPolicyModal from "$lib/components/iam/AttachPolicyModal.svelte";
 
     let groupName = $derived($page.params.id || "");
 
@@ -37,6 +38,7 @@
 
     let showInlineModal = $state(false);
     let editInlineName = $state<string | null>(null);
+    let showAttachPolicyModal = $state(false);
 
     let showAddUserModal = $state(false);
     let showDeleteModal = $state(false);
@@ -210,8 +212,11 @@
             <div class="flex flex-col gap-6 h-full">
                 <!-- Attached Policies -->
                 <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
-                    <div class="p-4 border-b border-gray-800 bg-gray-900/50">
+                    <div class="p-4 border-b border-gray-800 bg-gray-900/50 flex justify-between items-center">
                         <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Attached Policies</h3>
+                        <button onclick={() => showAttachPolicyModal = true} class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded shadow-sm transition">
+                            Attach Policy
+                        </button>
                     </div>
                     <div class="flex-1 overflow-auto">
                         <PaginatedTable
@@ -262,4 +267,5 @@
     {#if userToRemove}
         <DeleteConfirmModal bind:show={showRemoveUserModal} title="Remove User from Group" resourceName={userToRemove} onConfirm={confirmRemoveUser} loading={removingUser} />
     {/if}
+    <AttachPolicyModal bind:show={showAttachPolicyModal} entityType="Group" entityName={groupName} onSaved={loadDetails} />
 </div>
