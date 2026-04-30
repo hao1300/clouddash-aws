@@ -20,6 +20,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import InlinePolicyModal from "$lib/components/InlinePolicyModal.svelte";
     import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
+    import AddGroupToUserModal from "$lib/components/iam/AddGroupToUserModal.svelte";
 
     let userName = $derived($page.params.id || "");
 
@@ -44,6 +45,8 @@
     let groupToRemove = $state<string | null>(null);
     let showRemoveGroupModal = $state(false);
     let removingGroup = $state(false);
+
+    let showAddGroupModal = $state(false);
 
     $effect(() => {
         if (aws.iam && userName) {
@@ -179,6 +182,12 @@
             </div>
         {:else if detailTab === "groups"}
             <div class="h-full bg-gray-900 border border-gray-800 rounded-lg overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-gray-800 bg-gray-900/50 flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">User Groups</h3>
+                    <button onclick={() => showAddGroupModal = true} class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded shadow-sm transition">
+                        Add to Group
+                    </button>
+                </div>
                 {#snippet actionsSnippet(item: any)}
                     <button onclick={() => promptRemoveGroup(item.GroupName)} class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1 rounded shadow-sm transition border border-red-800/50">
                         Remove
@@ -260,4 +269,5 @@
     {#if groupToRemove}
         <DeleteConfirmModal bind:show={showRemoveGroupModal} title="Remove Group from User" resourceName={groupToRemove} onConfirm={confirmRemoveGroup} loading={removingGroup} />
     {/if}
+    <AddGroupToUserModal bind:show={showAddGroupModal} {userName} onSaved={loadDetails} />
 </div>

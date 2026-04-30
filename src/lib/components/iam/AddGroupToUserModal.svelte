@@ -1,62 +1,61 @@
 <script lang="ts">
     import { aws } from "$lib/services/aws.svelte";
-    import { AddUserToGroupCommand, ListUsersCommand, type User } from "@aws-sdk/client-iam";
+    import { AddUserToGroupCommand, ListGroupsCommand, type Group } from "@aws-sdk/client-iam";
     import Modal from "$lib/components/Modal.svelte";
 
     let {
         show = $bindable(false),
-        groupName,
+        userName,
         onSaved = () => {}
     } = $props<{
         show: boolean;
-        groupName: string;
+        userName: string;
         onSaved?: () => void;
     }>();
 
     let saving = $state(false);
-    let userName = $state("");
+    let groupName = $state("");
     let error = $state("");
     
-    // To optionally provide suggestions
-    let allUsers = $state<User[]>([]);
+    let allGroups = $state<Group[]>([]);
 
     $effect(() => {
         if (show) {
             error = "";
-            userName = "";
-            loadUsers();
+            groupName = "";
+            loadGroups();
         }
     });
 
-    async function loadUsers() {
+    async function loadGroups() {
         if (!aws.iam) return;
         try {
-            const res = await aws.iam.send(new ListUsersCommand({ MaxItems: 100 }));
-            allUsers = res.Users || [];
+            const res = await aws.iam.send(new ListGroupsCommand({ MaxItems: 100 }));
+            allGroups = res.Groups || [];
         } catch(e) {
-            // Ignore failure on loading suggestions
+            // Ignore
         }
     }
 
-    let filteredUsers = $derived(
-        userName 
-        ? allUsers.filter(u => u.UserName && u.UserName.toLowerCase().includes(userName.toLowerCase()))
-        : allUsers
+    let filteredGroups = $derived(
+        groupName 
+        ? allGroups.filter(g => g.GroupName && g.GroupName.toLowerCase().includes(groupName.toLowerCase()))
+        : allGroups
     );
 
     let showDropdown = $state(false);
 
-    function selectUser(name: string) {
-        userName = name;
+    function selectGroup(name: string) {
+        groupName = name;
         showDropdown = false;
     }
 
-    async function addUser() {
-        if (!aws.iam || !userName.trim() || !groupName) return;
+    async function addGroup() {
+        if (!aws.iam || !groupName.trim() || !userName) return;
         saving = true;
         error = "";
         try {
-            await aws.iam.send(new AddUserToGroupCommand({ GroupName: groupName, UserName: userName.trim() }));
+            await aws.iam.send(new AddUserToGroupCommand({ GroupName: groupName.trim(), UserName: userName }));
             show = false;
             onSaved();
         } catch(e: any) {
@@ -75,19 +74,19 @@
             </div>
         {/if}
         <div class="shrink-0 relative">
-            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">User Name</label>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Group Name</label>
             <input 
-                bind:value={userName} 
+                bind:value={groupName} 
                 onfocus={() => showDropdown = true}
                 onblur={() => setTimeout(() => showDropdown = false, 200)}
                 class="w-full bg-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500" 
-                placeholder="e.g. MyUser" 
+                placeholder="e.g. Administrators" 
             />
-            {#if showDropdown && filteredUsers.length > 0}
+            {#if showDropdown && filteredGroups.length > 0}
                 <div class="absolute z-50 w-full mt-1 bg-gray-900 border border-gray-700 rounded shadow-lg max-h-48 overflow-auto">
-                    {#each filteredUsers as user}
-                        <button type="button" class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white" onclick={() => selectUser(user.UserName || "")}>
-                            {user.UserName}
+                    {#each filteredGroups as group}
+                        <button type="button" class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white" onclick={() => selectGroup(group.GroupName || "")}>
+                            {group.GroupName}
                         </button>
                     {/each}
                 </div>
@@ -95,8 +94,8 @@
         </div>
         <div class="flex justify-end gap-2 pt-2 shrink-0">
             <button onclick={() => show = false} class="px-4 py-2 text-xs text-gray-400 hover:text-white transition">Cancel</button>
-            <button onclick={addUser} disabled={saving || !userName.trim()} class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded text-xs font-bold transition shadow disabled:opacity-50 inline-flex items-center gap-2">
-                {#if saving}<span class="animate-spin">⟳</span>{/if} Add User
+            <button onclick={addGroup} disabled={saving || !groupName.trim()} class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded text-xs font-bold transition shadow disabled:opacity-50 inline-flex items-center gap-2">
+                {#if saving}<span class="animate-spin">⟳</span>{/if} Add Group
             </button>
         </div>
     </div>
