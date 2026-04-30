@@ -3,13 +3,16 @@
         GetPolicyCommand,
         GetPolicyVersionCommand,
         CreatePolicyVersionCommand,
+        DeletePolicyCommand,
         type Policy,
         type PolicyVersion
     } from "@aws-sdk/client-iam";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
+    import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     import JsonEditor from "$lib/components/JsonEditor.svelte";
+    import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
 
     let policyArn = $derived(decodeURIComponent($page.params.id || ""));
 
@@ -27,6 +30,9 @@
 
     let policyJsonStr = $state("");
     let savingPolicy = $state(false);
+
+    let showDeleteModal = $state(false);
+    let deleting = $state(false);
 
     $effect(() => {
         if (aws.iam && policyArn) {
@@ -88,6 +94,22 @@
             savingPolicy = false;
         }
     }
+
+    async function deletePolicy() {
+        if (!aws.iam || !policyArn) return;
+        try {
+            deleting = true;
+            error = "";
+            await aws.iam.send(new DeletePolicyCommand({ PolicyArn: policyArn }));
+            showDeleteModal = false;
+            goto("/iam/policies");
+        } catch(e: any) {
+            error = e.message || String(e);
+            showDeleteModal = false;
+        } finally {
+            deleting = false;
+        }
+    }
 </script>
 
 <div class="h-full flex flex-col bg-gray-950 overflow-hidden relative">
@@ -127,6 +149,9 @@
                 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
                     <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
                         <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Policy Overview</h3>
+                        <button onclick={() => showDeleteModal = true} class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1 rounded shadow-sm transition border border-red-800/50">
+                            Delete Policy
+                        </button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -180,4 +205,5 @@
             </div>
         {/if}
     </div>
+    <DeleteConfirmModal bind:show={showDeleteModal} resourceName={policyDetails?.PolicyName || 'this policy'} onConfirm={deletePolicy} loading={deleting} {error} />
 </div>

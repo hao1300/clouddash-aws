@@ -7,6 +7,7 @@
         ListGroupsForUserCommand,
         ListAttachedUserPoliciesCommand,
         ListUserPoliciesCommand,
+        DeleteUserCommand,
         type User,
         type Group,
         type AttachedPolicy
@@ -17,6 +18,7 @@
     import { titleService } from "$lib/services/title.svelte";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import InlinePolicyModal from "$lib/components/InlinePolicyModal.svelte";
+    import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
 
     let userName = $derived($page.params.id || "");
 
@@ -34,6 +36,9 @@
 
     let showInlineModal = $state(false);
     let editInlineName = $state<string | null>(null);
+
+    let showDeleteModal = $state(false);
+    let deleting = $state(false);
 
     $effect(() => {
         if (aws.iam && userName) {
@@ -60,6 +65,22 @@
             error = e.message || String(e);
         } finally {
             loading = false;
+        }
+    }
+
+    async function deleteUser() {
+        if (!aws.iam || !userName) return;
+        try {
+            deleting = true;
+            error = "";
+            await aws.iam.send(new DeleteUserCommand({ UserName: userName }));
+            showDeleteModal = false;
+            goto("/iam/users");
+        } catch(e: any) {
+            error = e.message || String(e);
+            showDeleteModal = false;
+        } finally {
+            deleting = false;
         }
     }
 </script>
@@ -103,6 +124,9 @@
                 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
                     <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
                         <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">User Overview</h3>
+                        <button onclick={() => showDeleteModal = true} class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1 rounded shadow-sm transition border border-red-800/50">
+                            Delete User
+                        </button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -201,4 +225,5 @@
             <InlinePolicyModal bind:show={showInlineModal} type="User" entityName={userName} policyName={editInlineName} onSaved={loadDetails} />
         {/if}
     </div>
+    <DeleteConfirmModal bind:show={showDeleteModal} resourceName={userName} onConfirm={deleteUser} loading={deleting} {error} />
 </div>

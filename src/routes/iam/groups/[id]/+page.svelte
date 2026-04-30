@@ -6,6 +6,7 @@
         GetGroupCommand,
         ListGroupPoliciesCommand,
         ListAttachedGroupPoliciesCommand,
+        DeleteGroupCommand,
         type Group,
         type AttachedPolicy,
         type User
@@ -16,6 +17,8 @@
     import { titleService } from "$lib/services/title.svelte";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import InlinePolicyModal from "$lib/components/InlinePolicyModal.svelte";
+    import AddUserToGroupModal from "$lib/components/iam/AddUserToGroupModal.svelte";
+    import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
 
     let groupName = $derived($page.params.id || "");
 
@@ -33,6 +36,10 @@
 
     let showInlineModal = $state(false);
     let editInlineName = $state<string | null>(null);
+
+    let showAddUserModal = $state(false);
+    let showDeleteModal = $state(false);
+    let deleting = $state(false);
 
     $effect(() => {
         if (aws.iam && groupName) {
@@ -57,6 +64,22 @@
             error = e.message || String(e);
         } finally {
             loading = false;
+        }
+    }
+
+    async function deleteGroup() {
+        if (!aws.iam || !groupName) return;
+        try {
+            deleting = true;
+            error = "";
+            await aws.iam.send(new DeleteGroupCommand({ GroupName: groupName }));
+            showDeleteModal = false;
+            goto("/iam/groups");
+        } catch(e: any) {
+            error = e.message || String(e);
+            showDeleteModal = false;
+        } finally {
+            deleting = false;
         }
     }
 </script>
@@ -100,6 +123,9 @@
                 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
                     <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
                         <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Group Overview</h3>
+                        <button onclick={() => showDeleteModal = true} class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1 rounded shadow-sm transition border border-red-800/50">
+                            Delete Group
+                        </button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -123,6 +149,12 @@
             </div>
         {:else if detailTab === "users"}
             <div class="h-full bg-gray-900 border border-gray-800 rounded-lg overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-gray-800 bg-gray-900/50 flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Group Users</h3>
+                    <button onclick={() => showAddUserModal = true} class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded shadow-sm transition">
+                        Add User
+                    </button>
+                </div>
                 <PaginatedTable
                     items={users}
                     {loading}
@@ -194,4 +226,6 @@
             <InlinePolicyModal bind:show={showInlineModal} type="Group" entityName={groupName} policyName={editInlineName} onSaved={loadDetails} />
         {/if}
     </div>
+    <AddUserToGroupModal bind:show={showAddUserModal} {groupName} onSaved={loadDetails} />
+    <DeleteConfirmModal bind:show={showDeleteModal} resourceName={groupName} onConfirm={deleteGroup} loading={deleting} {error} />
 </div>
