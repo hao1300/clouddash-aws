@@ -66,7 +66,7 @@
     }
 </script>
 
-<Modal bind:open={show} title="Add User to Group" maxWidth="max-w-md">
+<Modal bind:open={show} title="Add User to Group" maxWidth="max-w-md" overflowVisible={true}>
     <div class="space-y-4 w-full flex flex-col">
         {#if error}
             <div class="bg-red-500/20 text-red-300 p-2 text-xs rounded border border-red-500/30 shrink-0">

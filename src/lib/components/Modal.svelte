@@ -7,12 +7,14 @@
         open = $bindable(false),
         title = "",
         maxWidth = "max-w-lg",
+        overflowVisible = false,
         children,
         headerActions,
     }: {
         open?: boolean;
         title?: string;
         maxWidth?: string;
+        overflowVisible?: boolean;
         children: Snippet;
         headerActions?: Snippet;
     } = $props();
@@ -34,7 +36,7 @@
         onkeydown={handleKeydown}
     >
         <div
-            class="bg-gray-900 rounded-xl border border-gray-800 shadow-2xl flex flex-col w-full {maxWidth} max-h-[90vh] overflow-hidden"
+            class="bg-gray-900 rounded-xl border border-gray-800 shadow-2xl flex flex-col w-full {maxWidth} max-h-[90vh] {overflowVisible ? '' : 'overflow-hidden'}"
         >
             <!-- Header -->
             <div
@@ -54,7 +56,7 @@
             </div>
 
             <!-- Body -->
-            <div class="flex-1 overflow-auto p-5">
+            <div class="flex-1 p-5 {overflowVisible ? '' : 'overflow-auto'}">
                 {@render children()}
             </div>
         </div>
