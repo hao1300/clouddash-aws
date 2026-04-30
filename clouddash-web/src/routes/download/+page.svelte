@@ -22,10 +22,12 @@
     {
       name: "Android",
       icon: SmartphoneIcon,
-      type: "Mobile APK",
+      type: "Google Play / APK",
+      playStoreLink:
+        "https://play.google.com/store/apps/details?id=dev.clouddash.aws",
       link: "https://static.clouddash.dev/downloads/android/clouddash-0.9.3.apk",
       instructions:
-        "Direct download for Android devices. Optimized for tablets and foldable phones.",
+        "Available on the Google Play Store. Direct APK available as backup.",
     },
     {
       name: "Linux",
@@ -89,13 +91,36 @@
 
             <p class="text-secondary mb-4 flex-grow-1">{dl.instructions}</p>
 
-            <a
-              href={dl.link}
-              class="btn btn-primary btn-lg w-100 rounded-pill fw-bold shadow-lg d-flex align-items-center justify-content-center gap-2"
-            >
-              <DownloadIcon size="20" />
-              Download for {dl.name}
-            </a>
+            {#if dl.playStoreLink}
+              <div class="d-flex flex-column gap-3">
+                <a
+                  href={dl.playStoreLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="play-store-badge transition-up"
+                >
+                  <img
+                    src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg"
+                    alt="Get it on Google Play"
+                    class="w-100"
+                  />
+                </a>
+                <a
+                  href={dl.link}
+                  class="text-secondary small text-center text-decoration-underline"
+                >
+                  Download APK
+                </a>
+              </div>
+            {:else}
+              <a
+                href={dl.link}
+                class="btn btn-primary btn-lg w-100 rounded-pill fw-bold shadow-lg d-flex align-items-center justify-content-center gap-2"
+              >
+                <DownloadIcon size="20" />
+                Download for {dl.name}
+              </a>
+            {/if}
           </div>
         </div>
       {/each}
@@ -159,5 +184,17 @@
   .transition-up:hover {
     transform: translateY(-5px);
     border-color: rgba(59, 130, 246, 0.5) !important;
+  }
+
+  .play-store-badge {
+    display: block;
+    max-width: 200px;
+    margin: 0 auto;
+    transition: transform 0.2s ease;
+  }
+
+  .play-store-badge img {
+    height: 60px;
+    width: auto;
   }
 </style>
