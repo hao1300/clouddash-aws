@@ -33,7 +33,7 @@
       name: "Linux",
       icon: MonitorIcon,
       type: "AppImage",
-      link: "https://static.clouddash.dev/downloads/linux/clouddash-0.9.4.AppImage",
+      link: "https://static.clouddash.dev/downloads/linux/clouddash-0.9.6.AppImage",
       instructions:
         "Universal Linux AppImage. Supports most distributions including Ubuntu, Fedora, and Debian.",
     },
