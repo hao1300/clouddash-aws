@@ -102,6 +102,87 @@
   let refreshKey = $state(0);
   let currentLoginId = $state(0);
 
+  // Pull-to-reload (mobile)
+  const PULL_THRESHOLD = 70;
+  const PULL_MAX = 140;
+  let pullDistance = $state(0);
+  let isPulling = $state(false);
+  let isRefreshing = $state(false);
+  let pullStartY = 0;
+  let pullScrollEl: HTMLElement | null = null;
+
+  function findScrollableAncestor(el: HTMLElement | null): HTMLElement | null {
+    while (el && el !== document.body) {
+      const style = getComputedStyle(el);
+      const oy = style.overflowY;
+      if (
+        (oy === "auto" || oy === "scroll") &&
+        el.scrollHeight > el.clientHeight + 1
+      ) {
+        return el;
+      }
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  function onTouchStart(e: TouchEvent) {
+    if (!isMobile || !isAuthenticated || isRefreshing) return;
+    if (e.touches.length !== 1) return;
+    pullScrollEl = findScrollableAncestor(e.target as HTMLElement);
+    const atTop = !pullScrollEl || pullScrollEl.scrollTop <= 0;
+    if (atTop) {
+      pullStartY = e.touches[0].clientY;
+      pullDistance = 0;
+      isPulling = false;
+    } else {
+      pullStartY = 0;
+    }
+  }
+
+  function onTouchMove(e: TouchEvent) {
+    if (!pullStartY || isRefreshing) return;
+    const dy = e.touches[0].clientY - pullStartY;
+    if (dy <= 0) {
+      if (isPulling) {
+        isPulling = false;
+        pullDistance = 0;
+      }
+      return;
+    }
+    if (pullScrollEl && pullScrollEl.scrollTop > 0) {
+      isPulling = false;
+      pullDistance = 0;
+      pullStartY = 0;
+      return;
+    }
+    if (dy < 8) return;
+    isPulling = true;
+    pullDistance = Math.min(PULL_MAX, dy * 0.5);
+    if (e.cancelable) e.preventDefault();
+  }
+
+  function onTouchEnd() {
+    if (!isPulling) {
+      pullStartY = 0;
+      pullScrollEl = null;
+      return;
+    }
+    if (pullDistance >= PULL_THRESHOLD) {
+      isRefreshing = true;
+      refreshKey++;
+      setTimeout(() => {
+        isRefreshing = false;
+        pullDistance = 0;
+      }, 600);
+    } else {
+      pullDistance = 0;
+    }
+    isPulling = false;
+    pullStartY = 0;
+    pullScrollEl = null;
+  }
+
   // History tracking for mobile back button
   afterNavigate(({ type, from, to }) => {
     if (type === "popstate") {
@@ -259,6 +340,11 @@
 
   let backUnlisten: UnlistenFn | null = null;
   onMount(async () => {
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    window.addEventListener("touchcancel", onTouchEnd, { passive: true });
+
     try {
       os = await invoke("get_os");
     } catch {
@@ -727,6 +813,10 @@
 
   onDestroy(() => {
     if (backUnlisten) backUnlisten();
+    window.removeEventListener("touchstart", onTouchStart);
+    window.removeEventListener("touchmove", onTouchMove);
+    window.removeEventListener("touchend", onTouchEnd);
+    window.removeEventListener("touchcancel", onTouchEnd);
   });
 </script>
 
@@ -1146,6 +1236,35 @@
         {/if}
 
         <div class="flex-1 overflow-hidden relative flex flex-col min-w-0">
+          {#if isMobile && (pullDistance > 0 || isRefreshing)}
+            <div
+              class="absolute left-1/2 z-[300] pointer-events-none"
+              style="top: 8px; transform: translateX(-50%) translateY({isRefreshing
+                ? 8
+                : pullDistance * 0.6}px); opacity: {isRefreshing
+                ? 1
+                : Math.min(1, pullDistance / 40)};"
+            >
+              <div
+                class="bg-gray-800 border border-gray-700 rounded-full p-2.5 shadow-xl flex items-center justify-center"
+              >
+                <div
+                  class={isRefreshing ? "animate-spin" : ""}
+                  style={isRefreshing
+                    ? ""
+                    : `transform: rotate(${pullDistance * 4}deg);`}
+                >
+                  <Icon
+                    path={mdiRefresh}
+                    size={20}
+                    color={pullDistance >= PULL_THRESHOLD || isRefreshing
+                      ? "#60a5fa"
+                      : "#9ca3af"}
+                  />
+                </div>
+              </div>
+            </div>
+          {/if}
           <ServiceLayout title={serviceTitle}>
             <div class="absolute inset-0">
               {#key refreshKey}
