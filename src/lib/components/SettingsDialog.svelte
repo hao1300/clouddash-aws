@@ -5,6 +5,8 @@
     import { mdiClose, mdiChevronLeft, mdiChevronRight } from "@mdi/js";
     import { invoke } from "@tauri-apps/api/core";
     import { getVersion } from "@tauri-apps/api/app";
+    import { check as checkForUpdate } from "@tauri-apps/plugin-updater";
+    import { relaunch } from "@tauri-apps/plugin-process";
     import { open as openDialog } from "@tauri-apps/plugin-dialog";
     import {
         settings,
@@ -35,6 +37,46 @@
 
     let os = $state("windows");
     let version = $state("0.0.0");
+    let isDesktop = $derived(os !== "android" && os !== "ios");
+
+    // Update check state
+    let updateChecking = $state(false);
+    let updateAvailable = $state<{ version: string; download: () => Promise<void> } | null>(null);
+    let updateStatus = $state<"" | "checking" | "up-to-date" | "available" | "downloading" | "error">("");
+    let updateError = $state("");
+
+    async function checkUpdate() {
+        updateChecking = true;
+        updateStatus = "checking";
+        updateError = "";
+        updateAvailable = null;
+        try {
+            const update = await checkForUpdate();
+            if (update?.available) {
+                updateStatus = "available";
+                updateAvailable = {
+                    version: update.version,
+                    download: async () => {
+                        updateStatus = "downloading";
+                        try {
+                            await update.downloadAndInstall();
+                            await relaunch();
+                        } catch (e: any) {
+                            updateError = e?.message || "Download failed";
+                            updateStatus = "error";
+                        }
+                    },
+                };
+            } else {
+                updateStatus = "up-to-date";
+            }
+        } catch (e: any) {
+            updateError = e?.message || "Check failed";
+            updateStatus = "error";
+        } finally {
+            updateChecking = false;
+        }
+    }
 
     onMount(async () => {
         try {
@@ -898,6 +940,46 @@
                     </div>
 
                     <div class="flex flex-col gap-2 w-full max-w-xs">
+                        {#if isDesktop}
+                            <div class="flex flex-col gap-1.5">
+                                {#if updateStatus === "available" && updateAvailable}
+                                    <button
+                                        onclick={updateAvailable.download}
+                                        class="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white px-4 py-2.5 rounded-lg text-xs font-semibold transition border border-green-500 shadow-lg shadow-green-600/20"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                        Install v{updateAvailable.version} & Restart
+                                    </button>
+                                {:else if updateStatus === "downloading"}
+                                    <button
+                                        disabled
+                                        class="flex items-center justify-center gap-2 bg-gray-800 text-gray-400 px-4 py-2.5 rounded-lg text-xs font-semibold border border-gray-700 cursor-not-allowed"
+                                    >
+                                        <svg class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="opacity-75"></path></svg>
+                                        Downloading & installing…
+                                    </button>
+                                {:else}
+                                    <button
+                                        onclick={checkUpdate}
+                                        disabled={updateChecking}
+                                        class="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white px-4 py-2.5 rounded-lg text-xs font-semibold transition border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {#if updateChecking}
+                                            <svg class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="opacity-75"></path></svg>
+                                            Checking…
+                                        {:else}
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"></path></svg>
+                                            Check for Updates
+                                        {/if}
+                                    </button>
+                                {/if}
+                                {#if updateStatus === "up-to-date"}
+                                    <p class="text-[10px] text-green-400 text-center">✓ You’re on the latest version</p>
+                                {:else if updateStatus === "error"}
+                                    <p class="text-[10px] text-red-400 text-center">{updateError || "Update check failed"}</p>
+                                {/if}
+                            </div>
+                        {/if}
                         <a
                             href="https://clouddash.dev"
                             target="_blank"
