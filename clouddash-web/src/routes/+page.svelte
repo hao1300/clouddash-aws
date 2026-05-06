@@ -96,6 +96,37 @@
   </div>
 </section>
 
+<!-- Demo Video Section -->
+<section id="demo" class="demo py-4">
+  <div class="container container-max">
+    <div class="text-center mb-4">
+      <h2 class="display-5 fw-bold font-outfit mb-3 text-white">
+        See It In Action
+      </h2>
+      <p class="text-secondary mw-600 mx-auto lead">
+        Watch a quick demo of CloudDash managing AWS resources on the go.
+      </p>
+    </div>
+
+    <div class="d-flex justify-content-center">
+      <div class="demo-video-wrapper p-2 rounded-5 glass shadow-2xl position-relative">
+        <div class="hero-glow"></div>
+        <div class="demo-video-frame rounded-4 overflow-hidden border border-gray position-relative">
+          <iframe
+            src="https://www.youtube-nocookie.com/embed/DjfuC5ZaRhg?rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&fs=0&disablekb=1"
+            title="CloudDash demo"
+            loading="lazy"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- Features Section -->
 <section id="features" class="features py-4 bg-gray-900 bg-opacity-30">
   <div class="container container-max">
@@ -177,6 +208,7 @@
     </div>
   </div>
 </section>
+
 <!-- Product Gallery Section -->
 <section id="gallery" class="gallery py-4 bg-gray-900 bg-opacity-10">
   <div class="container container-max">
@@ -375,6 +407,23 @@
       transparent 70%
     );
     pointer-events: none;
+  }
+
+  .demo-video-wrapper {
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .demo-video-frame {
+    aspect-ratio: 9 / 16;
+    background-color: var(--bg-950);
+  }
+
+  .demo-video-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
   }
 
   .gallery-item {
