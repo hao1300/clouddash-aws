@@ -430,12 +430,13 @@
       allProfiles.length === 0 ||
       (allProfiles.length === 1 && allProfiles[0] === "default");
 
-    if (saved?.authType) {
+    if (noRealProfiles) {
+      // First run / no credentials at all: always start at the API key form
+      authType = "manual";
+    } else if (saved?.authType) {
       authType = saved.authType;
-    } else if (!saved && allProfiles.length > 0) {
+    } else if (allProfiles.length > 0) {
       authType = "profile";
-    } else if (isMobile && noRealProfiles) {
-      authType = "qr";
     }
 
     if (saved?.accessKeyId) accessKeyId = saved.accessKeyId;

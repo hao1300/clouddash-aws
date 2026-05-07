@@ -75,6 +75,7 @@
     let importSummary = $state("");
     let importSummaryTimeout: any = null;
     let showProfilePicker = $state(false);
+    let qrAddedProfiles = $state<string[]>([]);
 
     let hasProfiles = $derived(
         allProfilesList.length > 0 &&
@@ -143,6 +144,7 @@
 
     async function processImportQueue() {
         if (importQueue.length > 0) {
+            const addedNames: string[] = [];
             await Promise.all(
                 importQueue.map(async (p: any) => {
                     try {
@@ -150,20 +152,25 @@
                             name: p.profile || "default",
                             properties: p,
                         });
+                        addedNames.push(p.profile || "default");
                     } catch (e) {
                         console.error(e);
                     }
                 }),
             );
 
-            const first = importQueue[0] || {};
-            if (first.profile) selectedProfile = first.profile;
+            const merged = [...qrAddedProfiles];
+            for (const name of addedNames) {
+                if (!merged.includes(name)) merged.push(name);
+            }
+            qrAddedProfiles = merged;
+
             if (onProfilesSaved) onProfilesSaved();
         }
 
         importQueue = [];
 
-        onSwitchAuthType("manual");
+        // Stay on the QR tab so the user can keep scanning or pick a profile.
 
         if (importSummaryTimeout) clearTimeout(importSummaryTimeout);
         importSummaryTimeout = setTimeout(() => (importSummary = ""), 5000);
@@ -362,9 +369,21 @@
                     <Icon path={mdiClose} size={20} />
                 </button>
             {/if}
-            <h1 class="text-xl font-bold mb-4 text-blue-400">
+            <h1 class="text-xl font-bold text-blue-400">
                 CloudDash for AWS
             </h1>
+            {#if !hasProfiles}
+                <p class="text-xs text-gray-400 mt-1 mb-4 leading-relaxed">
+                    Welcome — add your AWS credentials below to get started, or
+                    scan a QR code to import them from another device.
+                </p>
+            {:else if isAddingProfile}
+                <p class="text-xs text-gray-500 mt-1 mb-4">
+                    Add a new AWS profile.
+                </p>
+            {:else}
+                <div class="mb-4"></div>
+            {/if}
             {#if importSummary}
                 <div
                     class="bg-green-500/20 border border-green-500/30 text-green-400 p-2.5 rounded mb-4 text-sm font-medium transition-opacity"
@@ -394,14 +413,16 @@
                                 : 'text-gray-500 border-transparent hover:text-gray-300'}"
                             >API Keys</button
                         >
-                        <button
-                            onclick={() => onSwitchAuthType("assume")}
-                            class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
-                            'assume'
-                                ? 'text-blue-400 border-blue-500'
-                                : 'text-gray-500 border-transparent hover:text-gray-300'}"
-                            >Assume Role</button
-                        >
+                        {#if hasProfiles}
+                            <button
+                                onclick={() => onSwitchAuthType("assume")}
+                                class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
+                                'assume'
+                                    ? 'text-blue-400 border-blue-500'
+                                    : 'text-gray-500 border-transparent hover:text-gray-300'}"
+                                >Assume Role</button
+                            >
+                        {/if}
                         <button
                             onclick={() => onSwitchAuthType("qr")}
                             class="flex-1 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-colors border-b-2 {authType ===
@@ -417,13 +438,14 @@
                     <div
                         class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
                     >
-                        <strong>API Keys:</strong> To get your Access Key ID and
-                        Secret Access Key, follow the
+                        <strong>How to get keys:</strong> AWS Console → IAM →
+                        Users → your user → Security credentials → Create access
+                        key.
                         <a
                             href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html"
                             target="_blank"
                             class="underline hover:text-blue-200"
-                            rel="noopener noreferrer">official AWS guide</a
+                            rel="noopener noreferrer">Full guide</a
                         >.
                     </div>
 
@@ -585,11 +607,48 @@
                     <div
                         class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-300 mb-4 leading-relaxed"
                     >
-                        <strong>QR Scan:</strong> Scan the credentials QR code from
-                        your other device to securely transfer them here.
+                        <strong>Transfer from another device:</strong> On a
+                        device where CloudDash is already set up, open Settings
+                        → Export Keys. Scan the code shown there with the
+                        camera below to import those profiles here.
                     </div>
                     <div class="space-y-4">
                         {#if !_cameraActive}
+                            {#if qrAddedProfiles.length > 0}
+                                <div class="space-y-1.5">
+                                    <div
+                                        class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5"
+                                    >
+                                        Imported Profiles
+                                    </div>
+                                    {#each qrAddedProfiles as name}
+                                        <button
+                                            onclick={() => {
+                                                if (onSelectProfile) {
+                                                    selectedProfile = name;
+                                                    onSelectProfile(name);
+                                                }
+                                            }}
+                                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-blue-500/50 transition group text-left"
+                                        >
+                                            <Icon
+                                                path={mdiAccountCircle}
+                                                size={20}
+                                                class="text-gray-500 group-hover:text-blue-400 transition shrink-0"
+                                            />
+                                            <span
+                                                class="flex-1 text-sm font-mono text-gray-200 group-hover:text-white transition truncate"
+                                                >{name}</span
+                                            >
+                                            <Icon
+                                                path={mdiChevronRight}
+                                                size={16}
+                                                class="text-gray-600 group-hover:text-blue-400 transition shrink-0"
+                                            />
+                                        </button>
+                                    {/each}
+                                </div>
+                            {/if}
                             <div class="flex flex-col gap-3 py-4">
                                 <button
                                     onclick={() => (_cameraActive = true)}
@@ -608,7 +667,9 @@
                                             d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
                                         /><circle cx="12" cy="13" r="4" /></svg
                                     >
-                                    Launch QR Scanner
+                                    {qrAddedProfiles.length > 0
+                                        ? "Scan Another QR Code"
+                                        : "Launch QR Scanner"}
                                 </button>
                             </div>
                         {:else}
