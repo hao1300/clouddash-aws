@@ -430,6 +430,7 @@
                                     .filter((g) => !selectedLogGroups.includes(g.name))
                                     .map((g) => g.name)}
                                 value=""
+                                searchable={true}
                                 onchange={(val) => {
                                     if (val && !selectedLogGroups.includes(val)) {
                                         selectedLogGroups = [...selectedLogGroups, val];
@@ -440,8 +441,8 @@
                         {#if selectedLogGroups.length > 0}
                             <div class="flex flex-wrap gap-2">
                                 {#each selectedLogGroups as group (group)}
-                                    <div
-                                        class="inline-flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-full px-3 py-1 text-xs text-gray-300 shadow-sm"
+                                     <div
+                                         class="inline-flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-full px-3 py-1 text-xs text-gray-300 shadow-sm"
                                     >
                                         <span
                                             class="whitespace-normal break-all line-clamp-3 overflow-hidden max-w-[300px]"

@@ -12,6 +12,7 @@
         mono = false,
         small = false,
         primary = false,
+        searchable = false,
     }: {
         value: any;
         options: (string | { value: any; label: string; color?: string; fontMono?: boolean })[];
@@ -21,16 +22,25 @@
         mono?: boolean;
         small?: boolean;
         primary?: boolean;
+        searchable?: boolean;
     } = $props();
 
     let isOpen = $state(false);
     let openUp = $state(false);
     let container: HTMLElement;
+    let searchQuery = $state("");
+    let searchInput: HTMLInputElement;
 
     const normalizedOptions = $derived(
         options.map((opt) =>
             typeof opt === "string" ? { value: opt, label: opt } : opt,
         ),
+    );
+
+    const filteredOptions = $derived(
+        searchable && searchQuery.trim()
+            ? normalizedOptions.filter(opt => opt.label.toLowerCase().includes(searchQuery.toLowerCase()))
+            : normalizedOptions
     );
 
     const selectedOption = $derived(
@@ -46,6 +56,12 @@
             openUp = spaceBelow < dropdownMaxHeight && spaceAbove > spaceBelow;
         }
         isOpen = !isOpen;
+        if (isOpen) {
+            searchQuery = "";
+            if (searchable) {
+                setTimeout(() => searchInput && searchInput.focus(), 50);
+            }
+        }
     }
 
     function select(val: any) {
@@ -80,25 +96,44 @@
 
     {#if isOpen}
         <div
-            class="absolute z-[1000] left-0 right-0 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl overflow-hidden py-1 max-h-60 overflow-y-auto animate-in {openUp ? 'bottom-full mb-1' : 'top-full mt-1'}"
+            class="absolute z-[1000] left-0 right-0 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl overflow-hidden py-1 max-h-60 flex flex-col animate-in {openUp ? 'bottom-full mb-1' : 'top-full mt-1'}"
         >
-            {#each normalizedOptions as opt}
-                <button
-                    type="button"
-                    onclick={() => select(opt.value)}
-                    class="w-full text-left px-3 py-2 text-xs hover:bg-blue-600/20 hover:text-blue-400 transition-colors flex items-center justify-between {opt.value === value ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-300'} {mono || opt.fontMono ? 'font-mono' : ''}"
-                >
-                    <span class="flex-1 whitespace-normal break-all line-clamp-3 overflow-hidden">{opt.label}</span>
-                    {#if opt.value === value}
-                        <div class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></div>
-                    {/if}
-                </button>
-            {/each}
-            {#if normalizedOptions.length === 0}
-                <div class="px-3 py-4 text-center text-xs text-gray-600 italic">
-                    No options available
+            {#if searchable}
+                <div class="px-2 py-1.5 border-b border-gray-800 shrink-0">
+                    <input
+                        bind:this={searchInput}
+                        bind:value={searchQuery}
+                        type="text"
+                        placeholder="Search..."
+                        class="w-full bg-gray-950 border border-gray-800 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500 transition-colors"
+                        onclick={(e) => e.stopPropagation()}
+                        onkeydown={(e) => {
+                            if (e.key === 'Enter' && filteredOptions.length > 0) {
+                                select(filteredOptions[0].value);
+                            }
+                        }}
+                    />
                 </div>
             {/if}
+            <div class="overflow-y-auto flex-1">
+                {#each filteredOptions as opt}
+                    <button
+                        type="button"
+                        onclick={() => select(opt.value)}
+                        class="w-full text-left px-3 py-2 text-xs hover:bg-blue-600/20 hover:text-blue-400 transition-colors flex items-center justify-between {opt.value === value ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-300'} {mono || opt.fontMono ? 'font-mono' : ''}"
+                    >
+                        <span class="flex-1 whitespace-normal break-all line-clamp-3 overflow-hidden">{opt.label}</span>
+                        {#if opt.value === value}
+                            <div class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></div>
+                        {/if}
+                    </button>
+                {/each}
+                {#if filteredOptions.length === 0}
+                    <div class="px-3 py-4 text-center text-xs text-gray-600 italic">
+                        No options available
+                    </div>
+                {/if}
+            </div>
         </div>
     {/if}
 </div>
