@@ -25,7 +25,7 @@
       type: "Google Play / APK",
       playStoreLink:
         "https://play.google.com/store/apps/details?id=dev.clouddash.aws",
-      link: "https://static.clouddash.dev/downloads/android/clouddash-0.9.7.apk",
+      link: "https://static.clouddash.dev/downloads/android/clouddash-1.0.0.apk",
       instructions:
         "Available on the Google Play Store. Direct APK available as backup.",
     },
