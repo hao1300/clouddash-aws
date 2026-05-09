@@ -18,6 +18,8 @@
     import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
     import InsightsQueryEditor from "$lib/components/InsightsQueryEditor.svelte";
     import Select from "$lib/components/Select.svelte";
+    import Modal from "$lib/components/Modal.svelte";
+    import LogStreamViewer from "$lib/components/LogStreamViewer.svelte";
 
     let error = $state("");
     let actionMsg = $state("");
@@ -44,6 +46,12 @@
 
     let savedQueries = $state<any[]>([]);
     let selectedSavedQueryId = $state("");
+
+    const HISTORY_STORAGE_KEY = "aws-console:cloudwatch:insights:history";
+    let queryHistory = $state<{query: string, groups: string[], timeRange: number}[]>([]);
+    
+    let showLogModal = $state(false);
+    let selectedLogRow = $state<any>(null);
 
     let knownFields = $state<any[]>([]);
     let fieldsLoading = $state(false);
@@ -118,6 +126,13 @@
 
     onMount(() => {
         loadResultsFromSession();
+        try {
+            const h = localStorage.getItem(HISTORY_STORAGE_KEY);
+            if (h) {
+                const parsed = JSON.parse(h);
+                queryHistory = parsed.map((entry: any) => typeof entry === "string" ? {query: entry, groups: [], timeRange: 3600} : entry);
+            }
+        } catch (e) {}
     });
 
     let __initLoaded = false;
@@ -236,6 +251,10 @@
     }
 
     function navigateToLog(row: any) {
+        selectedLogRow = row;
+        showLogModal = true;
+    }
+    function _oldNavigateToLog(row: any) {
         let group =
             row["@logGroup"] ||
             (selectedLogGroups.length === 1 ? selectedLogGroups[0] : null);
@@ -280,6 +299,9 @@
                 }),
             );
             const queryId = startResp.queryId;
+            const newEntry = { query: logQuery, groups: selectedLogGroups, timeRange: timeRange };
+            queryHistory = [newEntry, ...queryHistory.filter(q => q.query !== logQuery || JSON.stringify(q.groups) !== JSON.stringify(selectedLogGroups) || q.timeRange !== timeRange)].slice(0, 50);
+            try { localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(queryHistory)); } catch(e){}
             if (!queryId) throw new Error("No queryId returned");
 
             let status = "Running";
@@ -354,6 +376,7 @@
     let isSidebarCollapsed = $state(false);
     let queryCollapsed = $state(false);
     let fieldsCollapsed = $state(false);
+    let sidebarTab = $state<"fields" | "history">("fields");
 </script>
 
 <div class="h-full flex flex-col overflow-hidden">
@@ -586,20 +609,23 @@
         <div
             class="bg-gray-900 border border-gray-800 rounded-lg shadow-sm flex flex-col h-full"
         >
-            <!-- Always-visible header; chevron only shown on mobile -->
-            <button
-                class="w-full flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-900/80 shrink-0 text-left cursor-default md:cursor-auto"
-                onclick={() => (fieldsCollapsed = !fieldsCollapsed)}
-                aria-expanded={!fieldsCollapsed}
-            >
-                <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider">Log Fields</h3>
-                <svg
-                    class="md:hidden w-4 h-4 text-gray-500 transition-transform duration-200 {fieldsCollapsed ? '' : 'rotate-180'}"
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                ><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-            </button>
+            <!-- Always-visible header -->
+            <div class="w-full flex items-center justify-between px-4 border-b border-gray-800 bg-gray-900/80 shrink-0 text-left">
+                <div class="flex gap-4">
+                    <button class="py-3 text-xs font-bold uppercase tracking-wider transition border-b-2 {sidebarTab === 'fields' ? 'text-blue-400 border-blue-500' : 'text-gray-400 border-transparent hover:text-gray-300'}" onclick={() => sidebarTab = 'fields'}>Fields</button>
+                    <button class="py-3 text-xs font-bold uppercase tracking-wider transition border-b-2 {sidebarTab === 'history' ? 'text-blue-400 border-blue-500' : 'text-gray-400 border-transparent hover:text-gray-300'}" onclick={() => sidebarTab = 'history'}>History</button>
+                </div>
+                <button
+                    class="md:hidden"
+                    onclick={() => (fieldsCollapsed = !fieldsCollapsed)}
+                    aria-expanded={!fieldsCollapsed}
+                >
+                    <svg class="w-4 h-4 text-gray-500 transition-transform duration-200 {fieldsCollapsed ? '' : 'rotate-180'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+            </div>
             <div class="{fieldsCollapsed ? 'hidden' : ''} md:block p-4 overflow-y-auto flex-1" style="max-height: 300px;">
-                {#if fieldsLoading}
+                {#if sidebarTab === "fields"}
+                    {#if fieldsLoading}
                     <div class="text-xs text-gray-500 animate-pulse">
                         Loading fields...
                     </div>
@@ -626,6 +652,42 @@
                             </li>
                         {/each}
                     </ul>
+                {/if}
+                {:else}
+                    {#if queryHistory.length === 0}
+                        <div class="text-xs text-gray-500 italic">No recent queries.</div>
+                    {:else}
+                        <ul class="space-y-3">
+                            {#each queryHistory as hEntry}
+                                <li class="group relative">
+                                    <button
+                                        onclick={() => { logQuery = hEntry.query; selectedLogGroups = hEntry.groups; timeRange = hEntry.timeRange; }}
+                                        class="text-[11px] text-gray-300 hover:text-blue-300 text-left font-mono bg-gray-950 p-2 rounded w-full border border-gray-800 hover:border-blue-500/50 transition pr-8"
+                                    >
+                                        <div class="line-clamp-3 whitespace-pre-wrap break-all mb-1">{hEntry.query}</div>
+                                        <div class="text-[9px] text-gray-500 font-sans flex items-center gap-2 mt-2 pt-1 border-t border-gray-800/50">
+                                            <span class="truncate flex-1 font-semibold" title={hEntry.groups.join(", ")}>{hEntry.groups.join(", ")}</span>
+                                            <span class="flex items-center gap-0.5 shrink-0">
+                                                <svg class="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                {hEntry.timeRange >= 86400 ? hEntry.timeRange/86400 + 'd' : hEntry.timeRange >= 3600 ? hEntry.timeRange/3600 + 'h' : hEntry.timeRange/60 + 'm'}
+                                            </span>
+                                        </div>
+                                    </button>
+                                    <button
+                                        onclick={(e) => {
+                                            e.stopPropagation();
+                                            queryHistory = queryHistory.filter((q) => q !== hEntry);
+                                            try { localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(queryHistory)); } catch(e){}
+                                        }}
+                                        class="absolute top-2 right-2 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Remove from history"
+                                    >
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                                    </button>
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
                 {/if}
             </div>
         </div>
@@ -757,3 +819,15 @@
 </DetailLayout>
 </div>
 </div>
+
+<Modal bind:open={showLogModal} title="Log Details" maxWidth="max-w-6xl" overflowVisible={false}>
+    {#if selectedLogRow}
+        {@const group = selectedLogRow["@logGroup"] || (selectedLogGroups.length === 1 ? selectedLogGroups[0] : "")}
+        {@const stream = selectedLogRow["@logStream"] || ""}
+        {@const timeMs = selectedLogRow["@timestamp"] ? new Date(selectedLogRow["@timestamp"] + "Z").getTime() : undefined}
+        <div class="h-[600px] flex flex-col -m-5 bg-gray-950">
+            <LogStreamViewer logGroupName={group} logStreamName={stream} initialTimeMs={timeMs} />
+        </div>
+    {/if}
+</Modal>
+
