@@ -324,7 +324,8 @@
                 ? 'w-full flex-row border-b'
                 : 'w-32 flex-col border-r'} bg-gray-950 border-gray-800 flex py-2 shrink-0 overflow-x-auto"
         >
-            {#each [["general", "General"], ["profiles", "Profiles"], ["regions", "Regions"], ["qrcode", "Export Keys"], ["pro", "Pro License"], ["about", "About"]] as const as [key, label]}
+            <!-- ["pro", "Pro License"] temporarily removed -->
+            {#each [["general", "General"], ["profiles", "Profiles"], ["regions", "Regions"], ["qrcode", "Export Keys"], ["about", "About"]] as const as [key, label]}
                 <button
                     onclick={() => (settingsTab = key)}
                     class="px-4 py-2.5 text-xs font-semibold transition whitespace-nowrap

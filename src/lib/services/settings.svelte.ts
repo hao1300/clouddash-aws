@@ -39,7 +39,7 @@ class SettingsService {
     deviceFingerprint = "";
 
     isPro = $derived.by(() => {
-        return this.licenseValid;
+        return true; // return this.licenseValid;
     });
 
     constructor() {

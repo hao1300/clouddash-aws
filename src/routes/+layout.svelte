@@ -280,6 +280,7 @@
     titleService.updateFromUrl($page.url.pathname);
     bookmarks.currentUrl = $page.url.pathname + $page.url.search;
 
+    /*
     if (
       !settings.isPro &&
       activeId &&
@@ -290,6 +291,7 @@
       goto("/upgrade", { replaceState: true });
       return;
     }
+    */
 
     if (Object.keys($page.params).length === 0) {
       const manifest = SERVICE_MANIFEST[activeId];
@@ -902,12 +904,14 @@
             <span class="text-sm font-bold text-gray-100 tracking-tight"
               >CloudDash for AWS</span
             >
+            <!--
             {#if settings.isPro}
               <span
                 class="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 text-[10px] font-black rounded border border-blue-500/30 uppercase tracking-tighter"
                 >Pro</span
               >
             {/if}
+            -->
           </div>
           <button
             onclick={() => (sideMenuOpen = false)}
@@ -924,6 +928,7 @@
           <div class="space-y-4">
             <div class="space-y-4">
               <div class="px-1 space-y-3">
+                <!--
                 {#if !settings.isPro}
                   <a
                     href="/upgrade"
@@ -938,6 +943,7 @@
                     Upgrade to Pro
                   </a>
                 {/if}
+                -->
                 <input
                   type="text"
                   bind:value={searchQuery}
@@ -967,6 +973,7 @@
                       >
                         <button
                           onclick={() => {
+                            /*
                             if (
                               !settings.isPro &&
                               !["cloudwatch", "s3", "dynamodb"].includes(svc.id)
@@ -975,6 +982,7 @@
                               if (window.innerWidth < 640) sideMenuOpen = false;
                               return;
                             }
+                            */
                             switchTab(svc.id);
                             if (window.innerWidth < 640) sideMenuOpen = false;
                           }}
@@ -990,6 +998,7 @@
                             />
                           {/if}
                           {svc.label}
+                          <!--
                           {#if !settings.isPro && !["cloudwatch", "s3", "dynamodb"].includes(svc.id)}
                             <Icon
                               path={mdiCrown}
@@ -998,6 +1007,7 @@
                               class="ml-1"
                             />
                           {/if}
+                          -->
                           {#if activeId === svc.id}
                             <div class="w-1 h-1 rounded-full bg-blue-500"></div>
                           {/if}
