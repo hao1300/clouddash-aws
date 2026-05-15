@@ -1,0 +1,462 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		403EC6C463662EA72AF14A05 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC66D71617B95F50BBDE13E1 /* MetalKit.framework */; };
+		7D341EBE553305E109C61A40 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 46F64D86457A47E030E9B31D /* main.mm */; };
+		843EF66A960239E9FD11B5F1 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4A04238B957BD3DCFC33D699 /* Security.framework */; };
+		90A29EBB367C182D58767831 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F84EBEECD73AB4E9A2D38AE /* CoreGraphics.framework */; };
+		B87C8E5E96DDE7A62068EAAC /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 11F4DFA0D5CAD9C8257DA484 /* Metal.framework */; };
+		BBFA77F05A8D7768C0FC69C5 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EE59C76151AD7473601BDDBD /* WebKit.framework */; };
+		BDB13C8993A31BC1B3E35771 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AAD4488AA3E66A883D741C55 /* QuartzCore.framework */; };
+		D9B90F1B6D4688EE4E330492 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 092999FE7BE7CCD2CE80DA48 /* UIKit.framework */; };
+		EBE5BC03E80AA67729B968F7 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0DF88B40444A6829221F6513 /* LaunchScreen.storyboard */; };
+		F41D81882831F458CCC4737E /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 0CDC68548AA371F05C371D81 /* assets */; };
+		F79EC8399B78B01D7C555CA2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 465247240BD5E1E008B2DAFE /* Assets.xcassets */; };
+		F81B3BD3A80DAAD4F46CBB88 /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 20FB68E94C8C0D10AE339B02 /* libapp.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		092999FE7BE7CCD2CE80DA48 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		0CDC68548AA371F05C371D81 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		0DF88B40444A6829221F6513 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		11F4DFA0D5CAD9C8257DA484 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		19310D9401AA986E9DC28632 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		20FB68E94C8C0D10AE339B02 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		465247240BD5E1E008B2DAFE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		46F64D86457A47E030E9B31D /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		4A04238B957BD3DCFC33D699 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		4FD75E62E669DEEEA243757A /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		82AA78883F9E550088AA5A9E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9F84EBEECD73AB4E9A2D38AE /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		AAD4488AA3E66A883D741C55 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		BC66D71617B95F50BBDE13E1 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		C3D13000CA8C07D2219B9D26 /* clouddash-aws_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "clouddash-aws_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EE59C76151AD7473601BDDBD /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		F2935229097CCCCB36274F3B /* state.rs */ = {isa = PBXFileReference; path = state.rs; sourceTree = "<group>"; };
+		FAAC8846278FE9C52D9E0EE1 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		FE240427113A670B2774BF9A /* clouddash-aws_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "clouddash-aws_iOS.entitlements"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		38A96113C531E50A94FB2C4A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F81B3BD3A80DAAD4F46CBB88 /* libapp.a in Frameworks */,
+				90A29EBB367C182D58767831 /* CoreGraphics.framework in Frameworks */,
+				B87C8E5E96DDE7A62068EAAC /* Metal.framework in Frameworks */,
+				403EC6C463662EA72AF14A05 /* MetalKit.framework in Frameworks */,
+				BDB13C8993A31BC1B3E35771 /* QuartzCore.framework in Frameworks */,
+				843EF66A960239E9FD11B5F1 /* Security.framework in Frameworks */,
+				D9B90F1B6D4688EE4E330492 /* UIKit.framework in Frameworks */,
+				BBFA77F05A8D7768C0FC69C5 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		16C9AE9F7650B3C756B17DCB /* clouddash-aws_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				FE240427113A670B2774BF9A /* clouddash-aws_iOS.entitlements */,
+				82AA78883F9E550088AA5A9E /* Info.plist */,
+			);
+			path = "clouddash-aws_iOS";
+			sourceTree = "<group>";
+		};
+		62DE97908F913D093CB7D677 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C3D13000CA8C07D2219B9D26 /* clouddash-aws_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		77D8BE0AB4C2855FEC8F41DA /* src */ = {
+			isa = PBXGroup;
+			children = (
+				4FD75E62E669DEEEA243757A /* lib.rs */,
+				19310D9401AA986E9DC28632 /* main.rs */,
+				F2935229097CCCCB36274F3B /* state.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		7AC502D09B29FE2EEFCDB0B8 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				FAAC8846278FE9C52D9E0EE1 /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		83892D60AEDD798480A45558 /* clouddash-aws */ = {
+			isa = PBXGroup;
+			children = (
+				46F64D86457A47E030E9B31D /* main.mm */,
+				7AC502D09B29FE2EEFCDB0B8 /* bindings */,
+			);
+			path = "clouddash-aws";
+			sourceTree = "<group>";
+		};
+		AADADBEECB9C1A6988F8214B /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		AED434B24659D6DC5B534ACF /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				83892D60AEDD798480A45558 /* clouddash-aws */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		E0AF520C1C87F66633C721CA = {
+			isa = PBXGroup;
+			children = (
+				0CDC68548AA371F05C371D81 /* assets */,
+				465247240BD5E1E008B2DAFE /* Assets.xcassets */,
+				0DF88B40444A6829221F6513 /* LaunchScreen.storyboard */,
+				16C9AE9F7650B3C756B17DCB /* clouddash-aws_iOS */,
+				AADADBEECB9C1A6988F8214B /* Externals */,
+				AED434B24659D6DC5B534ACF /* Sources */,
+				77D8BE0AB4C2855FEC8F41DA /* src */,
+				EA7A54173947BC769A750238 /* Frameworks */,
+				62DE97908F913D093CB7D677 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		EA7A54173947BC769A750238 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				9F84EBEECD73AB4E9A2D38AE /* CoreGraphics.framework */,
+				20FB68E94C8C0D10AE339B02 /* libapp.a */,
+				11F4DFA0D5CAD9C8257DA484 /* Metal.framework */,
+				BC66D71617B95F50BBDE13E1 /* MetalKit.framework */,
+				AAD4488AA3E66A883D741C55 /* QuartzCore.framework */,
+				4A04238B957BD3DCFC33D699 /* Security.framework */,
+				092999FE7BE7CCD2CE80DA48 /* UIKit.framework */,
+				EE59C76151AD7473601BDDBD /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		BF0FEDB2FB85BF2A725E785F /* clouddash-aws_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 60252CC2C49DEA84193DFC8E /* Build configuration list for PBXNativeTarget "clouddash-aws_iOS" */;
+			buildPhases = (
+				54CAAC4A9FDD8A7C87A05F66 /* Build Rust Code */,
+				8F0B9FDA396DAEFC96C4FC53 /* Sources */,
+				BBAB1483C9986066FDBD2EE4 /* Resources */,
+				38A96113C531E50A94FB2C4A /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "clouddash-aws_iOS";
+			packageProductDependencies = (
+			);
+			productName = "clouddash-aws_iOS";
+			productReference = C3D13000CA8C07D2219B9D26 /* clouddash-aws_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2A25D3E477A2757482D5E904 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 33B02188282AF0ED373E1AC8 /* Build configuration list for PBXProject "clouddash-aws" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = E0AF520C1C87F66633C721CA;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 62DE97908F913D093CB7D677 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				BF0FEDB2FB85BF2A725E785F /* clouddash-aws_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		BBAB1483C9986066FDBD2EE4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F79EC8399B78B01D7C555CA2 /* Assets.xcassets in Resources */,
+				EBE5BC03E80AA67729B968F7 /* LaunchScreen.storyboard in Resources */,
+				F41D81882831F458CCC4737E /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		54CAAC4A9FDD8A7C87A05F66 /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		8F0B9FDA396DAEFC96C4FC53 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7D341EBE553305E109C61A40 /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		062FAED22EAEC30F03B3C889 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		B6181D2BA14C8101B1DF2BF8 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "clouddash-aws_iOS/clouddash-aws_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "clouddash-aws_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.clouddash.aws;
+				PRODUCT_NAME = "CloudDash AWS";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		C52726FB319A0F9D233868FB /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		D8E698A25566DB93F6347B34 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "clouddash-aws_iOS/clouddash-aws_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "clouddash-aws_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.clouddash.aws;
+				PRODUCT_NAME = "CloudDash AWS";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		33B02188282AF0ED373E1AC8 /* Build configuration list for PBXProject "clouddash-aws" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				062FAED22EAEC30F03B3C889 /* debug */,
+				C52726FB319A0F9D233868FB /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		60252CC2C49DEA84193DFC8E /* Build configuration list for PBXNativeTarget "clouddash-aws_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B6181D2BA14C8101B1DF2BF8 /* debug */,
+				D8E698A25566DB93F6347B34 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 2A25D3E477A2757482D5E904 /* Project object */;
+}
