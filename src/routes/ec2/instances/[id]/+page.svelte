@@ -1,7 +1,7 @@
 <script lang="ts">
     import Icon from "$lib/components/Icon.svelte";
     import Select from "$lib/components/Select.svelte";
-    import { mdiLoading } from "@mdi/js";
+    import { mdiLoading, mdiPencil, mdiCheck, mdiClose } from "@mdi/js";
 
     import {
         DescribeInstancesCommand,
@@ -9,6 +9,7 @@
         StopInstancesCommand,
         RebootInstancesCommand,
         TerminateInstancesCommand,
+        CreateTagsCommand,
     } from "@aws-sdk/client-ec2";
     import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
     import MetricChart from "$lib/components/MetricChart.svelte";
@@ -33,6 +34,10 @@
     let loading = $state(false);
     let error = $state("");
     let actionMsg = $state("");
+
+    let isEditingName = $state(false);
+    let editingName = $state("");
+    let savingName = $state(false);
 
     let metricsLoading = $state(false);
     let metricPeriod = $state(86400);
@@ -89,6 +94,44 @@
             error = e.message || String(e);
         } finally {
             loading = false;
+        }
+    }
+
+    function startEditName() {
+        if (!instance) return;
+        editingName = instance.name === "Unnamed" ? "" : instance.name;
+        isEditingName = true;
+    }
+
+    function cancelEditName() {
+        isEditingName = false;
+        editingName = "";
+    }
+
+    async function saveName() {
+        if (!aws.ec2 || !instanceId || !instance) return;
+        const newName = editingName.trim();
+        const currentName = instance.name === "Unnamed" ? "" : instance.name;
+        if (newName === currentName) {
+            isEditingName = false;
+            return;
+        }
+        try {
+            savingName = true;
+            error = "";
+            await aws.ec2.send(
+                new CreateTagsCommand({
+                    Resources: [instanceId],
+                    Tags: [{ Key: "Name", Value: newName }],
+                }),
+            );
+            isEditingName = false;
+            actionMsg = `Instance renamed to ${newName || "Unnamed"}.`;
+            await loadInstance();
+        } catch (e: any) {
+            error = e.message || String(e);
+        } finally {
+            savingName = false;
         }
     }
 
@@ -205,8 +248,53 @@
             Loading Instance Details...
         </div>
     {:else if instance}
-        <div class="flex justify-end mb-4">
-            <div class="w-40">
+        <div class="flex justify-between items-center mb-4 gap-3 flex-wrap">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest shrink-0">Name</span>
+                {#if isEditingName}
+                    <input
+                        bind:value={editingName}
+                        onkeydown={(e) => {
+                            if (e.key === "Enter") saveName();
+                            else if (e.key === "Escape") cancelEditName();
+                        }}
+                        disabled={savingName}
+                        placeholder="Instance name"
+                        class="flex-1 min-w-0 max-w-xs bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white outline-none focus:border-blue-500 disabled:opacity-50"
+                    />
+                    <button
+                        onclick={saveName}
+                        disabled={savingName}
+                        class="p-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white transition disabled:opacity-50 shrink-0"
+                        title="Save"
+                    >
+                        <Icon path={savingName ? mdiLoading : mdiCheck} size={16} class={savingName ? "animate-spin" : ""} />
+                    </button>
+                    <button
+                        onclick={cancelEditName}
+                        disabled={savingName}
+                        class="p-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-200 transition disabled:opacity-50 shrink-0"
+                        title="Cancel"
+                    >
+                        <Icon path={mdiClose} size={16} />
+                    </button>
+                {:else}
+                    <span
+                        class="text-sm font-bold text-gray-200 truncate"
+                        title={instance.name}
+                    >
+                        {instance.name}
+                    </span>
+                    <button
+                        onclick={startEditName}
+                        class="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition shrink-0"
+                        title="Rename instance"
+                    >
+                        <Icon path={mdiPencil} size={16} />
+                    </button>
+                {/if}
+            </div>
+            <div class="w-40 shrink-0">
                 <Select
                     value=""
                     placeholder="Actions"

@@ -8,7 +8,9 @@
       "Bash(xcode-select -p)",
       "Bash(pnpm add *)",
       "Bash(npm install *)",
-      "Read(//Users/hao/.npm/**)"
+      "Read(//Users/hao/.npm/**)",
+      "Bash(npm run *)",
+      "Bash(grep -E \"ec2[\\\\\\\\\\\\/]instances[\\\\\\\\\\\\/]\\\\[id\\\\]|ERROR.*ec2\")"
     ]
   }
 }
