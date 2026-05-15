@@ -17,7 +17,6 @@
     "tauri-windows-build": "node --env-file=.env scripts/tauri-windows-build.js",
     "tauri": "tauri"
   },
-  "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-cloudformation": "^3.1000.0",
     "@aws-sdk/client-cloudfront": "^3.1000.0",
@@ -54,6 +53,7 @@
     "chart.js": "^4.4.7",
     "codemirror": "^6.0.2",
     "dagre": "^0.8.5",
+    "fflate": "^0.8.2",
     "highlight.js": "^11.11.1",
     "html5-qrcode": "^2.3.8",
     "qrcode": "1.5.4",
