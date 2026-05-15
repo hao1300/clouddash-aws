@@ -32,8 +32,9 @@
 
   const platforms = [
     { name: "Windows", status: "Available", isLive: true },
+    { name: "macOS", status: "Available", isLive: true },
+    { name: "Linux", status: "Available", isLive: true },
     { name: "Android", status: "Available", isLive: true },
-    { name: "MacOS", status: "Coming Soon", isLive: false },
     { name: "iOS", status: "Coming Soon", isLive: false },
   ];
 </script>
@@ -69,7 +70,7 @@
             <MonitorIcon size="20" />
             <SmartphoneIcon size="20" />
             <span class="small fw-medium opacity-75 ms-1"
-              >Available on Windows & Android</span
+              >Available on Windows, macOS, Linux & Android</span
             >
           </div>
         </div>
