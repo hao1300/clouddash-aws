@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(npx svelte-check *)",
-      "Bash(npm run *)"
+      "Bash(git *)",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(xcode-select -p)",
+      "Bash(pnpm add *)",
+      "Bash(npm install *)",
+      "Read(//Users/hao/.npm/**)"
     ]
   }
 }
