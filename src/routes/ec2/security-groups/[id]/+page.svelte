@@ -10,6 +10,7 @@
         RevokeSecurityGroupEgressCommand,
     } from "@aws-sdk/client-ec2";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
@@ -124,7 +125,7 @@
     async function handleDeleteRule(rule: any) {
         if (!aws.ec2) return;
         const msg = `Delete ${rule.type} rule: ${rule.protocol} ${rule.portRange} from/to ${rule.sourceDest}?`;
-        if (!confirm(msg)) return;
+        if (!(await confirmDialog({ message: msg, confirmText: "Delete", destructive: true }))) return;
 
         try {
             loading = true;

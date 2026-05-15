@@ -61,12 +61,7 @@
           >
             Get Started <ArrowRightIcon size="18" />
           </a>
-          <a
-            href="/pricing"
-            class="btn btn-dark btn-lg rounded-pill px-4 py-2 border border-gray"
-          >
-            View Pricing
-          </a>
+
         </div>
 
         <div class="mt-4 d-flex align-items-center gap-3">
@@ -331,12 +326,7 @@
           >
             Download Now
           </a>
-          <a
-            href="/pricing"
-            class="btn btn-outline-light btn-lg rounded-pill px-4 py-2 fw-bold"
-          >
-            View Pricing
-          </a>
+
         </div>
       </div>
     </div>

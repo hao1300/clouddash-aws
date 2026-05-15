@@ -12,6 +12,7 @@
     import { GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
     import MetricChart from "$lib/components/MetricChart.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
     import { goto } from "$app/navigation";
@@ -81,7 +82,11 @@
 
     async function executeAction(action: "restart" | "terminate" | "abort") {
         if (!aws.eb || !env?.EnvironmentId) return;
-        if (!confirm(`Are you sure you want to ${action} this environment?`)) return;
+        if (!(await confirmDialog({
+            message: `Are you sure you want to ${action} this environment?`,
+            confirmText: action.charAt(0).toUpperCase() + action.slice(1),
+            destructive: action === "terminate",
+        }))) return;
         
         try {
             actionLoading = true;

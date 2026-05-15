@@ -10,6 +10,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiRefresh } from "@mdi/js";
     import { goto } from "$app/navigation";
@@ -86,7 +87,8 @@
     }
 
     async function handleDelete(arn: string) {
-        if (!aws.sns || !confirm("Delete this topic?")) return;
+        if (!aws.sns) return;
+        if (!(await confirmDialog({ message: "Delete this topic?", confirmText: "Delete", destructive: true }))) return;
         try {
             loading = true;
             await aws.sns.send(new DeleteTopicCommand({ TopicArn: arn }));

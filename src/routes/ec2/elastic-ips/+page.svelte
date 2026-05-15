@@ -7,6 +7,7 @@
     } from "@aws-sdk/client-ec2";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
 
     let eips = $state<any[]>([]);
     let loading = $state(false);
@@ -60,7 +61,8 @@
     }
 
     async function handleRelease(id: string, ip: string) {
-        if (!aws.ec2 || !confirm(`Release Elastic IP ${ip}?`)) return;
+        if (!aws.ec2) return;
+        if (!(await confirmDialog({ message: `Release Elastic IP ${ip}?`, confirmText: "Release", destructive: true }))) return;
         try {
             loading = true;
             await aws.ec2.send(new ReleaseAddressCommand({ AllocationId: id }));

@@ -8,6 +8,7 @@
     import { pushToken, popToken } from "$lib/utils/pagination";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
@@ -82,9 +83,11 @@
     async function deleteLogGroup(name: string) {
         if (!aws.cwLogs) return;
         if (
-            !confirm(
-                `Are you sure you want to delete log group "${name}" and all its logs?`,
-            )
+            !(await confirmDialog({
+                message: `Are you sure you want to delete log group "${name}" and all its logs?`,
+                confirmText: "Delete",
+                destructive: true,
+            }))
         )
             return;
         try {

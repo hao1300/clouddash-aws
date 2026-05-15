@@ -12,6 +12,7 @@
     import Modal from "$lib/components/Modal.svelte";
     import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
     import CopyButton from "$lib/components/CopyButton.svelte";
@@ -201,7 +202,7 @@
 
     async function handlePurge() {
         if (!aws.sqs || !queueUrl) return;
-        if (!confirm("Purge all messages? This cannot be undone.")) return;
+        if (!(await confirmDialog({ message: "Purge all messages? This cannot be undone.", confirmText: "Purge", destructive: true }))) return;
         try {
             error = "";
             actionMsg = "";
@@ -216,9 +217,10 @@
     async function handleRedrive() {
         if (!aws.sqs || !queueArn) return;
         if (
-            !confirm(
-                "Start DLQ redrive? This will move messages back to their source queue.",
-            )
+            !(await confirmDialog({
+                message: "Start DLQ redrive? This will move messages back to their source queue.",
+                confirmText: "Start Redrive",
+            }))
         )
             return;
         try {

@@ -5,6 +5,7 @@
     } from "@aws-sdk/client-s3";
     import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
@@ -220,7 +221,8 @@
     }
 
     async function handleDelete() {
-        if (!bucket || !confirm(`Delete object ${key}?`)) return;
+        if (!bucket) return;
+        if (!(await confirmDialog({ message: `Delete object ${key}?`, confirmText: "Delete", destructive: true }))) return;
         try {
             loading = true;
             const s3Client = await aws.getS3ClientForBucket(bucket);

@@ -13,6 +13,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
@@ -104,7 +105,8 @@
     }
 
     async function handleDelete() {
-        if (!aws.sfn || !smArn || !confirm("Delete this state machine?"))
+        if (!aws.sfn || !smArn) return;
+        if (!(await confirmDialog({ message: "Delete this state machine?", confirmText: "Delete", destructive: true })))
             return;
         try {
             loading = true;

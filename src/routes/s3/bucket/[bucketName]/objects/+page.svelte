@@ -9,6 +9,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
@@ -190,7 +191,8 @@
     }
 
     async function handleDelete(key: string) {
-        if (!bucket || !confirm(`Delete ${key}?`)) return;
+        if (!bucket) return;
+        if (!(await confirmDialog({ message: `Delete ${key}?`, confirmText: "Delete", destructive: true }))) return;
         try {
             loading = true;
             const s3Client = await aws.getS3ClientForBucket(bucket);

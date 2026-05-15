@@ -11,6 +11,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
 
     let keyPairs = $state<any[]>([]);
     let loading = $state(false);
@@ -68,7 +69,8 @@
     }
 
     async function handleDelete(id: string, name: string) {
-        if (!aws.ec2 || !confirm(`Delete key pair ${name}?`)) return;
+        if (!aws.ec2) return;
+        if (!(await confirmDialog({ message: `Delete key pair ${name}?`, confirmText: "Delete", destructive: true }))) return;
         try {
             loading = true;
             await aws.ec2.send(new DeleteKeyPairCommand({ KeyName: name }));

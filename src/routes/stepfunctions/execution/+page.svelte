@@ -12,6 +12,7 @@
     import JsonLogViewer from "$lib/components/JsonLogViewer.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
@@ -291,7 +292,8 @@
     }
 
     async function handleRedrive() {
-        if (!aws.sfn || !execArn || !confirm("Redrive this execution?")) return;
+        if (!aws.sfn || !execArn) return;
+        if (!(await confirmDialog({ message: "Redrive this execution?", confirmText: "Redrive" }))) return;
         try {
             isRedriving = true;
             await aws.sfn.send(
@@ -306,7 +308,8 @@
     }
 
     async function handleStop() {
-        if (!aws.sfn || !execArn || !confirm("Stop this execution?")) return;
+        if (!aws.sfn || !execArn) return;
+        if (!(await confirmDialog({ message: "Stop this execution?", confirmText: "Stop", destructive: true }))) return;
         try {
             isStopping = true;
             await aws.sfn.send(

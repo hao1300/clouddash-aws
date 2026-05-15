@@ -9,6 +9,7 @@
         type FunctionConfiguration,
     } from "@aws-sdk/client-lambda";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
@@ -387,7 +388,8 @@
     }
 
     async function handleDelete() {
-        if (!aws.lambda || !fnName || !confirm("Delete this function?")) return;
+        if (!aws.lambda || !fnName) return;
+        if (!(await confirmDialog({ message: "Delete this function?", confirmText: "Delete", destructive: true }))) return;
         try {
             loading = true;
             await aws.lambda.send(

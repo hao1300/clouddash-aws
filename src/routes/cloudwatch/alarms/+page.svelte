@@ -10,6 +10,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { pushToken, popToken } from "$lib/utils/pagination";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiCircle } from "@mdi/js";
 
@@ -73,7 +74,11 @@
 
     async function deleteAlarm(alarmName: string) {
         if (!aws.cw) return;
-        if (!confirm(`Are you sure you want to delete alarm "${alarmName}"?`))
+        if (!(await confirmDialog({
+            message: `Are you sure you want to delete alarm "${alarmName}"?`,
+            confirmText: "Delete",
+            destructive: true,
+        })))
             return;
         try {
             alarmsLoading = true;

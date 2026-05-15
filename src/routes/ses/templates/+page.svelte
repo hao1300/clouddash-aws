@@ -10,6 +10,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
 
     let templates = $state<any[]>([]);
     let loading = $state(false);
@@ -77,7 +78,8 @@
     }
 
     async function handleDelete(name: string) {
-        if (!aws.ses || !confirm(`Delete template ${name}?`)) return;
+        if (!aws.ses) return;
+        if (!(await confirmDialog({ message: `Delete template ${name}?`, confirmText: "Delete", destructive: true }))) return;
         try {
             loading = true;
             await aws.ses.send(

@@ -14,6 +14,7 @@
     } from "@aws-sdk/client-ec2";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { goto } from "$app/navigation";
 
     let instances = $state<any[]>([]);
@@ -78,7 +79,7 @@
                     new RebootInstancesCommand({ InstanceIds: [id] }),
                 );
             if (action === "terminate") {
-                if (!confirm(`Terminate instance ${id}?`)) return;
+                if (!(await confirmDialog({ message: `Terminate instance ${id}?`, confirmText: "Terminate", destructive: true }))) return;
                 await aws.ec2.send(
                     new TerminateInstancesCommand({ InstanceIds: [id] }),
                 );

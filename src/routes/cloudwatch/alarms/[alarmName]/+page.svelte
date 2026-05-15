@@ -10,6 +10,7 @@
         DeleteAlarmsCommand,
     } from "@aws-sdk/client-cloudwatch";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import DetailLayout from "$lib/components/DetailLayout.svelte";
     import InfoCard from "$lib/components/InfoCard.svelte";
 
@@ -133,7 +134,11 @@
 
     async function deleteAlarm() {
         if (!aws.cw || !alarmName) return;
-        if (!confirm(`Are you sure you want to delete alarm "${alarmName}"?`))
+        if (!(await confirmDialog({
+            message: `Are you sure you want to delete alarm "${alarmName}"?`,
+            confirmText: "Delete",
+            destructive: true,
+        })))
             return;
         try {
             loading = true;

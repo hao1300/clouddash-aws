@@ -9,6 +9,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
     import Icon from "$lib/components/Icon.svelte";
@@ -107,9 +108,10 @@
         if (
             !aws.sns ||
             !subArn ||
-            subArn === "PendingConfirmation" ||
-            !confirm("Delete this subscription?")
+            subArn === "PendingConfirmation"
         )
+            return;
+        if (!(await confirmDialog({ message: "Delete this subscription?", confirmText: "Delete", destructive: true })))
             return;
         try {
             loading = true;

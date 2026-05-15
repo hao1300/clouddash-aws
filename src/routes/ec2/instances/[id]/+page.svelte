@@ -14,6 +14,7 @@
     import MetricChart from "$lib/components/MetricChart.svelte";
     import CopyButton from "$lib/components/CopyButton.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
@@ -110,7 +111,7 @@
                     new RebootInstancesCommand({ InstanceIds: [instanceId] }),
                 );
             if (action === "terminate") {
-                if (!confirm(`Terminate instance ${instanceId}?`)) return;
+                if (!(await confirmDialog({ message: `Terminate instance ${instanceId}?`, confirmText: "Terminate", destructive: true }))) return;
                 await aws.ec2.send(
                     new TerminateInstancesCommand({ InstanceIds: [instanceId] }),
                 );

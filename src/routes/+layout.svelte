@@ -22,6 +22,7 @@
   import ServiceLayout from "$lib/components/ServiceLayout.svelte";
   import BackButton from "$lib/components/BackButton.svelte";
   import ToastContainer from "$lib/components/ToastContainer.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import Icon from "$lib/components/Icon.svelte";
   import {
     mdiCrown,
@@ -1443,4 +1444,5 @@
     />
   {/if}
   <ToastContainer />
+  <ConfirmDialog />
 </main>

@@ -13,6 +13,7 @@
     import { pushToken, popToken } from "$lib/utils/pagination";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { titleService } from "$lib/services/title.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiDotsVertical, mdiClockOutline, mdiDelete } from "@mdi/js";
@@ -110,7 +111,11 @@
 
     async function deleteLogGroup() {
         if (!aws.cwLogs || !logGroupName) return;
-        if (!confirm(`Are you sure you want to delete log group "${logGroupName}"?`)) return;
+        if (!(await confirmDialog({
+            message: `Are you sure you want to delete log group "${logGroupName}"?`,
+            confirmText: "Delete",
+            destructive: true,
+        }))) return;
         try {
             await aws.cwLogs.send(new DeleteLogGroupCommand({ logGroupName }));
             goto("/cloudwatch/logs");
@@ -151,7 +156,7 @@
 
     async function deleteLogStream(streamName: string) {
         if (!aws.cwLogs || !logGroupName) return;
-        if (!confirm(`Delete stream "${streamName}"?`)) return;
+        if (!(await confirmDialog({ message: `Delete stream "${streamName}"?`, confirmText: "Delete", destructive: true }))) return;
         try {
             await aws.cwLogs.send(new DeleteLogStreamCommand({ logGroupName, logStreamName: streamName }));
             await loadLogStreams();

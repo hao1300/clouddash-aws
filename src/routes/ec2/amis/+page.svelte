@@ -6,6 +6,7 @@
     } from "@aws-sdk/client-ec2";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
 
     let amis = $state<any[]>([]);
     let loading = $state(false);
@@ -46,7 +47,8 @@
     }
 
     async function handleDeregister(id: string) {
-        if (!aws.ec2 || !confirm(`Deregister AMI ${id}?`)) return;
+        if (!aws.ec2) return;
+        if (!(await confirmDialog({ message: `Deregister AMI ${id}?`, confirmText: "Deregister", destructive: true }))) return;
         try {
             loading = true;
             await aws.ec2.send(new DeregisterImageCommand({ ImageId: id }));

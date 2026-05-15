@@ -53,13 +53,7 @@
             onclick={() => (isOpen = false)}>Features</a
           >
         </li>
-        <li class="nav-item">
-          <a
-            class="nav-link fw-medium"
-            href="/pricing"
-            onclick={() => (isOpen = false)}>Pricing</a
-          >
-        </li>
+
         <li class="nav-item">
           <a
             class="btn btn-primary rounded-pill px-4 ms-lg-2 shadow-sm fw-bold"
@@ -112,13 +106,7 @@
               >Features</a
             >
           </li>
-          <li>
-            <a
-              href="/pricing"
-              class="text-secondary text-decoration-none small hover-primary"
-              >Pricing</a
-            >
-          </li>
+
           <li>
             <a
               href="/download"

@@ -11,6 +11,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
     import { goto } from "$app/navigation";
 
     let sgs = $state<any[]>([]);
@@ -76,7 +77,8 @@
     }
 
     async function handleDelete(id: string) {
-        if (!aws.ec2 || !confirm(`Delete security group ${id}?`)) return;
+        if (!aws.ec2) return;
+        if (!(await confirmDialog({ message: `Delete security group ${id}?`, confirmText: "Delete", destructive: true }))) return;
         try {
             loading = true;
             await aws.ec2.send(new DeleteSecurityGroupCommand({ GroupId: id }));

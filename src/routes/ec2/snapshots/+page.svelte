@@ -11,6 +11,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import { aws } from "$lib/services/aws.svelte";
+    import { confirmDialog } from "$lib/services/confirm.svelte";
 
     let snapshots = $state<any[]>([]);
     let loading = $state(false);
@@ -74,7 +75,8 @@
     }
 
     async function handleDelete(id: string) {
-        if (!aws.ec2 || !confirm(`Delete snapshot ${id}?`)) return;
+        if (!aws.ec2) return;
+        if (!(await confirmDialog({ message: `Delete snapshot ${id}?`, confirmText: "Delete", destructive: true }))) return;
         try {
             loading = true;
             await aws.ec2.send(new DeleteSnapshotCommand({ SnapshotId: id }));
