@@ -15,7 +15,7 @@
       name: "Windows",
       icon: MonitorIcon,
       type: "Desktop App",
-      link: "https://static.clouddash.dev/downloads/windows/clouddash-1.0.0-setup.exe",
+      link: "https://static.clouddash.dev/downloads/windows/clouddash-1.0.1-setup.exe",
       instructions:
         "Stable installer for Windows 10/11. Includes auto-updates and system tray support.",
     },
