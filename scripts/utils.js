@@ -22,12 +22,15 @@ export function updateWebVersion(version, platform = null) {
     if (!platform || platform === 'linux') {
         content = content.replace(/downloads\/linux\/clouddash-[\d.]+\.AppImage/g, `downloads/linux/clouddash-${version}.AppImage`);
     }
+    if (!platform || platform === 'macos') {
+        content = content.replace(/downloads\/macos\/clouddash-[\d.]+\.dmg/g, `downloads/macos/clouddash-${version}.dmg`);
+    }
 
     fs.writeFileSync(webPath, content);
     console.log(`Updated ${webPath} (${platform || 'all platforms'}) to version ${version}`);
 }
 
-export function generateUpdateMetadata(platform, version, signaturePath, downloadUrl) {
+export function generateUpdateMetadata(platform, version, signaturePath, downloadUrl, archOverride = null) {
     if (!fs.existsSync(signaturePath)) {
         console.warn(`Warning: Signature file not found at ${signaturePath}, skipping metadata generation.`);
         return;
@@ -44,8 +47,8 @@ export function generateUpdateMetadata(platform, version, signaturePath, downloa
         notes: `Version ${version} release.`
     };
 
-    const target = platform; // 'windows' or 'linux'
-    const arch = 'x86_64';
+    const target = platform; // 'windows', 'linux', or 'darwin'
+    const arch = archOverride || 'x86_64';
 
     const outputDir = `clouddash-web/static/versions/${target}/${arch}`;
     if (!fs.existsSync(outputDir)) {
@@ -65,6 +68,8 @@ function getMimeType(filePath) {
         '.appimage': 'application/x-executable',
         '.deb': 'application/vnd.debian.binary-package',
         '.rpm': 'application/x-rpm',
+        '.dmg': 'application/x-apple-diskimage',
+        '.gz': 'application/gzip',
         '.zip': 'application/zip',
         '.json': 'application/json',
         '.txt': 'text/plain',

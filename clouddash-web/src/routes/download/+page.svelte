@@ -37,10 +37,17 @@
       instructions:
         "Universal Linux AppImage. Supports most distributions including Ubuntu, Fedora, and Debian.",
     },
+    {
+      name: "macOS",
+      icon: MonitorIcon,
+      type: "Universal DMG",
+      link: "https://static.clouddash.dev/downloads/macos/clouddash-1.0.0.dmg",
+      instructions:
+        "Universal build for Apple Silicon and Intel Macs. Requires macOS 10.15 or later.",
+    },
   ];
 
   const upcoming = [
-    { name: "MacOS", icon: MonitorIcon },
     { name: "iOS", icon: SmartphoneIcon },
   ];
 </script>
