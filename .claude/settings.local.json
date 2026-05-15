@@ -10,7 +10,9 @@
       "Bash(npm install *)",
       "Read(//Users/hao/.npm/**)",
       "Bash(npm run *)",
-      "Bash(grep -E \"ec2[\\\\\\\\\\\\/]instances[\\\\\\\\\\\\/]\\\\[id\\\\]|ERROR.*ec2\")"
+      "Bash(grep -E \"ec2[\\\\\\\\\\\\/]instances[\\\\\\\\\\\\/]\\\\[id\\\\]|ERROR.*ec2\")",
+      "Bash(grep -E \"ses[\\\\\\\\\\\\/]\\\\+page|ERROR.*ses\\\\\\\\\\\\\\\\\\\\+page\")",
+      "Bash(grep -E \"ses\\\\\\\\\\\\\\\\\\\\+page.svelte\")"
     ]
   }
 }
