@@ -6,10 +6,9 @@ This repository contains the CloudDash app source code, including the desktop sh
 
 ## Project Goals
 
-- Keep AWS profiles and user data local by default.
-- Provide native desktop builds for Windows, Linux, and macOS, plus Android builds where supported.
+- Keep AWS profiles and user data local.
+- Provide native desktop builds for Windows, Linux, and macOS, plus Android builds where supported. iOS builds are not available until we have more funding.
 - Make the source available so users can inspect, build, and contribute to the app.
-- Avoid hosted team sync or shared profile features that would require CloudDash to store sensitive user data.
 
 ## Sponsorship
 
@@ -17,7 +16,7 @@ CloudDash development is sponsored by [Chrome-Stats](https://chrome-stats.com/),
 
 If CloudDash is useful to you or your company, please consider sponsoring the project. Sponsorship helps pay for code signing, release infrastructure, CI builds, test devices, security maintenance, and the time required to keep CloudDash improving.
 
-You can support the project by using the GitHub Sponsors button if it is available on this repository, sharing feedback, reporting issues, contributing patches, or reaching out through [Chrome-Stats](https://chrome-stats.com/) for larger sponsorships.
+You can support the project by using the GitHub Sponsors button available on this repository, sharing feedback, reporting issues, and contributing patches.
 
 ## License
 
