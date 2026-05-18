@@ -1,6 +1,23 @@
 # CloudDash for AWS
 
-CloudDash is a local-first AWS management dashboard built with Tauri, SvelteKit, and TypeScript.
+CloudDash for AWS is a local-first AWS management dashboard built with Tauri, SvelteKit, TypeScript, and Rust. It is designed for developers and operators who want a fast native interface for day-to-day AWS work without moving their cloud credentials, profiles, or operational data into a hosted team service.
+
+This repository contains the CloudDash app source code, including the desktop shell, frontend UI, Tauri commands, AWS service integrations, and release automation. Official builds are published from this repository through GitHub Releases.
+
+## Project Goals
+
+- Keep AWS profiles and user data local by default.
+- Provide native desktop builds for Windows, Linux, and macOS, plus Android builds where supported.
+- Make the source available so users can inspect, build, and contribute to the app.
+- Avoid hosted team sync or shared profile features that would require CloudDash to store sensitive user data.
+
+## Sponsorship
+
+CloudDash development is sponsored by [Chrome-Stats](https://chrome-stats.com/), a platform for researching Chrome extensions, browser ecosystem data, and extension market trends.
+
+If CloudDash is useful to you or your company, please consider sponsoring the project. Sponsorship helps pay for code signing, release infrastructure, CI builds, test devices, security maintenance, and the time required to keep CloudDash improving.
+
+You can support the project by using the GitHub Sponsors button if it is available on this repository, sharing feedback, reporting issues, contributing patches, or reaching out through [Chrome-Stats](https://chrome-stats.com/) for larger sponsorships.
 
 ## License
 
