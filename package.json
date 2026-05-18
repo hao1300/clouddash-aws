@@ -13,12 +13,9 @@
     "tauri-dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "tauri-build": "tauri build",
     "tauri-android-dev": "tauri android dev --config src-tauri/tauri.dev.conf.json",
-    "tauri-android-build": "node --env-file=.env scripts/tauri-android-build.js",
+    "tauri-android-build": "tauri android build",
     "tauri-ios-dev": "tauri ios dev --config src-tauri/tauri.dev.conf.json",
     "tauri-ios-build": "tauri ios build",
-    "tauri-linux-build": "node --env-file=.env scripts/tauri-linux-build.js",
-    "tauri-mac-build": "node --env-file=.env scripts/tauri-mac-build.js",
-    "tauri-windows-build": "node --env-file=.env scripts/tauri-windows-build.js",
     "tauri": "tauri"
   },
   "dependencies": {

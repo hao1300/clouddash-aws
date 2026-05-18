@@ -10,3 +10,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .wrangler
 .tauri
+.claude/
+.idea/
+.vscode/
+/.idea/
