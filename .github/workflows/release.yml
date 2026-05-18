@@ -110,6 +110,14 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Validate updater signing secret
+        shell: bash
+        run: |
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is required because src-tauri/tauri.conf.json enables bundle.createUpdaterArtifacts."
+            exit 1
+          fi
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -216,6 +224,8 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -225,6 +235,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Validate updater signing secret
+        shell: bash
+        run: |
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is required because src-tauri/tauri.conf.json enables bundle.createUpdaterArtifacts."
+            exit 1
+          fi
 
       - name: Setup Java
         uses: actions/setup-java@v4
