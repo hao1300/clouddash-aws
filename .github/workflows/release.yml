@@ -1,0 +1,252 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag. Defaults to v{src-tauri version}.
+        required: false
+        default: ""
+      draft:
+        description: Create the release as a draft
+        required: true
+        type: boolean
+        default: true
+      prerelease:
+        description: Mark the release as a prerelease
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Prepare release
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      draft: ${{ steps.release.outputs.draft }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version and tag
+        id: release
+        shell: bash
+        run: |
+          version="$(node -e "console.log(JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json', 'utf8')).version)")"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME}"
+            draft="false"
+            prerelease="false"
+          else
+            tag="${{ inputs.release_tag }}"
+            if [ -z "$tag" ]; then
+              tag="v${version}"
+            fi
+            draft="${{ inputs.draft }}"
+            prerelease="${{ inputs.prerelease }}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "draft=$draft" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+  desktop:
+    name: ${{ matrix.label }}
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows x64
+            os: windows-latest
+            build_command: npm run tauri-build
+            stage_command: npm run release:stage -- windows
+            rust_target: ""
+            artifact: release-windows-x64
+          - label: Linux x64
+            os: ubuntu-22.04
+            build_command: npm run tauri-build
+            stage_command: npm run release:stage -- linux
+            rust_target: ""
+            artifact: release-linux-x64
+          - label: macOS Apple Silicon
+            os: macos-14
+            build_command: npx tauri build --target aarch64-apple-darwin
+            stage_command: npm run release:stage -- macos aarch64-apple-darwin
+            rust_target: aarch64-apple-darwin
+            artifact: release-macos-aarch64
+          - label: macOS Intel
+            os: macos-15-intel
+            build_command: npx tauri build --target x86_64-apple-darwin
+            stage_command: npm run release:stage -- macos x86_64-apple-darwin
+            rust_target: x86_64-apple-darwin
+            artifact: release-macos-x86_64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Rust target
+        if: matrix.rust_target != ''
+        run: rustup target add ${{ matrix.rust_target }}
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: ${{ matrix.build_command }}
+
+      - name: Stage release assets
+        run: ${{ matrix.stage_command }}
+
+      - name: Upload staged assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: release-dist
+          if-no-files-found: error
+
+  android:
+    name: Android APK and AAB
+    needs: prepare
+    runs-on: ubuntu-22.04
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android packages
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Android Rust targets
+        run: rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+      - name: Configure Android signing
+        run: |
+          cd src-tauri/gen/android
+          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" > keystore.properties
+          echo "password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> keystore.properties
+          echo "${{ secrets.ANDROID_KEY_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/clouddash-upload.jks"
+          echo "storeFile=$RUNNER_TEMP/clouddash-upload.jks" >> keystore.properties
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Android artifacts
+        run: npm run tauri-android-build
+
+      - name: Stage Android assets
+        run: npm run release:stage -- android
+
+      - name: Upload staged assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-android
+          path: release-dist
+          if-no-files-found: error
+
+  publish:
+    name: Create GitHub Release
+    needs:
+      - prepare
+      - desktop
+      - android
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_DRAFT: ${{ needs.prepare.outputs.draft }}
+      RELEASE_PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download staged assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Write release notes
+        shell: bash
+        run: |
+          cat > release-notes.md <<EOF
+          CloudDash ${RELEASE_VERSION}
+
+          Official signed builds for Windows, Linux, macOS, and Android.
+          EOF
+
+      - name: Create or update release
+        shell: bash
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          else
+            args=(release create "$RELEASE_TAG" release-assets/* --title "CloudDash ${RELEASE_VERSION}" --notes-file release-notes.md --target "$GITHUB_SHA")
+            if [ "$RELEASE_DRAFT" = "true" ]; then
+              args+=(--draft)
+            fi
+            if [ "$RELEASE_PRERELEASE" = "true" ]; then
+              args+=(--prerelease)
+            fi
+            gh "${args[@]}"
+          fi
