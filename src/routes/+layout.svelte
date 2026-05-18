@@ -16,7 +16,6 @@
   import { aws } from "$lib/services/aws.svelte";
   import { bookmarks } from "$lib/services/bookmarks.svelte";
   import { titleService } from "$lib/services/title.svelte";
-  import { settings } from "$lib/services/settings.svelte";
   import { SERVICE_MANIFEST } from "$lib/services/service-manifest";
 
   import ServiceLayout from "$lib/components/ServiceLayout.svelte";
@@ -25,7 +24,6 @@
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import Icon from "$lib/components/Icon.svelte";
   import {
-    mdiCrown,
     mdiKey,
     mdiWindowRestore,
     mdiRefresh,
@@ -280,19 +278,6 @@
   $effect(() => {
     titleService.updateFromUrl($page.url.pathname);
     bookmarks.currentUrl = $page.url.pathname + $page.url.search;
-
-    /*
-    if (
-      !settings.isPro &&
-      activeId &&
-      activeId !== "settings" &&
-      activeId !== "upgrade" &&
-      !["cloudwatch", "s3", "dynamodb"].includes(activeId)
-    ) {
-      goto("/upgrade", { replaceState: true });
-      return;
-    }
-    */
 
     if (Object.keys($page.params).length === 0) {
       const manifest = SERVICE_MANIFEST[activeId];
@@ -905,14 +890,6 @@
             <span class="text-sm font-bold text-gray-100 tracking-tight"
               >CloudDash for AWS</span
             >
-            <!--
-            {#if settings.isPro}
-              <span
-                class="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 text-[10px] font-black rounded border border-blue-500/30 uppercase tracking-tighter"
-                >Pro</span
-              >
-            {/if}
-            -->
           </div>
           <button
             onclick={() => (sideMenuOpen = false)}
@@ -929,22 +906,6 @@
           <div class="space-y-4">
             <div class="space-y-4">
               <div class="px-1 space-y-3">
-                <!--
-                {#if !settings.isPro}
-                  <a
-                    href="/upgrade"
-                    onclick={(e) => {
-                      e.preventDefault();
-                      goto("/upgrade");
-                      if (window.innerWidth < 640) sideMenuOpen = false;
-                    }}
-                    class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-[11px] font-bold py-2 rounded flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all border border-blue-500/50"
-                  >
-                    <Icon path={mdiCrown} size={16} />
-                    Upgrade to Pro
-                  </a>
-                {/if}
-                -->
                 <input
                   type="text"
                   bind:value={searchQuery}
@@ -974,16 +935,6 @@
                       >
                         <button
                           onclick={() => {
-                            /*
-                            if (
-                              !settings.isPro &&
-                              !["cloudwatch", "s3", "dynamodb"].includes(svc.id)
-                            ) {
-                              goto("/upgrade");
-                              if (window.innerWidth < 640) sideMenuOpen = false;
-                              return;
-                            }
-                            */
                             switchTab(svc.id);
                             if (window.innerWidth < 640) sideMenuOpen = false;
                           }}
@@ -999,16 +950,6 @@
                             />
                           {/if}
                           {svc.label}
-                          <!--
-                          {#if !settings.isPro && !["cloudwatch", "s3", "dynamodb"].includes(svc.id)}
-                            <Icon
-                              path={mdiCrown}
-                              size={12}
-                              color="rgb(234 179 8)"
-                              class="ml-1"
-                            />
-                          {/if}
-                          -->
                           {#if activeId === svc.id}
                             <div class="w-1 h-1 rounded-full bg-blue-500"></div>
                           {/if}

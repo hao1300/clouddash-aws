@@ -33,9 +33,6 @@
         },
         {
           "url": "https://*.aws.amazon.com/*"
-        },
-        {
-          "url": "https://*.polar.sh/*"
         }
       ]
     }
