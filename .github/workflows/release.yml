@@ -67,8 +67,6 @@ jobs:
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
@@ -119,6 +117,13 @@ jobs:
         if: matrix.rust_target != ''
         run: rustup target add ${{ matrix.rust_target }}
 
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.artifact }}
+          cache-on-failure: true
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -128,8 +133,72 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Import Apple Developer certificate
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${APPLE_CERTIFICATE}" ] || [ -z "${APPLE_CERTIFICATE_PASSWORD}" ]; then
+            echo "::error::APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD secrets are required for macOS release builds."
+            exit 1
+          fi
+
+          certificate_path="$RUNNER_TEMP/apple-certificate.p12"
+          keychain_path="$RUNNER_TEMP/clouddash-signing.keychain-db"
+          keychain_password="$(openssl rand -base64 32)"
+
+          if ! printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$certificate_path" 2>/dev/null; then
+            printf '%s' "$APPLE_CERTIFICATE" | base64 -D > "$certificate_path"
+          fi
+
+          if ! openssl pkcs12 -in "$certificate_path" -nokeys -passin "pass:${APPLE_CERTIFICATE_PASSWORD}" >/dev/null 2>&1; then
+            echo "::error::APPLE_CERTIFICATE must be the base64 contents of an exported .p12, and APPLE_CERTIFICATE_PASSWORD must match that .p12 export password."
+            exit 1
+          fi
+
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -k "$keychain_path" -P "$APPLE_CERTIFICATE_PASSWORD" -f pkcs12 -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path" $(security list-keychains -d user | sed 's/"//g')
+          security default-keychain -d user -s "$keychain_path"
+
+          identities="$(security find-identity -v -p codesigning "$keychain_path")"
+          echo "$identities"
+
+          signing_identity="${APPLE_SIGNING_IDENTITY:-}"
+          if [ -z "$signing_identity" ]; then
+            signing_identity="$(printf '%s\n' "$identities" | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
+          fi
+          if [ -z "$signing_identity" ]; then
+            signing_identity="$(printf '%s\n' "$identities" | awk -F'"' '/Apple Distribution/ { print $2; exit }')"
+          fi
+          if [ -z "$signing_identity" ]; then
+            signing_identity="$(printf '%s\n' "$identities" | awk -F'"' '/Apple Development/ { print $2; exit }')"
+          fi
+          if [ -z "$signing_identity" ]; then
+            echo "::error::No valid Apple code signing identity was found in APPLE_CERTIFICATE."
+            exit 1
+          fi
+
+          echo "APPLE_SIGNING_IDENTITY=$signing_identity" >> "$GITHUB_ENV"
+          echo "APPLE_KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
+
       - name: Build
         run: ${{ matrix.build_command }}
+
+      - name: Delete Apple signing keychain
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ -n "${APPLE_KEYCHAIN_PATH:-}" ] && [ -f "$APPLE_KEYCHAIN_PATH" ]; then
+            security delete-keychain "$APPLE_KEYCHAIN_PATH"
+          fi
 
       - name: Stage release assets
         run: ${{ matrix.stage_command }}
@@ -177,6 +246,13 @@ jobs:
 
       - name: Add Android Rust targets
         run: rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: android
+          cache-on-failure: true
 
       - name: Configure Android signing
         run: |
