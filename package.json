@@ -2,6 +2,7 @@
   "name": "clouddash-aws",
   "version": "0.1.0",
   "description": "",
+  "license": "FSL-1.1-ALv2",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

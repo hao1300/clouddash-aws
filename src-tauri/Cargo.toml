@@ -3,6 +3,7 @@ name = "clouddash-aws"
 version = "0.1.0"
 description = "High-performance local AWS management dashboard"
 authors = ["support@chrome-stats.com"]
+license-file = "../LICENSE.md"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
