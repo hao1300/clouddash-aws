@@ -4,6 +4,14 @@ CloudDash for AWS is a local-first AWS management dashboard built with Tauri, Sv
 
 This repository contains the CloudDash app source code, including the desktop shell, frontend UI, Tauri commands, AWS service integrations, and release automation. Official builds are published from this repository through GitHub Releases.
 
+## Screenshots
+
+![CloudDash S3 preview](static/screenshots/s3-preview.png)
+
+![CloudDash CloudWatch Logs Insights](static/screenshots/logs-insights.png)
+
+![CloudDash EC2 metrics](static/screenshots/ec2-metrics.png)
+
 ## Project Goals
 
 - Keep AWS profiles and user data local.
