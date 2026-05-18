@@ -64,22 +64,40 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
 
-          set +e
-          output="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" 2>&1)"
-          status=$?
-          set -e
+          check_release_tag() {
+            local candidate="$1"
 
-          if [ "$status" -eq 0 ]; then
-            echo "::error::GitHub Release '$RELEASE_TAG' already exists. Bump src-tauri/tauri.conf.json version or choose a new release_tag before deploying."
-            exit 1
+            set +e
+            output="$(gh release view "$candidate" --repo "$GITHUB_REPOSITORY" 2>&1)"
+            status=$?
+            set -e
+
+            if [ "$status" -eq 0 ]; then
+              echo "::error::GitHub Release '$candidate' already exists. Bump src-tauri/tauri.conf.json version or choose a new release_tag before deploying."
+              exit 1
+            fi
+
+            if ! grep -qiE "not found|HTTP 404|release not found" <<< "$output"; then
+              echo "::error::Could not verify whether GitHub Release '$candidate' already exists."
+              echo "$output"
+              exit 1
+            fi
+          }
+
+          check_release_tag "$RELEASE_TAG"
+
+          canonical_tag="v${RELEASE_VERSION}"
+          if [ "$canonical_tag" != "$RELEASE_TAG" ]; then
+            check_release_tag "$canonical_tag"
           fi
 
-          if ! grep -qiE "not found|HTTP 404|release not found" <<< "$output"; then
-            echo "::error::Could not verify whether GitHub Release '$RELEASE_TAG' already exists."
-            echo "$output"
+          existing_version_tag="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json name,tagName --jq "[.[] | select(.name == \"CloudDash ${RELEASE_VERSION}\") | .tagName][0] // \"\"")"
+          if [ -n "$existing_version_tag" ]; then
+            echo "::error::Release version '${RELEASE_VERSION}' already exists as GitHub Release '$existing_version_tag'. Bump src-tauri/tauri.conf.json before deploying."
             exit 1
           fi
 
@@ -377,10 +395,12 @@ jobs:
       - name: Create release
         shell: bash
         run: |
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::GitHub Release '$RELEASE_TAG' already exists. Refusing to overwrite release assets."
-            exit 1
-          fi
+          for candidate in "$RELEASE_TAG" "v${RELEASE_VERSION}"; do
+            if gh release view "$candidate" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "::error::GitHub Release '$candidate' already exists. Refusing to overwrite release assets."
+              exit 1
+            fi
+          done
 
           args=(release create "$RELEASE_TAG" release-assets/* --title "CloudDash ${RELEASE_VERSION}" --notes-file release-notes.md --target "$GITHUB_SHA")
           if [ "$RELEASE_DRAFT" = "true" ]; then
