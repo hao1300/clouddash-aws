@@ -6,6 +6,8 @@ This repository contains the CloudDash app source code, including the desktop sh
 
 Official Website: [clouddash.dev](https://clouddash.dev/)
 
+DISCLAIMER: CloudDash is not affiliated with Amazon Web Services.
+
 ## Screenshots
 
 ![CloudDash S3 preview](static/screenshots/s3-preview.png)
