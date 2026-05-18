@@ -67,10 +67,6 @@ jobs:
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     strategy:
       fail-fast: false
       matrix:
@@ -147,11 +143,21 @@ jobs:
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY_SECRET: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID_SECRET: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD_SECRET: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID_SECRET: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
 
+          if [ -z "${APPLE_CERTIFICATE}" ] && [ -z "${APPLE_CERTIFICATE_PASSWORD}" ]; then
+            echo "::warning::APPLE_CERTIFICATE is not configured. Building unsigned macOS artifacts."
+            echo "MACOS_SIGNING_MODE=unsigned" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
           if [ -z "${APPLE_CERTIFICATE}" ] || [ -z "${APPLE_CERTIFICATE_PASSWORD}" ]; then
-            echo "::error::APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD secrets are required for macOS release builds."
+            echo "::error::APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD must either both be set or both be omitted for unsigned macOS builds."
             exit 1
           fi
 
@@ -179,7 +185,7 @@ jobs:
           identities="$(security find-identity -v -p codesigning "$keychain_path")"
           echo "$identities"
 
-          signing_identity="${APPLE_SIGNING_IDENTITY:-}"
+          signing_identity="${APPLE_SIGNING_IDENTITY_SECRET:-}"
           if [ -z "$signing_identity" ]; then
             signing_identity="$(printf '%s\n' "$identities" | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
           fi
@@ -196,9 +202,23 @@ jobs:
 
           echo "APPLE_SIGNING_IDENTITY=$signing_identity" >> "$GITHUB_ENV"
           echo "APPLE_KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
+          echo "MACOS_SIGNING_MODE=signed" >> "$GITHUB_ENV"
+
+          if [ -n "${APPLE_ID_SECRET}" ] && [ -n "${APPLE_PASSWORD_SECRET}" ] && [ -n "${APPLE_TEAM_ID_SECRET}" ]; then
+            echo "APPLE_ID=${APPLE_ID_SECRET}" >> "$GITHUB_ENV"
+            echo "APPLE_PASSWORD=${APPLE_PASSWORD_SECRET}" >> "$GITHUB_ENV"
+            echo "APPLE_TEAM_ID=${APPLE_TEAM_ID_SECRET}" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Apple notarization secrets are incomplete. macOS artifacts will be signed but not notarized."
+          fi
 
       - name: Build
         run: ${{ matrix.build_command }}
+
+      - name: Report unsigned macOS build
+        if: runner.os == 'macOS' && env.MACOS_SIGNING_MODE == 'unsigned'
+        run: |
+          echo "::warning::This macOS artifact is unsigned. Users will need to right-click Open or approve it in System Settings > Privacy & Security."
 
       - name: Delete Apple signing keychain
         if: always() && runner.os == 'macOS'
@@ -326,7 +346,8 @@ jobs:
           cat > release-notes.md <<EOF
           CloudDash ${RELEASE_VERSION}
 
-          Official signed builds for Windows, Linux, macOS, and Android.
+          Official builds for Windows, Linux, macOS, and Android.
+          macOS builds are unsigned unless Apple Developer signing secrets are configured.
           EOF
 
       - name: Create or update release
