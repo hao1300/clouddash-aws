@@ -827,7 +827,7 @@
         {@const stream = selectedLogRow["@logStream"] || ""}
         {@const timeMs = selectedLogRow["@timestamp"] ? new Date(selectedLogRow["@timestamp"] + "Z").getTime() : undefined}
         <div class="h-[600px] flex flex-col -m-5 bg-gray-950">
-            <LogStreamViewer logGroupName={group} logStreamName={stream} initialTimeMs={timeMs} />
+            <LogStreamViewer logGroupName={group} logStreamName={stream} initialTimeMs={timeMs} targetMessage={selectedLogRow["@message"]} />
         </div>
     {/if}
 </Modal>

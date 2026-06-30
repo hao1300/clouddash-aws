@@ -13,10 +13,12 @@
         logGroupName,
         logStreamName,
         initialTimeMs,
+        targetMessage,
     }: {
         logGroupName: string;
         logStreamName: string;
         initialTimeMs?: number;
+        targetMessage?: string;
     } = $props();
 
     let error = $state("");
@@ -28,8 +30,10 @@
     let logEventsFilter = $state("");
     let loadingDirection = $state<"next" | "prev" | "initial" | "none">("none");
     let useLocalTime = $state(true);
+    let highlightIndex = $state(-1);
 
     let scrollContainer: HTMLDivElement;
+    let eventEls = $state<(HTMLDivElement | undefined)[]>([]);
 
     function formatTimestamp(ts: number | undefined) {
         if (!ts) return "-";
@@ -45,12 +49,41 @@
         if (aws.cwLogs && logGroupName && logStreamName) {
             if (initialTimeMs) {
                 // Load events in a ±5 minute window around the target timestamp
-                loadLogEvents({ startTime: initialTimeMs - 300000 });
+                loadLogEvents({
+                    startTime: initialTimeMs,
+                    endTime: initialTimeMs + 300000,
+                    scrollToTarget: true,
+                });
             } else {
                 loadLogEvents();
             }
         }
     });
+
+    // Pick the log event that matches the record clicked in Logs Insights.
+    // Prefer an exact timestamp + message match (handles multiple events sharing
+    // the same millisecond), then fall back to timestamp, then nearest in time.
+    function findTargetIndex(ts: number, msg?: string): number {
+        if (logEvents.length === 0) return -1;
+        if (msg !== undefined) {
+            const exact = logEvents.findIndex(
+                (e) => e.timestamp === ts && e.message === msg,
+            );
+            if (exact >= 0) return exact;
+        }
+        const exactTs = logEvents.findIndex((e) => e.timestamp === ts);
+        if (exactTs >= 0) return exactTs;
+        let best = 0;
+        let bestDiff = Infinity;
+        for (let i = 0; i < logEvents.length; i++) {
+            const diff = Math.abs((logEvents[i].timestamp ?? 0) - ts);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                best = i;
+            }
+        }
+        return best;
+    }
 
     async function loadLogEvents(
         options: {
@@ -58,10 +91,14 @@
             direction?: "next" | "prev";
             startTime?: number;
             endTime?: number;
+            scrollToTarget?: boolean;
         } = {},
     ) {
         if (!aws.cwLogs) return;
         const { token, direction = "next", startTime, endTime } = options;
+        // The highlight only applies to the initial target load; clear it on any
+        // fresh (non-paginated) load so it can't point at a stale row.
+        if (!token) highlightIndex = -1;
         try {
             logEventsLoading = true;
             loadingDirection = token ? direction : "initial";
@@ -97,6 +134,11 @@
                     } else if (direction === "prev") {
                         if (newEvents.length > 0) {
                             logEvents = [...newEvents, ...logEvents];
+                            // Keep the highlighted row pointing at the same event
+                            // now that earlier events shifted its index down.
+                            if (highlightIndex >= 0) {
+                                highlightIndex += newEvents.length;
+                            }
                         }
                     }
                 } else {
@@ -145,6 +187,11 @@
                     } else if (direction === "prev") {
                         if (newEvents.length > 0) {
                             logEvents = [...newEvents, ...logEvents];
+                            // Keep the highlighted row pointing at the same event
+                            // now that earlier events shifted its index down.
+                            if (highlightIndex >= 0) {
+                                highlightIndex += newEvents.length;
+                            }
                         }
                     }
                 } else {
@@ -170,6 +217,15 @@
                 const newScrollHeight = scrollContainer.scrollHeight;
                 scrollContainer.scrollTop =
                     oldScrollTop + (newScrollHeight - oldScrollHeight);
+            }
+
+            // Highlight and scroll to the record that was clicked in Logs Insights
+            if (options.scrollToTarget && initialTimeMs) {
+                highlightIndex = findTargetIndex(initialTimeMs, targetMessage);
+                await tick(); // Wait for the events (and their refs) to render
+                eventEls[highlightIndex]?.scrollIntoView({
+                    block: "center",
+                });
             }
         } catch (e) {
             error = String(e);
@@ -272,9 +328,13 @@
                             {/if}
                         </button>
 
-                        {#each logEvents as event}
+                        {#each logEvents as event, i}
                             <div
-                                class="group hover:bg-gray-800/40 p-1.5 rounded flex gap-4 transition-colors w-full"
+                                bind:this={eventEls[i]}
+                                class="group p-1.5 rounded flex gap-4 transition-colors w-full {i ===
+                                highlightIndex
+                                    ? 'bg-yellow-500/15 ring-1 ring-yellow-500/40'
+                                    : 'hover:bg-gray-800/40'}"
                             >
                                 <div
                                     class="text-[10px] text-gray-500 whitespace-nowrap pt-0.5 select-none font-sans mt-[2px]"
