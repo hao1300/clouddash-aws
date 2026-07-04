@@ -1,11 +1,12 @@
 <script lang="ts">
     import {
-        ListSecretsCommand,
-        CreateSecretCommand,
-        type SecretListEntry,
-    } from "@aws-sdk/client-secrets-manager";
+        DescribeParametersCommand,
+        PutParameterCommand,
+        type ParameterMetadata,
+    } from "@aws-sdk/client-ssm";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import Modal from "$lib/components/Modal.svelte";
+    import Select from "$lib/components/Select.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiLoading } from "@mdi/js";
     import { aws } from "$lib/services/aws.svelte";
@@ -13,7 +14,7 @@
     import { page } from "$app/stores";
     import { titleService } from "$lib/services/title.svelte";
 
-    let secrets = $state<SecretListEntry[]>([]);
+    let parameters = $state<ParameterMetadata[]>([]);
     let loading = $state(false);
     let error = $state("");
     let marker = $state<string | undefined>(undefined);
@@ -21,12 +22,13 @@
 
     let showCreateModal = $state(false);
     let newName = $state("");
+    let newType = $state("String");
     let newValue = $state("");
     let newDescription = $state("");
     let creating = $state(false);
 
     async function handleCreate() {
-        if (!aws.secretsManager || !newName.trim() || !newValue) return;
+        if (!aws.ssm || !newName.trim() || !newValue) return;
         try {
             creating = true;
             error = "";
@@ -36,10 +38,11 @@
                 valueToSave = JSON.stringify(JSON.parse(newValue));
             } catch (e) {}
 
-            await aws.secretsManager.send(
-                new CreateSecretCommand({
+            await aws.ssm.send(
+                new PutParameterCommand({
                     Name: newName.trim(),
-                    SecretString: valueToSave,
+                    Value: valueToSave,
+                    Type: newType as any,
                     Description: newDescription.trim() || undefined,
                 }),
             );
@@ -47,9 +50,10 @@
             const created = newName.trim();
             showCreateModal = false;
             newName = "";
+            newType = "String";
             newValue = "";
             newDescription = "";
-            goto(`/secretsmanager/${encodeURIComponent(created)}`);
+            goto(`/parameterstore/${encodeURIComponent(created)}`);
         } catch (e: any) {
             error = e.message || String(e);
         } finally {
@@ -60,21 +64,21 @@
     let __initLoaded = false;
     $effect(() => {
         titleService.setResource("", undefined, $page.url.pathname);
-        if (aws.secretsManager && !__initLoaded) {
+        if (aws.ssm && !__initLoaded) {
             __initLoaded = true;
-            loadSecrets();
+            loadParameters();
         }
     });
 
-    async function loadSecrets(token?: string) {
-        if (!aws.secretsManager) return;
+    async function loadParameters(token?: string) {
+        if (!aws.ssm) return;
         try {
             loading = true;
             error = "";
-            const res = await aws.secretsManager.send(
-                new ListSecretsCommand({ MaxResults: 50, NextToken: token }),
+            const res = await aws.ssm.send(
+                new DescribeParametersCommand({ MaxResults: 50, NextToken: token }),
             );
-            secrets = res.SecretList || [];
+            parameters = res.Parameters || [];
             if (token) history.push(token);
             marker = res.NextToken;
         } catch (e: any) {
@@ -84,8 +88,8 @@
         }
     }
 
-    function handleSelectSecret(secret: SecretListEntry) {
-        goto(`/secretsmanager/${encodeURIComponent(secret.Name || "")}`);
+    function handleSelectParameter(parameter: ParameterMetadata) {
+        goto(`/parameterstore/${encodeURIComponent(parameter.Name || "")}`);
     }
 </script>
 
@@ -97,64 +101,78 @@
         </div>{/if}
 
     <PaginatedTable
-        items={secrets}
+        items={parameters}
         {loading}
         onRefresh={() => {
             history = [];
-            loadSecrets();
+            loadParameters();
         }}
         hasNext={!!marker}
         hasPrev={history.length > 0}
-        onNext={() => loadSecrets(marker)}
+        onNext={() => loadParameters(marker)}
         onPrev={() => {
             history.pop();
-            loadSecrets(history[history.length - 1]);
+            loadParameters(history[history.length - 1]);
         }}
         columns={[
             {
                 label: "Name",
                 key: "Name",
-                onClick: (item) => handleSelectSecret(item),
+                onClick: (item) => handleSelectParameter(item),
+            },
+            { label: "Type", key: "Type" },
+            { label: "Tier", key: "Tier" },
+            {
+                label: "Last Modified",
+                key: "LastModifiedDate",
+                format: (v) => (v ? new Date(v).toLocaleString() : ""),
             },
             { label: "Description", key: "Description" },
-            {
-                label: "Last Accessed (UTC)",
-                key: "LastAccessedDate",
-                format: (v) => (v ? new Date(v).toLocaleDateString(undefined, { timeZone: "UTC" }) : ""),
-            },
         ]}
     >
         {#snippet headerActionsSnippet()}
             <button
                 onclick={() => (showCreateModal = true)}
                 class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow"
-                >Store a New Secret</button
+                >Create Parameter</button
             >
         {/snippet}
     </PaginatedTable>
 </div>
 
-<Modal bind:open={showCreateModal} title="Store a New Secret">
+<Modal bind:open={showCreateModal} title="Create Parameter" overflowVisible>
     <div class="space-y-4 text-gray-300">
         <div>
             <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
-                >Secret Name</label
+                >Name</label
             >
             <input
                 type="text"
                 bind:value={newName}
-                placeholder="my/app/secret"
+                placeholder="/my/app/parameter"
                 class="w-full bg-black border border-gray-700 rounded p-2 text-xs text-white font-mono outline-none focus:border-blue-500 transition"
             />
         </div>
         <div>
             <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
-                >Secret Value</label
+                >Type</label
+            >
+            <Select
+                bind:value={newType}
+                options={[
+                    { value: "String", label: "String" },
+                    { value: "StringList", label: "StringList" },
+                    { value: "SecureString", label: "SecureString" },
+                ]}
+            />
+        </div>
+        <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1"
+                >Value</label
             >
             <textarea
                 bind:value={newValue}
                 rows="5"
-                placeholder={'plaintext or {"key": "value"}'}
                 class="w-full bg-black border border-gray-700 rounded p-2 text-xs text-white font-mono outline-none focus:border-blue-500 transition"
             ></textarea>
         </div>
@@ -180,7 +198,7 @@
                 class="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-xs font-bold transition flex items-center gap-2"
             >
                 {#if creating}<Icon path={mdiLoading} size={14} class="animate-spin" />{/if}
-                Store Secret
+                Create
             </button>
         </div>
     </div>

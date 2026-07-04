@@ -124,5 +124,11 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
         icon: "/icons/ses.svg",
         tabs: {
         }
+    },
+    parameterstore: {
+        label: "Parameter Store",
+        icon: "/icons/parameterstore.svg",
+        tabs: {
+        }
     }
 };

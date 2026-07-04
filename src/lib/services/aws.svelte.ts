@@ -13,6 +13,7 @@ import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import { ElasticBeanstalkClient } from "@aws-sdk/client-elastic-beanstalk";
 import { CloudFormationClient } from "@aws-sdk/client-cloudformation";
 import { SESClient } from "@aws-sdk/client-ses";
+import { SSMClient } from "@aws-sdk/client-ssm";
 import { fetch } from "@tauri-apps/plugin-http";
 import type { AwsCreds } from "./aws-creds";
 
@@ -118,6 +119,7 @@ class AwsState {
     eb = $derived(this.#config ? new ElasticBeanstalkClient(this.#config) : null);
     cloudFormation = $derived(this.#config ? new CloudFormationClient(this.#config) : null);
     ses = $derived(this.#config ? new SESClient(this.#config) : null);
+    ssm = $derived(this.#config ? new SSMClient(this.#config) : null);
 
     #s3Clients = new Map<string, S3Client>();
     #cwClients = new Map<string, CloudWatchClient>();
