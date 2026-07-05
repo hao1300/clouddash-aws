@@ -90,4 +90,12 @@
     :global(.cm-activeLine) {
         background-color: #161b22 !important;
     }
+    /* Higher-contrast text selection to pair with the #0d1117 background */
+    :global(.cm-editor .cm-selectionBackground),
+    :global(.cm-editor.cm-focused .cm-selectionBackground) {
+        background-color: #2f5a94 !important;
+    }
+    :global(.cm-editor .cm-content ::selection) {
+        background-color: #2f5a94 !important;
+    }
 </style>

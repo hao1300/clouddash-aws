@@ -5,7 +5,8 @@
     import {
         GetSecretValueCommand,
         DescribeSecretCommand,
-        UpdateSecretCommand
+        UpdateSecretCommand,
+        DeleteSecretCommand
     } from "@aws-sdk/client-secrets-manager";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
@@ -13,6 +14,7 @@
     import { titleService } from "$lib/services/title.svelte";
     import JsonEditor from "$lib/components/JsonEditor.svelte";
     import InfoCard from "$lib/components/InfoCard.svelte";
+    import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
 
     let secretId = $derived($page.params.id || "");
 
@@ -29,6 +31,11 @@
     let valueLoading = $state(false);
     let saveLoading = $state(false);
     let actionMsg = $state("");
+
+    let showDeleteModal = $state(false);
+    let deleting = $state(false);
+
+    let secretName = $derived(secretDetails?.Name || secretId.split(":").pop() || secretId);
 
     let activeTab = $state<"json" | "key-value">("json");
 
@@ -131,6 +138,24 @@
             saveLoading = false;
         }
     }
+
+    async function handleDeleteSecret() {
+        if (!aws.secretsManager || !secretId) return;
+        try {
+            deleting = true;
+            error = "";
+            await aws.secretsManager.send(
+                new DeleteSecretCommand({ SecretId: secretId }),
+            );
+            showDeleteModal = false;
+            goto("/secretsmanager");
+        } catch (e: any) {
+            error = e.message || String(e);
+            showDeleteModal = false;
+        } finally {
+            deleting = false;
+        }
+    }
 </script>
 
 <div class="h-full flex flex-col bg-gray-950 overflow-hidden relative">
@@ -146,6 +171,14 @@
         </div>{/if}
 
     <div class="flex-1 overflow-auto p-2 space-y-2 flex flex-col min-h-0">
+        <div class="flex justify-end shrink-0">
+            <button
+                onclick={() => (showDeleteModal = true)}
+                class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1.5 rounded shadow-sm transition border border-red-800/50 font-bold uppercase tracking-widest"
+            >
+                Delete Secret
+            </button>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
             <InfoCard label="ARN" value={secretDetails?.ARN || secretId} />
             <InfoCard label="Description" value={secretDetails?.Description || "-"} />
@@ -246,4 +279,13 @@
             </div>
         </div>
     </div>
+
+    <DeleteConfirmModal
+        bind:show={showDeleteModal}
+        title="Delete Secret"
+        resourceName={secretName}
+        onConfirm={handleDeleteSecret}
+        loading={deleting}
+        {error}
+    />
 </div>

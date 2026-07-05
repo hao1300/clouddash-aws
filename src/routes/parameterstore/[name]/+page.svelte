@@ -6,12 +6,15 @@
         GetParameterCommand,
         DescribeParametersCommand,
         PutParameterCommand,
+        DeleteParameterCommand,
     } from "@aws-sdk/client-ssm";
     import { aws } from "$lib/services/aws.svelte";
     import { page } from "$app/stores";
+    import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
     import JsonEditor from "$lib/components/JsonEditor.svelte";
     import InfoCard from "$lib/components/InfoCard.svelte";
+    import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
 
     let paramName = $derived($page.params.name || "");
 
@@ -29,6 +32,8 @@
     let paramType = $state<string>("String");
     let valueLoading = $state(false);
     let saveLoading = $state(false);
+    let showDeleteModal = $state(false);
+    let deleting = $state(false);
 
     let isJson = $derived.by(() => {
         if (!paramValue) return false;
@@ -123,6 +128,24 @@
             saveLoading = false;
         }
     }
+
+    async function handleDeleteParameter() {
+        if (!aws.ssm || !paramName) return;
+        try {
+            deleting = true;
+            error = "";
+            await aws.ssm.send(
+                new DeleteParameterCommand({ Name: paramName }),
+            );
+            showDeleteModal = false;
+            goto("/parameterstore");
+        } catch (e: any) {
+            error = e.message || String(e);
+            showDeleteModal = false;
+        } finally {
+            deleting = false;
+        }
+    }
 </script>
 
 <div class="h-full flex flex-col bg-gray-950 overflow-hidden relative">
@@ -138,6 +161,14 @@
         </div>{/if}
 
     <div class="flex-1 overflow-auto p-2 space-y-2 flex flex-col min-h-0">
+        <div class="flex justify-end shrink-0">
+            <button
+                onclick={() => (showDeleteModal = true)}
+                class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1.5 rounded shadow-sm transition border border-red-800/50 font-bold uppercase tracking-widest"
+            >
+                Delete Parameter
+            </button>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
             <InfoCard label="Name" value={paramName} />
             <InfoCard label="Type" value={paramType} />
@@ -216,4 +247,13 @@
             </div>
         </div>
     </div>
+
+    <DeleteConfirmModal
+        bind:show={showDeleteModal}
+        title="Delete Parameter"
+        resourceName={paramName}
+        onConfirm={handleDeleteParameter}
+        loading={deleting}
+        {error}
+    />
 </div>
