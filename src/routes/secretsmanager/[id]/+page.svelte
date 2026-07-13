@@ -31,6 +31,7 @@
     let valueLoading = $state(false);
     let saveLoading = $state(false);
     let actionMsg = $state("");
+    let detailsExpanded = $state(false);
 
     let showDeleteModal = $state(false);
     let deleting = $state(false);
@@ -171,20 +172,82 @@
         </div>{/if}
 
     <div class="flex-1 overflow-auto p-2 space-y-2 flex flex-col min-h-0">
-        <div class="flex justify-end shrink-0">
+        <section
+            class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-sm shrink-0"
+        >
             <button
-                onclick={() => (showDeleteModal = true)}
-                class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1.5 rounded shadow-sm transition border border-red-800/50 font-bold uppercase tracking-widest"
+                type="button"
+                class="w-full px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-gray-800/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+                onclick={() => (detailsExpanded = !detailsExpanded)}
+                aria-expanded={detailsExpanded}
+                aria-controls="secret-details"
             >
-                Delete Secret
+                <span
+                    class="text-[10px] font-bold uppercase tracking-widest text-gray-300"
+                    >Secret details</span
+                >
+                <svg
+                    class="w-4 h-4 text-gray-500 transition-transform duration-200 {detailsExpanded
+                        ? 'rotate-180'
+                        : ''}"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 9l-7 7-7-7"
+                    />
+                </svg>
             </button>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
-            <InfoCard label="ARN" value={secretDetails?.ARN || secretId} />
-            <InfoCard label="Description" value={secretDetails?.Description || "-"} />
-            <InfoCard label="Created Date" value={secretDetails?.CreatedDate ? new Date(secretDetails.CreatedDate).toLocaleString() : "-"} />
-            <InfoCard label="Last Accessed Date (UTC)" value={secretDetails?.LastAccessedDate ? new Date(secretDetails.LastAccessedDate).toLocaleDateString(undefined, { timeZone: "UTC" }) : "-"} />
-        </div>
+
+            {#if detailsExpanded}
+                <div
+                    id="secret-details"
+                    class="border-t border-gray-800 p-3 space-y-3"
+                >
+                    <div class="flex justify-end">
+                        <button
+                            onclick={() => (showDeleteModal = true)}
+                            class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1.5 rounded shadow-sm transition border border-red-800/50 font-bold uppercase tracking-widest"
+                        >
+                            Delete Secret
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <InfoCard
+                            label="ARN"
+                            value={secretDetails?.ARN || secretId}
+                        />
+                        <InfoCard
+                            label="Description"
+                            value={secretDetails?.Description || "-"}
+                        />
+                        <InfoCard
+                            label="Created Date"
+                            value={secretDetails?.CreatedDate
+                                ? new Date(
+                                      secretDetails.CreatedDate,
+                                  ).toLocaleString()
+                                : "-"}
+                        />
+                        <InfoCard
+                            label="Last Accessed Date (UTC)"
+                            value={secretDetails?.LastAccessedDate
+                                ? new Date(
+                                      secretDetails.LastAccessedDate,
+                                  ).toLocaleDateString(undefined, {
+                                      timeZone: "UTC",
+                                  })
+                                : "-"}
+                        />
+                    </div>
+                </div>
+            {/if}
+        </section>
 
         <div
             class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-sm flex flex-col flex-1 min-h-[300px]"

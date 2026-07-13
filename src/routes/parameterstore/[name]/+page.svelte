@@ -32,6 +32,7 @@
     let paramType = $state<string>("String");
     let valueLoading = $state(false);
     let saveLoading = $state(false);
+    let detailsExpanded = $state(false);
     let showDeleteModal = $state(false);
     let deleting = $state(false);
 
@@ -161,35 +162,79 @@
         </div>{/if}
 
     <div class="flex-1 overflow-auto p-2 space-y-2 flex flex-col min-h-0">
-        <div class="flex justify-end shrink-0">
+        <section
+            class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-sm shrink-0"
+        >
             <button
-                onclick={() => (showDeleteModal = true)}
-                class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1.5 rounded shadow-sm transition border border-red-800/50 font-bold uppercase tracking-widest"
+                type="button"
+                class="w-full px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-gray-800/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+                onclick={() => (detailsExpanded = !detailsExpanded)}
+                aria-expanded={detailsExpanded}
+                aria-controls="parameter-details"
             >
-                Delete Parameter
+                <span
+                    class="text-[10px] font-bold uppercase tracking-widest text-gray-300"
+                    >Parameter details</span
+                >
+                <svg
+                    class="w-4 h-4 text-gray-500 transition-transform duration-200 {detailsExpanded
+                        ? 'rotate-180'
+                        : ''}"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 9l-7 7-7-7"
+                    />
+                </svg>
             </button>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
-            <InfoCard label="Name" value={paramName} />
-            <InfoCard label="Type" value={paramType} />
-            <InfoCard label="ARN" value={details?.ARN || "-"} />
-            <InfoCard
-                label="Version"
-                value={details?.Version != null ? String(details.Version) : "-"}
-            />
-            <InfoCard label="Tier" value={metadata?.Tier || "-"} />
-            <InfoCard
-                label="Last Modified"
-                value={details?.LastModifiedDate
-                    ? new Date(details.LastModifiedDate).toLocaleString()
-                    : "-"}
-            />
-            <InfoCard
-                label="Description"
-                value={metadata?.Description || "-"}
-                className="md:col-span-2"
-            />
-        </div>
+
+            {#if detailsExpanded}
+                <div
+                    id="parameter-details"
+                    class="border-t border-gray-800 p-3 space-y-3"
+                >
+                    <div class="flex justify-end">
+                        <button
+                            onclick={() => (showDeleteModal = true)}
+                            class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1.5 rounded shadow-sm transition border border-red-800/50 font-bold uppercase tracking-widest"
+                        >
+                            Delete Parameter
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <InfoCard label="Name" value={paramName} />
+                        <InfoCard label="Type" value={paramType} />
+                        <InfoCard label="ARN" value={details?.ARN || "-"} />
+                        <InfoCard
+                            label="Version"
+                            value={details?.Version != null
+                                ? String(details.Version)
+                                : "-"}
+                        />
+                        <InfoCard label="Tier" value={metadata?.Tier || "-"} />
+                        <InfoCard
+                            label="Last Modified"
+                            value={details?.LastModifiedDate
+                                ? new Date(
+                                      details.LastModifiedDate,
+                                  ).toLocaleString()
+                                : "-"}
+                        />
+                        <InfoCard
+                            label="Description"
+                            value={metadata?.Description || "-"}
+                            className="md:col-span-2"
+                        />
+                    </div>
+                </div>
+            {/if}
+        </section>
 
         <div
             class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-sm flex flex-col flex-1 min-h-[300px]"
