@@ -96,7 +96,7 @@
     }
 
     $effect(() => {
-        if (viewingMessage) showModal = true;
+        showModal = viewingMessage !== null;
     });
 
     $effect(() => {

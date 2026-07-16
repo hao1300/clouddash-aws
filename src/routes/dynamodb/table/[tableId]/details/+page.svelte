@@ -44,7 +44,7 @@
     let deleteIndexLoading = $state(false);
 
     $effect(() => {
-        if (indexToDelete) showDeleteModal = true;
+        showDeleteModal = indexToDelete !== null;
     });
 
     $effect(() => {

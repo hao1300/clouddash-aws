@@ -41,7 +41,7 @@
     let deleteTableLoading = $state(false);
 
     $effect(() => {
-        if (tableToDelete) showDeleteModal = true;
+        showDeleteModal = tableToDelete !== null;
     });
 
     $effect(() => {

@@ -42,7 +42,7 @@
     let deleteLoading = $state(false);
 
     $effect(() => {
-        if (queueToDelete) showDeleteModal = true;
+        showDeleteModal = queueToDelete !== null;
     });
 
     $effect(() => {

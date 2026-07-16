@@ -65,7 +65,7 @@
     let showViewModal = $state(false);
 
     $effect(() => {
-        if (itemToDelete) showDeleteModal = true;
+        showDeleteModal = itemToDelete !== null;
     });
 
     $effect(() => {
@@ -73,7 +73,7 @@
     });
 
     $effect(() => {
-        if (viewingItem) showViewModal = true;
+        showViewModal = viewingItem !== null;
     });
 
     $effect(() => {
