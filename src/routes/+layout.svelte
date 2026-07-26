@@ -188,13 +188,13 @@
       navigationHistory.pop();
     } else if (navigationHistory.isBackNavigation) {
       navigationHistory.isBackNavigation = false;
-    } else if (from && from.url.pathname !== window.location.pathname) {
+    } else if (from?.url && from.url.pathname !== window.location.pathname) {
       if (from.url.pathname !== "/") {
         navigationHistory.push(from.url.pathname + from.url.search);
       }
     }
 
-    if (to && to.url.pathname !== "/") {
+    if (to?.url && to.url.pathname !== "/") {
       navigationHistory.setLastUrl(to.url.pathname + to.url.search);
     }
   });
