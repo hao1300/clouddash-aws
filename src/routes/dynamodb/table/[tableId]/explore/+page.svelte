@@ -581,7 +581,7 @@
                             bind:value={queryIndex}
                             options={[
                                 { value: "", label: `Table - ${tableName}` },
-                                ...(tableSchema?.GlobalSecondaryIndexes || []).map(idx => ({
+                                ...(tableSchema?.GlobalSecondaryIndexes || []).map((idx: any) => ({
                                     value: idx.IndexName,
                                     label: `Index - ${idx.IndexName}`
                                 }))

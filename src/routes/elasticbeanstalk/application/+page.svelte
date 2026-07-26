@@ -63,7 +63,7 @@
             {
                 label: "Application Name",
                 key: "ApplicationName",
-                onClick: (item) => goto(`/elasticbeanstalk/application/${encodeURIComponent(item.ApplicationName)}`),
+                onClick: (item) => goto(`/elasticbeanstalk/application/${encodeURIComponent(item.ApplicationName ?? "")}`),
             },
             { label: "Description", key: "Description" },
             {

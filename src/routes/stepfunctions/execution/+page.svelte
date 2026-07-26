@@ -332,9 +332,8 @@
     }
 
     function getEventResource(event: HistoryEvent) {
-        let arn = event.lambdaFunctionScheduledEventDetails?.resource || 
-                    event.taskScheduledEventDetails?.resource ||
-                    event.stateMachineScheduledEventDetails?.stateMachineArn;
+        let arn = event.lambdaFunctionScheduledEventDetails?.resource ||
+                    event.taskScheduledEventDetails?.resource;
         
         if (!arn) return null;
 

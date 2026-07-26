@@ -134,7 +134,7 @@
                             key: "EnvironmentName",
                             onClick: (item) =>
                                 goto(
-                                    `/elasticbeanstalk/environment/${encodeURIComponent(item.EnvironmentId || item.EnvironmentName)}`,
+                                    `/elasticbeanstalk/environment/${encodeURIComponent(item.EnvironmentId || item.EnvironmentName || "")}`,
                                 ),
                         },
                         {

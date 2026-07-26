@@ -4,6 +4,7 @@
     import { mdiChevronDown } from "@mdi/js";
 
     let {
+        id = undefined,
         value = $bindable(),
         options = [], // string[] or { value: string, label: string, color?: string }[]
         class: className = "",
@@ -14,6 +15,7 @@
         primary = false,
         searchable = false,
     }: {
+        id?: string;
         value: any;
         options: (string | { value: any; label: string; color?: string; fontMono?: boolean })[];
         class?: string;
@@ -84,6 +86,7 @@
 
 <div class="relative inline-block w-full {className}" bind:this={container}>
     <button
+        {id}
         type="button"
         onclick={toggle}
         class="w-full flex items-center justify-between gap-2 bg-gray-800 rounded border border-gray-700 hover:border-gray-600 transition-all text-left {small ? 'p-1.5 text-[10px]' : 'p-2 text-sm'} {mono || selectedOption?.fontMono ? 'font-mono' : ''}"

@@ -120,7 +120,6 @@
         if (_cameraActive) {
             listen("tauri://back-button", () => {
                 _cameraActive = false;
-                cancel().catch(console.error);
             }).then((u) => (unlisten = u));
         }
         return () => {

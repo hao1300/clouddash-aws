@@ -15,7 +15,6 @@
     import hljs from 'highlight.js';
     import 'highlight.js/styles/github-dark.css';
     import { invoke } from "@tauri-apps/api/core";
-    import { openUrl } from "@tauri-apps/plugin-opener";
     import { settings } from "$lib/services/settings.svelte";
     import { toastService } from "$lib/services/toast.svelte";
     import { writeFile, exists } from "tauri-plugin-scoped-storage-api";
@@ -148,7 +147,11 @@
 
     async function handleDownload() {
         try {
-            const fileName = key.split("/").pop() || "download";
+            // Split on both separators and strip traversal: S3 keys are
+            // attacker-controlled and a backslash survives a "/"-only split,
+            // which escapes the download folder on Windows.
+            const fileName =
+                key.split(/[\\/]/).pop()?.replace(/^\.+/, "") || "download";
             const s3Client = await aws.getS3ClientForBucket(bucket);
             if (!s3Client) throw new Error("Could not initialize S3 client");
 

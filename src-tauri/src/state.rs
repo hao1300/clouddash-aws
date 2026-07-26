@@ -2,9 +2,13 @@ use aws_config::meta::region::RegionProviderChain;
 use aws_config::Region;
 use serde::Deserialize;
 use std::sync::Arc;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
+// `Manager` is only needed for the mobile app_data_dir/document_dir lookups.
+#[cfg(any(target_os = "android", target_os = "ios"))]
+use tauri::Manager;
 use tokio::sync::RwLock;
 
+#[cfg_attr(not(any(target_os = "android", target_os = "ios")), allow(unused_variables))]
 fn get_aws_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
@@ -23,6 +27,7 @@ fn get_aws_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, Stri
 }
 
 #[tauri::command]
+#[cfg_attr(not(any(target_os = "android", target_os = "ios")), allow(unused_variables))]
 pub fn get_default_download_directory(app_handle: tauri::AppHandle) -> Result<String, String> {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
@@ -234,10 +239,49 @@ pub fn save_profile(
     use std::fs::OpenOptions;
     use std::io::Write;
 
+    // These files are shared with the AWS CLI/SDKs, and `properties` can come
+    // straight from a scanned QR code, so nothing here is trusted. A value
+    // containing a newline could inject arbitrary extra profile sections, and
+    // `credential_process`/`credential_source` are *executed* by every AWS SDK
+    // when the profile is resolved — neither is ever written by this app.
+    const ALLOWED_KEYS: [&str; 8] = [
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "aws_session_token",
+        "region",
+        "output",
+        "role_arn",
+        "source_profile",
+        "mfa_serial",
+    ];
+
+    if name.is_empty() || name.contains(['\n', '\r', '[', ']']) {
+        return Err("Invalid profile name".into());
+    }
+    for (k, v) in properties.iter() {
+        if k == "profile" {
+            continue;
+        }
+        if !ALLOWED_KEYS.contains(&k.as_str()) {
+            return Err(format!("Unsupported profile key: {}", k));
+        }
+        if v.contains(['\n', '\r']) {
+            return Err(format!("Invalid value for {}", k));
+        }
+    }
+
     let aws_dir = get_aws_dir(&app_handle)?;
 
     if !aws_dir.exists() {
         std::fs::create_dir_all(&aws_dir).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(
+                &aws_dir,
+                std::fs::Permissions::from_mode(0o700),
+            );
+        }
     }
 
     let cred_path = aws_dir.join("credentials");
@@ -265,11 +309,7 @@ pub fn save_profile(
     let mut has_cfg = false;
 
     let is_cred_key = |k: &str| {
-        k == "aws_access_key_id"
-            || k == "aws_secret_access_key"
-            || k == "aws_session_token"
-            || k == "credential_process"
-            || k == "credential_source"
+        k == "aws_access_key_id" || k == "aws_secret_access_key" || k == "aws_session_token"
     };
 
     for (k, v) in properties.iter() {
@@ -289,11 +329,16 @@ pub fn save_profile(
     }
 
     if has_cred {
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&cred_path)
-            .map_err(|e| e.to_string())?;
+        // Long-lived secret keys land here; match the AWS CLI's 0600 rather than
+        // inheriting the default 0666 & ~umask (typically 0644).
+        let mut opts = OpenOptions::new();
+        opts.create(true).append(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        let mut file = opts.open(&cred_path).map_err(|e| e.to_string())?;
         file.write_all(cred_buf.as_bytes())
             .map_err(|e| e.to_string())?;
     }
@@ -424,7 +469,16 @@ pub fn get_os() -> String {
 #[tauri::command]
 pub async fn save_file(path: String, data: Vec<u8>) -> Result<(), String> {
     use std::io::Write;
-    let mut file = std::fs::File::create(path).map_err(|e| e.to_string())?;
+    // Defence in depth: the caller builds this path from an S3 object key, which
+    // is attacker-controlled. Refuse traversal components outright so a crafted
+    // key cannot escape the chosen download directory.
+    let p = std::path::Path::new(&path);
+    if p.components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err("Refusing to write to a path containing '..'".into());
+    }
+    let mut file = std::fs::File::create(p).map_err(|e| e.to_string())?;
     file.write_all(&data).map_err(|e| e.to_string())?;
     Ok(())
 }

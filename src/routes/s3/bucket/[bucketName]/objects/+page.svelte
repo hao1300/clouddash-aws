@@ -212,7 +212,11 @@
 
     async function handleDownload(key: string) {
         try {
-            const fileName = key.split("/").pop() || "download";
+            // Split on both separators and strip traversal: S3 keys are
+            // attacker-controlled and a backslash survives a "/"-only split,
+            // which escapes the download folder on Windows.
+            const fileName =
+                key.split(/[\\/]/).pop()?.replace(/^\.+/, "") || "download";
             const s3Client = await aws.getS3ClientForBucket(bucket);
             if (!s3Client) throw new Error("Could not initialize S3 client");
 

@@ -13,6 +13,17 @@ vite.config.ts.timestamp-*
 .claude/
 .idea/
 .vscode/
-/.idea/
 release-dist/
 *.aab
+*.apk
+dist/
+coverage/
+
+# Build/tool output that has been committed by accident before
+*.log
+
+# Signing material — must never be committed
+*.jks
+*.keystore
+*.p12
+*.pem

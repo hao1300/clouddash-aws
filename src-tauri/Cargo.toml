@@ -33,7 +33,6 @@ dirs = "5.0"
 # Credential resolution + S3 proxy (S3 doesn't support browser CORS)
 aws-config = { version = "1.1", default-features = false, features = ["rustls", "rt-tokio", "behavior-version-latest", "sso"] }
 aws-credential-types = { version = "1.2", default-features = false, features = ["hardcoded-credentials"] }
-base64 = "0.22.1"
 
 [profile.release]
 opt-level = "s"       # Optimize for binary size

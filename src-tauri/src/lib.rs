@@ -1,6 +1,8 @@
 mod state;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
+// Only used by the Android JNI callback below.
+#[cfg(target_os = "android")]
 use tauri::Emitter;
 
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();

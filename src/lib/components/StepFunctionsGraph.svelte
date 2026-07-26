@@ -73,7 +73,6 @@
         {nodeTypes}
         fitView
         onnodeclick={handleNodeClick}
-        on:nodeclick={(e) => handleNodeClick(e.detail)}
         proOptions={{ hideAttribution: true }}
         colorMode="dark"
         minZoom={0.1}

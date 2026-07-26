@@ -55,7 +55,13 @@
             const formatted = JSON.stringify(parsedValue, null, 2);
             return highlightJson(formatted);
         }
-        return secretValue;
+        // Non-JSON secrets bypass the highlighter (which escapes for us), so this
+        // branch must escape before it reaches {@html} — a secret value is
+        // attacker-controlled by anyone holding secretsmanager:PutSecretValue.
+        return secretValue
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
     });
 
     $effect(() => {

@@ -15,7 +15,7 @@
     import Icon from "$lib/components/Icon.svelte";
     import { mdiRefresh } from "@mdi/js";
 
-    let topicName = $derived($page.params.topicName);
+    let topicName = $derived($page.params.topicName || "");
     let arn = $derived($page.url.searchParams.get("arn") || "");
 
     let attributes = $state<Record<string, string>>({});

@@ -27,7 +27,10 @@
     let error = $state("");
     
     let allPolicies = $state<Policy[]>([]);
-    let loaded = $state(false);
+    // Deliberately not $state: the effect below reads it, so making it reactive
+    // means loadPolicies()'s write re-runs the effect and clears what the user
+    // has typed while the policy list was still loading.
+    let loaded = false;
 
     $effect(() => {
         if (show) {
@@ -64,7 +67,10 @@
     }
 
     function handleInput() {
-        selectedArn = searchText; // If they manually type an ARN
+        // Only treat typed text as an ARN if it looks like one — otherwise
+        // touching the box after picking from the dropdown would replace the
+        // real ARN with the policy's display name.
+        selectedArn = searchText.startsWith("arn:") ? searchText : "";
     }
 
     async function attach() {

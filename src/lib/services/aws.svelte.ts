@@ -85,6 +85,12 @@ class AwsState {
 
     setCredentials(creds: AwsCreds | null) {
         this.#creds = creds;
+        // The $derived clients rebuild automatically, but these manual caches are
+        // keyed by region alone — without clearing them a profile switch keeps
+        // signing requests with the previous account's credentials.
+        this.#s3Clients.clear();
+        this.#cwClients.clear();
+        this.#bucketRegions.clear();
     }
 
     getCredentials(): AwsCreds | null {

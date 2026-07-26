@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { Handle, Position, type NodeProps } from '@xyflow/svelte';
+    import { Handle, Position, type Node, type NodeProps } from '@xyflow/svelte';
     import type { NodeData } from '../utils/aslParser';
 
-    let { data, isConnectable }: NodeProps<NodeData> = $props();
+    let { data, isConnectable }: NodeProps<Node<NodeData>> = $props();
     
     let statusClass = $derived.by(() => {
         switch (data.status) {

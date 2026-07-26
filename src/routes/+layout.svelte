@@ -294,7 +294,18 @@
   function loadState() {
     try {
       const r = localStorage.getItem(STORAGE_KEY);
-      return r ? JSON.parse(r) : null;
+      if (!r) return null;
+      const saved = JSON.parse(r);
+      // Older builds persisted raw AWS keys here. Scrub them on first read so
+      // upgrading actually removes the secrets from disk rather than just
+      // ceasing to add new ones.
+      if (saved?.accessKeyId || saved?.secretAccessKey || saved?.sessionToken) {
+        delete saved.accessKeyId;
+        delete saved.secretAccessKey;
+        delete saved.sessionToken;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      }
+      return saved;
     } catch {
       return null;
     }
@@ -316,9 +327,9 @@
         accountId,
         roleName,
         sourceProfile,
-        accessKeyId,
-        secretAccessKey,
-        sessionToken,
+        // Deliberately NOT persisted: accessKeyId / secretAccessKey / sessionToken.
+        // localStorage is an unencrypted WebView file outside ~/.aws that backup
+        // and sync tooling picks up. Use "save profile" to persist credentials.
         saveProfileChecked,
         saveProfileName,
         sideMenuOpen,
@@ -358,11 +369,19 @@
       });
     }
 
-    const initialState = await invoke<{
+    // Guarded like get_os above: an unhandled rejection here aborts the rest of
+    // onMount, which silently skips saved-state restore, profile loading and
+    // auto-login, leaving the app stuck on an empty login screen.
+    let initialState: {
       path: string | null;
       region: string | null;
       profile: string | null;
-    }>("get_initial_state");
+    } = { path: null, region: null, profile: null };
+    try {
+      initialState = await invoke("get_initial_state");
+    } catch (e) {
+      console.error("Failed to get initial state", e);
+    }
 
     const saved = loadState();
 
@@ -427,9 +446,6 @@
       authType = "profile";
     }
 
-    if (saved?.accessKeyId) accessKeyId = saved.accessKeyId;
-    if (saved?.secretAccessKey) secretAccessKey = saved.secretAccessKey;
-    if (saved?.sessionToken) sessionToken = saved.sessionToken;
     if (saved?.accountId) accountId = saved.accountId;
     if (saved?.roleName) roleName = saved.roleName;
     if (saved?.sourceProfile) sourceProfile = saved.sourceProfile;

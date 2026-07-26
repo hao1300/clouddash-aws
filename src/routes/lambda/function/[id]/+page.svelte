@@ -179,7 +179,7 @@
                         Period: period,
                         Statistics: [stat],
                     }),
-                ) as any;
+                );
 
                 return (resp.Datapoints || []).map((dp) => ({
                     rawTimestamp: dp.Timestamp!,

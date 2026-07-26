@@ -82,12 +82,17 @@ export function parseHistoryEvents(events: HistoryEvent[]) {
                 const details = 
                     event.taskFailedEventDetails || 
                     event.taskTimedOutEventDetails || 
-                    event.lambdaFunctionFailedEventDetails || 
-                    event.lambdaFunctionTimedOutEventDetails || 
-                    event.parallelStateFailedEventDetails ||
+                    event.taskStartFailedEventDetails ||
+                    event.taskSubmitFailedEventDetails ||
+                    event.lambdaFunctionFailedEventDetails ||
+                    event.lambdaFunctionTimedOutEventDetails ||
+                    event.lambdaFunctionStartFailedEventDetails ||
+                    event.lambdaFunctionScheduleFailedEventDetails ||
                     event.activityFailedEventDetails ||
                     event.activityTimedOutEventDetails ||
-                    event.mapStateFailedEventDetails;
+                    event.activityScheduleFailedEventDetails ||
+                    event.mapRunFailedEventDetails ||
+                    event.evaluationFailedEventDetails;
                 
                 if (details) {
                     stateDetails[stateName].error = details;
@@ -99,9 +104,21 @@ export function parseHistoryEvents(events: HistoryEvent[]) {
         if (event.lambdaFunctionScheduledEventDetails) {
             stateDetails[stateName].resource = event.lambdaFunctionScheduledEventDetails.resource;
         } else if (event.taskScheduledEventDetails) {
-            stateDetails[stateName].resource = event.taskScheduledEventDetails.resource;
-        } else if (event.stateMachineScheduledEventDetails) {
-            stateDetails[stateName].resource = event.stateMachineScheduledEventDetails.stateMachineArn;
+            // A nested state machine arrives as a TaskScheduled event; the target ARN
+            // is only available inside the JSON parameters payload.
+            const scheduled = event.taskScheduledEventDetails;
+            let resource = scheduled.resource;
+            if (scheduled.resourceType === "states" && scheduled.parameters) {
+                try {
+                    const params = JSON.parse(scheduled.parameters);
+                    if (typeof params.StateMachineArn === "string") {
+                        resource = params.StateMachineArn;
+                    }
+                } catch {
+                    // Malformed parameters — fall back to the integration resource.
+                }
+            }
+            stateDetails[stateName].resource = resource;
         }
     }
 

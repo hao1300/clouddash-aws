@@ -244,9 +244,9 @@
             try {
                 const folder = await pickFolder();
                 if (folder) {
-                    settings.downloadFolder = folder.uri;
+                    settings.downloadFolder = folder.uri ?? "";
                     settings.downloadFolderId = folder.id;
-                    settings.downloadFolderName = folder.name;
+                    settings.downloadFolderName = folder.name ?? "";
                     settings.save();
                     onChange();
                 }

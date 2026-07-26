@@ -78,7 +78,7 @@ class TitleService {
      */
     setResource(name: string, href?: string, path?: string) {
         this.resources = [{
-            name: decodeURIComponent(name),
+            name,
             href,
             path: path || this.currentPath
         }];
@@ -89,7 +89,7 @@ class TitleService {
      */
     setResources(resources: { name: string, href?: string, path?: string }[]) {
         this.resources = resources.map(res => ({
-            name: decodeURIComponent(res.name),
+            name: res.name,
             href: res.href,
             path: res.path || this.currentPath
         }));
@@ -101,7 +101,7 @@ class TitleService {
     addResource(name: string, href?: string, path?: string) {
         untrack(() => {
             this.resources = [...this.resources, {
-                name: decodeURIComponent(name),
+                name,
                 href,
                 path: path || this.currentPath
             }];

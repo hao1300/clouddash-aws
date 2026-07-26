@@ -120,7 +120,12 @@
         if (b === 0) return "0 B";
         const k = 1024;
         const s = ["B", "KB", "MB", "GB", "TB"];
-        const i = Math.floor(Math.log(b) / Math.log(k));
+        // Clamp: this is also used as a Chart.js axis-tick formatter, which
+        // passes fractional values (0 < b < 1) that would give i = -1.
+        const i = Math.max(
+            0,
+            Math.min(s.length - 1, Math.floor(Math.log(b) / Math.log(k))),
+        );
         return parseFloat((b / Math.pow(k, i)).toFixed(1)) + " " + s[i];
     }
 </script>
