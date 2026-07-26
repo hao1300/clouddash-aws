@@ -17,7 +17,9 @@
     "tauri-ios-dev": "tauri ios dev --config src-tauri/tauri.dev.conf.json",
     "tauri-ios-build": "tauri ios build",
     "release:stage": "node scripts/stage-release-artifacts.js",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@aws-sdk/client-cloudformation": "^3.1000.0",
@@ -68,15 +70,18 @@
     "@sveltejs/kit": "^2.9.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@tauri-apps/cli": "^2",
+    "@testing-library/svelte": "^5.4.2",
     "@types/dagre": "^0.7.54",
     "@types/qrcode": "^1.5.5",
     "autoprefixer": "^10.4.27",
+    "jsdom": "^29.1.1",
     "postcss": "^8.5.6",
     "sharp": "^0.34.5",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.6.2",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }
