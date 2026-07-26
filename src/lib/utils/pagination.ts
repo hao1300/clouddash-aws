@@ -15,6 +15,11 @@ export function formatBytes(bytes: number) {
     if (bytes === 0) return "0 B";
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    // Clamp both ends: fractional values (0 < bytes < 1) give i = -1, which
+    // indexes off the front of `sizes` and renders "204.8 undefined".
+    const i = Math.max(
+        0,
+        Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k))),
+    );
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }

