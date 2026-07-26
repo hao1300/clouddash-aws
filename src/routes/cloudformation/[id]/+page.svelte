@@ -1,110 +1,22 @@
 <script lang="ts">
-    import {
-        DescribeStackResourcesCommand,
-        DescribeStacksCommand,
-        type StackResource,
-    } from "@aws-sdk/client-cloudformation";
-    import PaginatedTable from "$lib/components/PaginatedTable.svelte";
-    import { aws } from "$lib/services/aws.svelte";
-    import { page } from "$app/stores";
     import { goto } from "$app/navigation";
-    import { titleService } from "$lib/services/title.svelte";
-    import InfoCard from "$lib/components/InfoCard.svelte";
+    import { page } from "$app/stores";
 
-    let stackId = $derived($page.params.id || "");
-
+    // Stack details moved into the master/detail view on /cloudformation. Keep this
+    // route as a redirect so existing links and bookmarks still resolve.
     $effect(() => {
-        const name = stack?.StackName || stackId.split("/")[1] || stackId;
-        titleService.setResource(name, undefined, $page.url.pathname);
+        const id = $page.params.id;
+        goto(
+            id
+                ? `/cloudformation?stack=${encodeURIComponent(id)}`
+                : "/cloudformation",
+            { replaceState: true },
+        );
     });
-
-    let resources = $state<StackResource[]>([]);
-    let stack = $state<any>(null);
-    let loading = $state(false);
-    let error = $state("");
-
-    $effect(() => {
-        if (aws.cloudFormation && stackId) {
-            loadStackDetails();
-        }
-    });
-
-    async function loadStackDetails() {
-        if (!aws.cloudFormation || !stackId) return;
-        try {
-            loading = true;
-            error = "";
-            const [resDetails, resResources] = await Promise.all([
-                aws.cloudFormation.send(
-                    new DescribeStacksCommand({ StackName: stackId }),
-                ),
-                aws.cloudFormation.send(
-                    new DescribeStackResourcesCommand({ StackName: stackId }),
-                ),
-            ]);
-            stack = resDetails.Stacks?.[0];
-            resources = resResources.StackResources || [];
-        } catch (e: any) {
-            error = e.message || String(e);
-        } finally {
-            loading = false;
-        }
-    }
 </script>
 
-<div class="h-full flex flex-col bg-gray-950 overflow-auto p-2 relative">
-    {#if error}<div
-            class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
-        >
-            {error}
-        </div>{/if}
-
-    {#if !stackId}
-        <div
-            class="p-8 text-gray-500 italic text-xs uppercase tracking-widest bg-gray-900/20 border border-gray-800 rounded-lg text-center"
-        >
-            No Stack Selected
-        </div>
-    {:else if loading}
-        <div
-            class="flex-1 flex items-center justify-center text-blue-400 animate-pulse text-xs font-bold uppercase tracking-widest"
-        >
-            Loading Stack Details...
-        </div>
-    {:else if stack}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <InfoCard label="Stack ID" value={stack.StackId} />
-            <InfoCard label="Status" value={stack.StackStatus} />
-            <InfoCard label="Created" value={stack.CreationTime?.toLocaleString()} />
-            <InfoCard label="Description" value={stack.Description || "-"} />
-        </div>
-
-        <div class="flex-1 min-h-0 flex flex-col">
-            <h3
-                class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 border-b border-gray-800 pb-2"
-            >
-                Resources
-            </h3>
-            <div
-                class="flex-1 min-h-0 border border-gray-800 rounded-xl overflow-hidden"
-            >
-                <PaginatedTable
-                    items={resources}
-                    loading={false}
-                    columns={[
-                        { label: "Logical ID", key: "LogicalResourceId" },
-                        { label: "Physical ID", key: "PhysicalResourceId" },
-                        { label: "Type", key: "ResourceType" },
-                        { label: "Status", key: "ResourceStatus" },
-                        {
-                            label: "Last Updated",
-                            key: "LastUpdatedTimestamp",
-                            format: (v) =>
-                                v ? new Date(v).toLocaleString() : "-",
-                        },
-                    ]}
-                />
-            </div>
-        </div>
-    {/if}
+<div
+    class="h-full flex items-center justify-center text-gray-500 text-xs uppercase tracking-widest"
+>
+    Redirecting...
 </div>
