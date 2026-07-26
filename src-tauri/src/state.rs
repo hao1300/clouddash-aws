@@ -551,8 +551,8 @@ mod tests {
     #[test]
     fn accepts_a_normal_profile() {
         let p = props(&[
-            ("aws_access_key_id", "AKIAIOSFODNN7EXAMPLE"),
-            ("aws_secret_access_key", "secret"),
+            ("aws_access_key_id", "EXAMPLE-NOT-A-REAL-KEY"),
+            ("aws_secret_access_key", "EXAMPLE-NOT-A-REAL-SECRET"),
             ("region", "us-east-1"),
         ]);
         assert!(validate_profile_input("work", &p).is_ok());
@@ -591,7 +591,7 @@ mod tests {
     #[test]
     fn rejects_newlines_in_values() {
         for injected in [
-            "us-east-1\n[profile admin]\naws_access_key_id = AKIA",
+            "us-east-1\n[profile admin]\naws_access_key_id = EXAMPLE",
             "us-east-1\r\nfoo = bar",
         ] {
             let p = props(&[("region", injected)]);
