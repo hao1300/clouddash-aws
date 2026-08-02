@@ -21,6 +21,7 @@
     import JsonEditor from "$lib/components/JsonEditor.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiRefresh, mdiClose, mdiFormatListText, mdiPlay } from "@mdi/js";
+    import { getStateMachineDetailsHref } from "$lib/utils/sfnStateMachine";
 
     let execArn = $derived($page.url.searchParams.get("id") || "");
 
@@ -182,7 +183,7 @@
                 } catch (e) { /* ignore */ }
             }
         } else if (type === "StepFunctions") {
-            href = `/stepfunctions/details?id=${encodeURIComponent(arn)}`;
+            href = getStateMachineDetailsHref(arn);
         } else if (type === "SQS") {
             href = `/sqs/queue?url=${encodeURIComponent(arn)}`;
         } else if (type === "SNS") {
@@ -225,7 +226,7 @@
         }
 
         const machineHref = details?.stateMachineArn
-            ? `/stepfunctions/details?id=${details.stateMachineArn}`
+            ? getStateMachineDetailsHref(details.stateMachineArn)
             : undefined;
 
         titleService.setResources([
@@ -325,7 +326,7 @@
 
     function handleBack() {
         if (details?.stateMachineArn) {
-            goto(`/stepfunctions/details?id=${details.stateMachineArn}`);
+            goto(getStateMachineDetailsHref(details.stateMachineArn));
         } else {
             goto("/stepfunctions");
         }
@@ -356,7 +357,7 @@
         }
         if (arn.includes(":states:")) {
             const name = arn.split(":").pop() || "";
-            return { label: name, href: `/stepfunctions/details?id=${encodeURIComponent(arn)}` };
+            return { label: name, href: getStateMachineDetailsHref(arn) };
         }
         if (arn.includes(":sqs:")) {
             return { label: arn.split("/").pop() || "Queue", href: `/sqs/queue?url=${encodeURIComponent(arn)}` };

@@ -5,9 +5,11 @@
 
     import {
         DescribeStateMachineCommand,
+        ListStateMachinesCommand,
         ListExecutionsCommand,
         StartExecutionCommand,
         DeleteStateMachineCommand,
+        type SFNClient,
         type ExecutionListItem,
     } from "@aws-sdk/client-sfn";
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
@@ -17,19 +19,32 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
+    import {
+        getStateMachineName,
+        resolveStateMachineArnByName,
+    } from "$lib/utils/sfnStateMachine";
 
-    let smArn = $derived($page.url.searchParams.get("id") || "");
-
-    $effect(() => {
-        const name = smDetails?.name || smArn.split(":").pop() || smArn;
-        titleService.setResource(name, undefined, $page.url.pathname);
-    });
+    let requestedStateMachine = $derived(
+        $page.url.searchParams.get("name") ||
+            $page.url.searchParams.get("id") ||
+            "",
+    );
+    let stateMachineName = $derived(
+        getStateMachineName(requestedStateMachine),
+    );
 
     let loading = $state(false);
     let error = $state("");
     let actionMsg = $state("");
     let smDetails = $state<any>(null);
+    let smArn = $state("");
     let detailTab = $state<"executions" | "start" | "definition">("executions");
+    let stateMachineLoadGeneration = 0;
+
+    $effect(() => {
+        const name = smDetails?.name || stateMachineName;
+        titleService.setResource(name, undefined, $page.url.pathname);
+    });
 
     // Executions List
     let executions = $state<ExecutionListItem[]>([]);
@@ -41,42 +56,106 @@
     let startName = $state("");
 
     $effect(() => {
-        if (aws.sfn && smArn) {
-            loadDetails();
-            loadExecutions();
+        const client = aws.sfn;
+        const name = stateMachineName;
+        if (client && name) {
+            refreshStateMachine(client, name);
         }
     });
 
-    async function loadDetails() {
-        if (!aws.sfn || !smArn) return;
+    async function refreshStateMachine(client: SFNClient, name: string) {
+        const generation = ++stateMachineLoadGeneration;
+        loading = true;
+        error = "";
+        actionMsg = "";
+        smArn = "";
+        smDetails = null;
+        executions = [];
+        execMarker = undefined;
+        execHistory = [];
+
         try {
-            const res = await aws.sfn.send(
-                new DescribeStateMachineCommand({ stateMachineArn: smArn }),
+            const resolvedArn = await resolveStateMachineArnByName(
+                name,
+                async (nextToken) =>
+                    client.send(
+                        new ListStateMachinesCommand({
+                            maxResults: 1000,
+                            nextToken,
+                        }),
+                    ),
             );
-            smDetails = res;
+
+            if (generation !== stateMachineLoadGeneration) return;
+
+            const [detailsResponse, executionsResponse] = await Promise.all([
+                client.send(
+                    new DescribeStateMachineCommand({
+                        stateMachineArn: resolvedArn,
+                    }),
+                ),
+                client.send(
+                    new ListExecutionsCommand({
+                        stateMachineArn: resolvedArn,
+                        maxResults: 50,
+                    }),
+                ),
+            ]);
+
+            if (generation !== stateMachineLoadGeneration) return;
+
+            smArn = resolvedArn;
+            smDetails = detailsResponse;
+            executions = executionsResponse.executions || [];
+            execMarker = executionsResponse.nextToken;
         } catch (e: any) {
+            if (generation !== stateMachineLoadGeneration) return;
             error = e.message || String(e);
+        } finally {
+            if (generation === stateMachineLoadGeneration) {
+                loading = false;
+            }
         }
     }
 
     async function loadExecutions(token?: string) {
-        if (!aws.sfn || !smArn) return;
+        const client = aws.sfn;
+        const stateMachineArn = smArn;
+        const generation = stateMachineLoadGeneration;
+        if (!client || !stateMachineArn) return;
+
         try {
             loading = true;
-            const res = await aws.sfn.send(
+            error = "";
+            const res = await client.send(
                 new ListExecutionsCommand({
-                    stateMachineArn: smArn,
+                    stateMachineArn,
                     maxResults: 50,
                     nextToken: token,
                 }),
             );
+
+            if (
+                generation !== stateMachineLoadGeneration ||
+                stateMachineArn !== smArn
+            ) {
+                return;
+            }
+
             executions = res.executions || [];
             if (token) execHistory.push(token);
             execMarker = res.nextToken;
         } catch (e: any) {
-            error = e.message || String(e);
+            if (generation === stateMachineLoadGeneration) {
+                error = e.message || String(e);
+            }
         } finally {
-            loading = false;
+            if (
+                generation === stateMachineLoadGeneration &&
+                stateMachineArn === smArn
+            ) {
+                loading = false;
+            }
         }
     }
 

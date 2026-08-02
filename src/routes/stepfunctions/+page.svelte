@@ -10,6 +10,7 @@
     import PaginatedTable from "$lib/components/PaginatedTable.svelte";
     import { aws } from "$lib/services/aws.svelte";
     import { goto } from "$app/navigation";
+    import { getStateMachineDetailsHref } from "$lib/utils/sfnStateMachine";
 
     let stateMachines = $state<StateMachineListItem[]>([]);
     let loading = $state(false);
@@ -47,7 +48,8 @@
     }
 
     function handleSelectSM(sm: StateMachineListItem) {
-        goto(`/stepfunctions/details?id=${sm.stateMachineArn}`);
+        const identifier = sm.name || sm.stateMachineArn;
+        if (identifier) goto(getStateMachineDetailsHref(identifier));
     }
 </script>
 
