@@ -43,6 +43,11 @@
         duration: [] as any[],
         throttles: [] as any[],
     });
+    let metricsWindow = $state<{
+        start: Date;
+        end: Date;
+        periodSeconds: number;
+    } | null>(null);
 
     let currentFetchedPeriod = $state(0);
 
@@ -195,6 +200,7 @@
             ]);
 
             metricsData = { invocations, errors, duration, throttles };
+            metricsWindow = { start, end, periodSeconds: period };
         } catch (e) {
             console.error(e);
         } finally {
@@ -803,16 +809,44 @@
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="bg-gray-900 p-4 rounded-lg border border-gray-800">
-                    <MetricChart title="Invocations (Sum)" data={metricsData.invocations} loading={metricsLoading} />
+                    <MetricChart
+                        title="Invocations (Sum)"
+                        data={metricsData.invocations}
+                        loading={metricsLoading}
+                        rangeStart={metricsWindow?.start}
+                        rangeEnd={metricsWindow?.end}
+                        periodSeconds={metricsWindow?.periodSeconds}
+                    />
                 </div>
                 <div class="bg-gray-900 p-4 rounded-lg border border-gray-800">
-                    <MetricChart title="Errors (Sum)" data={metricsData.errors} loading={metricsLoading} />
+                    <MetricChart
+                        title="Errors (Sum)"
+                        data={metricsData.errors}
+                        loading={metricsLoading}
+                        rangeStart={metricsWindow?.start}
+                        rangeEnd={metricsWindow?.end}
+                        periodSeconds={metricsWindow?.periodSeconds}
+                    />
                 </div>
                 <div class="bg-gray-900 p-4 rounded-lg border border-gray-800">
-                    <MetricChart title="Duration (Avg ms)" data={metricsData.duration} loading={metricsLoading} />
+                    <MetricChart
+                        title="Duration (Avg ms)"
+                        data={metricsData.duration}
+                        loading={metricsLoading}
+                        rangeStart={metricsWindow?.start}
+                        rangeEnd={metricsWindow?.end}
+                        periodSeconds={metricsWindow?.periodSeconds}
+                    />
                 </div>
                 <div class="bg-gray-900 p-4 rounded-lg border border-gray-800">
-                    <MetricChart title="Throttles (Sum)" data={metricsData.throttles} loading={metricsLoading} />
+                    <MetricChart
+                        title="Throttles (Sum)"
+                        data={metricsData.throttles}
+                        loading={metricsLoading}
+                        rangeStart={metricsWindow?.start}
+                        rangeEnd={metricsWindow?.end}
+                        periodSeconds={metricsWindow?.periodSeconds}
+                    />
                 </div>
             </div>
         {/if}

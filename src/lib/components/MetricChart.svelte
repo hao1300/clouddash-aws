@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, untrack } from "svelte";
+    import { untrack } from "svelte";
     import Chart from "chart.js/auto";
     import Icon from "$lib/components/Icon.svelte";
     import { mdiRefresh } from "@mdi/js";
@@ -15,16 +15,35 @@
         loading = false,
         formatValue = (v: number) => v.toLocaleString(),
         yLabel = "",
+        rangeStart,
+        rangeEnd,
+        periodSeconds,
     }: {
         data: DataPoint[];
         title?: string;
         loading?: boolean;
         formatValue?: (v: number) => string;
         yLabel?: string;
+        rangeStart?: Date;
+        rangeEnd?: Date;
+        periodSeconds?: number;
     } = $props();
 
     let canvasRef = $state<HTMLCanvasElement>();
     let chartInstance: Chart | null = null;
+
+    function getXAxisTickStep(rangeMs: number) {
+        const minute = 60 * 1000;
+        const hour = 60 * minute;
+        const day = 24 * hour;
+
+        if (rangeMs <= hour) return 10 * minute;
+        if (rangeMs <= 3 * hour) return 30 * minute;
+        if (rangeMs <= 12 * hour) return 2 * hour;
+        if (rangeMs <= day) return 3 * hour;
+        if (rangeMs <= 3 * day) return 12 * hour;
+        return day;
+    }
 
     $effect(() => {
         if (!canvasRef) {
@@ -35,10 +54,13 @@
             return;
         }
 
-        // We only want to rebuild the chart when data changes
+        // Capture the reactive inputs before doing the Chart.js work untracked.
         const currentData = data;
         const currentTitle = title;
         const currentYLabel = yLabel;
+        const rangeStartMs = rangeStart?.getTime();
+        const rangeEndMs = rangeEnd?.getTime();
+        const periodMs = periodSeconds ? periodSeconds * 1000 : undefined;
 
         if (!currentData || currentData.length === 0) {
             if (chartInstance) {
@@ -53,13 +75,60 @@
                 (a, b) => a.rawTimestamp.getTime() - b.rawTimestamp.getTime(),
             );
 
-            const labels = chrono.map((d) => d.rawTimestamp);
-            const values = chrono.map((d) => Number(d.rawAverage) || 0);
+            const values: { x: number; y: number | null }[] = [];
+            for (const datapoint of chrono) {
+                const x = datapoint.rawTimestamp.getTime();
+                const previous = values.at(-1);
+
+                // CloudWatch omits buckets with no samples. Add a skipped point
+                // so Chart.js does not draw a line across an unobserved period.
+                if (
+                    periodMs &&
+                    previous &&
+                    x - previous.x > periodMs * 1.5
+                ) {
+                    values.push({ x: previous.x + periodMs, y: null });
+                }
+
+                const rawValue = Number(datapoint.rawAverage);
+                values.push({
+                    x,
+                    y: Number.isFinite(rawValue) ? rawValue : 0,
+                });
+            }
+
+            const dataStartMs = chrono[0]?.rawTimestamp.getTime();
+            const dataEndMs = chrono.at(-1)?.rawTimestamp.getTime();
+            const displayedRangeMs =
+                (rangeEndMs ?? dataEndMs ?? 0) -
+                (rangeStartMs ?? dataStartMs ?? 0);
+            const xTickStepMs = getXAxisTickStep(displayedRangeMs);
+
+            const formatXAxisTick = (timestamp: number) => {
+                const date = new Date(timestamp);
+                if (displayedRangeMs > 24 * 60 * 60 * 1000) {
+                    return date.toLocaleDateString([], {
+                        month: "short",
+                        day: "numeric",
+                    });
+                }
+                return date.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                });
+            };
 
             if (chartInstance) {
-                chartInstance.data.labels = labels;
                 chartInstance.data.datasets[0].data = values;
                 chartInstance.data.datasets[0].label = currentTitle;
+                const xScale = chartInstance.options.scales?.x as any;
+                if (xScale) {
+                    xScale.min = rangeStartMs;
+                    xScale.max = rangeEndMs;
+                    xScale.ticks.stepSize = xTickStepMs;
+                    xScale.ticks.callback = (value: string | number) =>
+                        formatXAxisTick(Number(value));
+                }
                 const yScale = chartInstance.options.scales?.y as any;
                 if (yScale && yScale.title) {
                     yScale.title.text = currentYLabel;
@@ -73,7 +142,6 @@
                 chartInstance = new Chart(canvasRef as HTMLCanvasElement, {
                     type: "line",
                     data: {
-                        labels: labels,
                         datasets: [
                             {
                                 label: currentTitle,
@@ -109,12 +177,9 @@
                                 borderWidth: 1,
                                 callbacks: {
                                     title: function (context) {
-                                        const dateLabel =
-                                            labels[context[0].dataIndex];
-                                        if (!dateLabel) return "";
-                                        return new Date(
-                                            dateLabel,
-                                        ).toLocaleString([], {
+                                        const timestamp = context[0]?.parsed.x;
+                                        if (timestamp == null) return "";
+                                        return new Date(timestamp).toLocaleString([], {
                                             month: "short",
                                             day: "numeric",
                                             hour: "2-digit",
@@ -138,22 +203,21 @@
                         },
                         scales: {
                             x: {
+                                type: "linear",
+                                min: rangeStartMs,
+                                max: rangeEndMs,
                                 grid: {
                                     color: "#374151",
                                     display: false,
                                 },
                                 ticks: {
                                     color: "#6B7280",
+                                    stepSize: xTickStepMs,
                                     font: {
                                         size: 10,
                                     },
-                                    callback: function (value, index) {
-                                        const d = labels[index] as Date;
-                                        if (!d) return "";
-                                        return d.toLocaleTimeString([], {
-                                            hour: "2-digit",
-                                            minute: "2-digit",
-                                        });
+                                    callback: function (value) {
+                                        return formatXAxisTick(Number(value));
                                     },
                                 },
                             },
