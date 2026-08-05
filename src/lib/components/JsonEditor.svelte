@@ -2,10 +2,9 @@
     import { onMount } from 'svelte';
     import { EditorView, basicSetup } from 'codemirror';
     import { json } from '@codemirror/lang-json';
-    import { StreamLanguage } from '@codemirror/language';
-    import { properties } from '@codemirror/legacy-modes/mode/properties';
     import { Compartment, type Extension } from '@codemirror/state';
     import { oneDark } from '@codemirror/theme-one-dark';
+    import { propertiesLanguage } from '$lib/utils/properties-language';
 
     let { value = $bindable(""), readonly = false, language = "json", onchange = () => {} } = $props<{
         value?: string;
@@ -20,7 +19,6 @@
     let internalChange = false;
     let configuredLanguage: typeof language | undefined;
     const languageCompartment = new Compartment();
-    const propertiesLanguage = StreamLanguage.define(properties);
 
     function languageExtension(value: typeof language): Extension {
         if (value === "json") return json();
