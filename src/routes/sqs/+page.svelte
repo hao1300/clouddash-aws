@@ -79,8 +79,8 @@
                 const pageItems = await Promise.all(
                     pageUrls.map(async (url: string) => {
                         const name = url.split("/").pop() ?? url;
-                        let msgsAvail = "N/A",
-                            msgsFlight = "N/A";
+                        let msgsAvail: number | null = null,
+                            msgsFlight: number | null = null;
                         try {
                             const attrs = await aws.sqs!.send(
                                 new GetQueueAttributesCommand({
@@ -91,13 +91,29 @@
                                     ],
                                 }),
                             );
-                            msgsAvail =
-                                attrs.Attributes?.ApproximateNumberOfMessages ??
-                                "N/A";
-                            msgsFlight =
+                            const available =
+                                attrs.Attributes?.ApproximateNumberOfMessages;
+                            const inFlight =
                                 attrs.Attributes
-                                    ?.ApproximateNumberOfMessagesNotVisible ??
-                                "N/A";
+                                    ?.ApproximateNumberOfMessagesNotVisible;
+                            msgsAvail =
+                                available !== undefined
+                                    ? Number(available)
+                                    : null;
+                            msgsFlight =
+                                inFlight !== undefined
+                                    ? Number(inFlight)
+                                    : null;
+                            if (
+                                msgsAvail !== null &&
+                                !Number.isFinite(msgsAvail)
+                            )
+                                msgsAvail = null;
+                            if (
+                                msgsFlight !== null &&
+                                !Number.isFinite(msgsFlight)
+                            )
+                                msgsFlight = null;
                         } catch {
                             /* skip */
                         }
@@ -218,14 +234,24 @@
             items={queues}
             {loading}
             onRefresh={() => loadQueues()}
+            defaultSortKey="messages_available"
+            defaultSortDirection="desc"
             columns={[
                 {
                     key: "name",
                     label: "Queue Name",
                     onClick: (item) => handleSelectQueue(item),
                 },
-                { key: "messages_available", label: "Messages Available" },
-                { key: "messages_in_flight", label: "Messages In Flight" },
+                {
+                    key: "messages_available",
+                    label: "Messages Available",
+                    format: (value) => value === null ? "N/A" : String(value),
+                },
+                {
+                    key: "messages_in_flight",
+                    label: "Messages In Flight",
+                    format: (value) => value === null ? "N/A" : String(value),
+                },
             ]}
         >
             {#snippet headerActionsSnippet()}

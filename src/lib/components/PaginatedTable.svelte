@@ -1,6 +1,7 @@
 <script lang="ts" generics="T">
     import type { Snippet } from "svelte";
     import Icon from "$lib/components/Icon.svelte";
+    import { sortItemsByKey } from "$lib/utils/table-sort";
     import { mdiMagnify, mdiClose, mdiArrowUp, mdiArrowDown, mdiChevronLeft, mdiChevronRight, mdiSort } from "@mdi/js";
 
     let {
@@ -15,6 +16,8 @@
         onPrev = () => {},
         onRefresh = () => {},
         onRowClick = undefined,
+        defaultSortKey = null,
+        defaultSortDirection = "asc",
         actionsSnippet = undefined,
         headerActionsSnippet = undefined,
         cellSnippet = undefined,
@@ -39,6 +42,8 @@
         onPrev?: () => void;
         onRefresh?: () => void;
         onRowClick?: (item: T) => void;
+        defaultSortKey?: string | null;
+        defaultSortDirection?: "asc" | "desc";
         actionsSnippet?: Snippet<[T]>;
         headerActionsSnippet?: Snippet;
         cellSnippet?: Snippet<[string, any, T]>;
@@ -51,6 +56,22 @@
     let showMobileSort = $state(false);
     let sortKey = $state<string | null>(null);
     let sortAsc = $state(true);
+    let sortInitialized = false;
+
+    $effect(() => {
+        const initialKey = defaultSortKey;
+        const initialDirection = defaultSortDirection;
+        if (!sortInitialized) {
+            sortKey = initialKey;
+            sortAsc = initialDirection === "asc";
+            sortInitialized = true;
+        }
+    });
+
+    function resetSort() {
+        sortKey = defaultSortKey;
+        sortAsc = defaultSortDirection === "asc";
+    }
 
     // Sorting and filtering logic over the *current page* only
     let processedItems = $derived.by(() => {
@@ -73,20 +94,7 @@
 
         // 2. Sort
         if (sortKey) {
-            result.sort((a, b) => {
-                const valA = (a as any)[sortKey!];
-                const valB = (b as any)[sortKey!];
-
-                let cmp = 0;
-                if (typeof valA === "number" && typeof valB === "number") {
-                    cmp = valA - valB;
-                } else {
-                    const sA = String(valA ?? "");
-                    const sB = String(valB ?? "");
-                    cmp = sA.localeCompare(sB);
-                }
-                return sortAsc ? cmp : -cmp;
-            });
+            result = sortItemsByKey(result, sortKey, sortAsc);
         }
 
         return result;
@@ -193,8 +201,8 @@
                         <div class="absolute left-0 top-full mt-1 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 py-1 overflow-hidden">
                             <button
                                 type="button"
-                                onclick={() => { sortKey = null; showMobileSort = false; }}
-                                class="w-full text-left px-3 py-2 text-xs hover:bg-blue-600/20 hover:text-blue-400 transition-colors {!sortKey ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-300'}"
+                                onclick={() => { resetSort(); showMobileSort = false; }}
+                                class="w-full text-left px-3 py-2 text-xs hover:bg-blue-600/20 hover:text-blue-400 transition-colors {sortKey === defaultSortKey && sortAsc === (defaultSortDirection === 'asc') ? 'bg-blue-600/10 text-blue-400 font-bold' : 'text-gray-300'}"
                             >
                                 Default Sort
                             </button>
