@@ -15,6 +15,7 @@
     import JsonEditor from "$lib/components/JsonEditor.svelte";
     import InfoCard from "$lib/components/InfoCard.svelte";
     import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
+    import { detectValueFormat } from "$lib/utils/value-format";
 
     let paramName = $derived($page.params.name || "");
 
@@ -36,15 +37,7 @@
     let showDeleteModal = $state(false);
     let deleting = $state(false);
 
-    let isJson = $derived.by(() => {
-        if (!paramValue) return false;
-        try {
-            const parsed = JSON.parse(paramValue);
-            return typeof parsed === "object" && parsed !== null;
-        } catch {
-            return false;
-        }
-    });
+    let valueFormat = $derived(detectValueFormat(paramValue ?? ""));
 
     let hasUnsavedChanges = $derived(
         paramValue !== null &&
@@ -256,7 +249,7 @@
                     <div class="flex-1 w-full min-h-0 relative">
                         <JsonEditor
                             bind:value={paramValue}
-                            language={isJson ? "json" : "text"}
+                            language={valueFormat}
                         />
                         {#if hasUnsavedChanges}
                             <div class="absolute bottom-4 right-4 z-10 flex gap-2">

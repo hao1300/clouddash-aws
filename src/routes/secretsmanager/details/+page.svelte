@@ -7,7 +7,11 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { titleService } from "$lib/services/title.svelte";
-    import { highlightJson } from "$lib/utils/json-highlight";
+    import { highlightStructuredValue } from "$lib/utils/json-highlight";
+    import {
+        detectValueFormat,
+        parseSimpleKeyValue,
+    } from "$lib/utils/value-format";
 
     let secretId = $derived($page.url.searchParams.get("id") || "");
 
@@ -24,44 +28,14 @@
 
     let activeTab = $state<"json" | "key-value">("json");
 
-    let parsedValue = $derived.by(() => {
-        if (!secretValue) return null;
-        try {
-            return JSON.parse(secretValue);
-        } catch {
-            return null;
-        }
-    });
+    let valueFormat = $derived(detectValueFormat(secretValue ?? ""));
+    let keyValueEntries = $derived(
+        secretValue ? parseSimpleKeyValue(secretValue) : null,
+    );
 
-    let isSimpleKeyValue = $derived.by(() => {
-        if (
-            !parsedValue ||
-            typeof parsedValue !== "object" ||
-            Array.isArray(parsedValue)
-        )
-            return false;
-        return Object.values(parsedValue).every(
-            (v) =>
-                typeof v === "string" ||
-                typeof v === "number" ||
-                typeof v === "boolean" ||
-                v === null,
-        );
-    });
-
-    let highlightedJson = $derived.by(() => {
+    let highlightedValue = $derived.by(() => {
         if (!secretValue) return "";
-        if (parsedValue) {
-            const formatted = JSON.stringify(parsedValue, null, 2);
-            return highlightJson(formatted);
-        }
-        // Non-JSON secrets bypass the highlighter (which escapes for us), so this
-        // branch must escape before it reaches {@html} — a secret value is
-        // attacker-controlled by anyone holding secretsmanager:PutSecretValue.
-        return secretValue
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
+        return highlightStructuredValue(secretValue);
     });
 
     $effect(() => {
@@ -183,7 +157,11 @@
                             : 'border-transparent text-gray-500 hover:text-gray-300'}"
                         onclick={() => (activeTab = "json")}
                     >
-                        JSON
+                        {valueFormat === "properties"
+                            ? "Properties"
+                            : valueFormat === "json"
+                              ? "JSON"
+                              : "Text"}
                     </button>
                     <button
                         class="text-[10px] font-bold uppercase tracking-widest py-3 border-b-2 {activeTab ===
@@ -204,8 +182,8 @@
                 {#if secretValue}
                     {#if activeTab === "json"}
                         <pre
-                            class="text-xs font-mono whitespace-pre-wrap break-all p-4 m-0 hljs">{@html highlightedJson}</pre>
-                    {:else if isSimpleKeyValue}
+                            class="text-xs font-mono whitespace-pre-wrap break-all p-4 m-0 hljs">{@html highlightedValue}</pre>
+                    {:else if keyValueEntries}
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr
@@ -216,7 +194,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each Object.entries(parsedValue) as [key, val]}
+                                {#each keyValueEntries as [key, val]}
                                     <tr
                                         class="border-b border-gray-800/50 hover:bg-gray-800/20"
                                     >

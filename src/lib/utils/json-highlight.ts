@@ -1,10 +1,13 @@
 /**
- * Shared JSON syntax highlighting utility using highlight.js.
+ * Shared structured-value syntax highlighting utility using highlight.js.
  */
 import hljs from "highlight.js/lib/core";
 import json from "highlight.js/lib/languages/json";
+import properties from "highlight.js/lib/languages/properties";
+import { detectValueFormat } from "./value-format";
 
 hljs.registerLanguage("json", json);
+hljs.registerLanguage("properties", properties);
 
 /**
  * Highlights a raw JSON string using highlight.js.
@@ -12,6 +15,21 @@ hljs.registerLanguage("json", json);
  */
 export function highlightJson(jsonStr: string): string {
     return hljs.highlight(jsonStr, { language: "json" }).value;
+}
+
+export function highlightStructuredValue(value: string): string {
+    const format = detectValueFormat(value);
+    if (format === "json") {
+        return highlightJson(JSON.stringify(JSON.parse(value), null, 2));
+    }
+    if (format === "properties") {
+        return hljs.highlight(value, { language: "properties" }).value;
+    }
+
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 }
 
 /**

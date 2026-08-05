@@ -1,13 +1,16 @@
 <script lang="ts">
-    import { onMount, createEventDispatcher } from 'svelte';
+    import { onMount } from 'svelte';
     import { EditorView, basicSetup } from 'codemirror';
     import { json } from '@codemirror/lang-json';
+    import { StreamLanguage } from '@codemirror/language';
+    import { properties } from '@codemirror/legacy-modes/mode/properties';
+    import { Compartment, type Extension } from '@codemirror/state';
     import { oneDark } from '@codemirror/theme-one-dark';
 
     let { value = $bindable(""), readonly = false, language = "json", onchange = () => {} } = $props<{
         value?: string;
         readonly?: boolean;
-        language?: "json" | "text";
+        language?: "json" | "properties" | "text";
         onchange?: (val: string) => void;
     }>();
 
@@ -15,6 +18,15 @@
     let view = $state<EditorView | null>(null);
 
     let internalChange = false;
+    let configuredLanguage: typeof language | undefined;
+    const languageCompartment = new Compartment();
+    const propertiesLanguage = StreamLanguage.define(properties);
+
+    function languageExtension(value: typeof language): Extension {
+        if (value === "json") return json();
+        if (value === "properties") return propertiesLanguage;
+        return [];
+    }
 
     $effect(() => {
         const _val = value !== undefined ? value : "";
@@ -29,7 +41,21 @@
         internalChange = false;
     });
 
+    $effect(() => {
+        const nextLanguage = language;
+        if (view && nextLanguage !== configuredLanguage) {
+            view.dispatch({
+                effects: languageCompartment.reconfigure(
+                    languageExtension(nextLanguage),
+                ),
+            });
+            configuredLanguage = nextLanguage;
+        }
+    });
+
     onMount(() => {
+        configuredLanguage = language;
+
         const updateListener = EditorView.updateListener.of((update) => {
             if (update.docChanged && update.view.hasFocus) {
                 internalChange = true;
@@ -43,12 +69,9 @@
             basicSetup,
             oneDark,
             updateListener,
-            EditorView.lineWrapping
+            EditorView.lineWrapping,
+            languageCompartment.of(languageExtension(language)),
         ];
-
-        if (language === "json") {
-            extensions.push(json());
-        }
 
         if (readonly) {
             extensions.push(EditorView.editable.of(false));

@@ -154,7 +154,7 @@
             <textarea
                 bind:value={newValue}
                 rows="5"
-                placeholder={'plaintext or {"key": "value"}'}
+                placeholder={'plaintext, key=value, or {"key": "value"}'}
                 class="w-full bg-black border border-gray-700 rounded p-2 text-xs text-white font-mono outline-none focus:border-blue-500 transition"
             ></textarea>
         </div>

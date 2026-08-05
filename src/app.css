@@ -50,7 +50,7 @@
   background: #374151;
 }
 
-/* JSON syntax highlighting (highlight.js tokens) */
+/* Structured-value syntax highlighting (highlight.js tokens) */
 .hljs { color: #9ca3af; }
 .hljs-attr { color: #7dd3fc; }
 .hljs-string { color: #86efac; }

@@ -15,6 +15,10 @@
     import JsonEditor from "$lib/components/JsonEditor.svelte";
     import InfoCard from "$lib/components/InfoCard.svelte";
     import DeleteConfirmModal from "$lib/components/iam/DeleteConfirmModal.svelte";
+    import {
+        detectValueFormat,
+        parseSimpleKeyValue,
+    } from "$lib/utils/value-format";
 
     let secretId = $derived($page.params.id || "");
 
@@ -40,30 +44,10 @@
 
     let activeTab = $state<"json" | "key-value">("json");
 
-    let parsedValue = $derived.by(() => {
-        if (!secretValue) return null;
-        try {
-            return JSON.parse(secretValue);
-        } catch {
-            return null;
-        }
-    });
-
-    let isSimpleKeyValue = $derived.by(() => {
-        if (
-            !parsedValue ||
-            typeof parsedValue !== "object" ||
-            Array.isArray(parsedValue)
-        )
-            return false;
-        return Object.values(parsedValue).every(
-            (v) =>
-                typeof v === "string" ||
-                typeof v === "number" ||
-                typeof v === "boolean" ||
-                v === null,
-        );
-    });
+    let valueFormat = $derived(detectValueFormat(secretValue ?? ""));
+    let keyValueEntries = $derived(
+        secretValue ? parseSimpleKeyValue(secretValue) : null,
+    );
 
     let hasUnsavedChanges = $derived(secretValue !== null && originalSecretValue !== null && secretValue !== originalSecretValue);
 
@@ -263,7 +247,11 @@
                             : 'border-transparent text-gray-500 hover:text-gray-300'}"
                         onclick={() => (activeTab = "json")}
                     >
-                        JSON
+                        {valueFormat === "properties"
+                            ? "Properties"
+                            : valueFormat === "json"
+                              ? "JSON"
+                              : "Text"}
                     </button>
                     <button
                         class="text-[10px] font-bold uppercase tracking-widest py-3 border-b-2 {activeTab ===
@@ -284,7 +272,10 @@
                 {#if secretValue !== null}
                     {#if activeTab === "json"}
                         <div class="flex-1 w-full min-h-0 relative">
-                            <JsonEditor bind:value={secretValue} />
+                            <JsonEditor
+                                bind:value={secretValue}
+                                language={valueFormat}
+                            />
                             {#if hasUnsavedChanges}
                                 <div class="absolute bottom-4 right-4 z-10 flex gap-2">
                                     <button 
@@ -303,7 +294,7 @@
                                 </div>
                             {/if}
                         </div>
-                    {:else if isSimpleKeyValue}
+                    {:else if keyValueEntries}
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr
@@ -314,7 +305,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each Object.entries(parsedValue) as [key, val]}
+                                {#each keyValueEntries as [key, val]}
                                     <tr
                                         class="border-b border-gray-800/50 hover:bg-gray-800/20"
                                     >
