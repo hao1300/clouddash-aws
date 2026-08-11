@@ -10,6 +10,8 @@ export interface AwsCreds {
     secret_access_key: string;
     session_token: string | null;
     region: string;
+    /** ISO-8601 expiration returned by STS for temporary credentials. */
+    expiration?: string | null;
 }
 
 export async function getAwsCredentials(): Promise<AwsCreds> {

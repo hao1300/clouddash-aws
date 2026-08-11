@@ -14,6 +14,7 @@
   import Login from "$lib/components/Login.svelte";
   import Select from "$lib/components/Select.svelte";
   import { aws } from "$lib/services/aws.svelte";
+  import type { AwsCreds } from "$lib/services/aws-creds";
   import { bookmarks } from "$lib/services/bookmarks.svelte";
   import { titleService } from "$lib/services/title.svelte";
   import { SERVICE_MANIFEST } from "$lib/services/service-manifest";
@@ -502,6 +503,96 @@
     error = "";
   }
 
+  async function assumeRoleCredentials(
+    target: any,
+    source: any,
+    targetRegion: string,
+    profileName: string,
+    refreshing = false,
+  ): Promise<AwsCreds> {
+    if (!source.aws_access_key_id || !source.aws_secret_access_key) {
+      throw new Error(
+        `Source profile ${target.source_profile} has no access keys`,
+      );
+    }
+
+    const { STSClient, AssumeRoleCommand } = await import(
+      "@aws-sdk/client-sts"
+    );
+    const { customRequestHandler } = await import(
+      "$lib/services/aws.svelte"
+    );
+    const sts = new STSClient({
+      region: targetRegion,
+      credentials: {
+        accessKeyId: source.aws_access_key_id,
+        secretAccessKey: source.aws_secret_access_key,
+        sessionToken: source.aws_session_token || undefined,
+      },
+      requestHandler: customRequestHandler,
+    });
+
+    let res;
+    console.log("[Auth] Attempting AssumeRole without MFA for", target.role_arn);
+    try {
+      res = await sts.send(
+        new AssumeRoleCommand({
+          RoleArn: target.role_arn,
+          RoleSessionName: "CloudDashSession",
+        }),
+      );
+      console.log("[Auth] AssumeRole without MFA successful");
+    } catch (err: any) {
+      console.log(
+        "[Auth] AssumeRole failed:",
+        err,
+        "Target MFA Serial:",
+        target.mfa_serial,
+      );
+      if (
+        target.mfa_serial &&
+        (err.name === "AccessDenied" ||
+          err.name === "AccessDeniedException" ||
+          err.message?.toLowerCase().includes("mfa") ||
+          err.message?.toLowerCase().includes("multifactorauthentication"))
+      ) {
+        console.log("[Auth] Prompting for MFA token...");
+        const mfaToken = window.prompt(
+          `MFA token code required to ${refreshing ? "refresh" : "assume"} profile ${profileName}:`,
+        );
+        if (!mfaToken) {
+          console.warn("[Auth] MFA token prompt cancelled or empty");
+          throw new Error(
+            refreshing
+              ? "MFA token is required to refresh this assumed role."
+              : "MFA token is required to assume this role.",
+          );
+        }
+        console.log("[Auth] Retrying AssumeRole with MFA Token...");
+        res = await sts.send(
+          new AssumeRoleCommand({
+            RoleArn: target.role_arn,
+            RoleSessionName: "CloudDashSession",
+            SerialNumber: target.mfa_serial,
+            TokenCode: mfaToken,
+          }),
+        );
+        console.log("[Auth] AssumeRole with MFA successful");
+      } else {
+        throw err;
+      }
+    }
+
+    if (!res.Credentials) throw new Error("STS returned no credentials");
+    return {
+      access_key_id: res.Credentials.AccessKeyId!,
+      secret_access_key: res.Credentials.SecretAccessKey!,
+      session_token: res.Credentials.SessionToken || null,
+      region: targetRegion,
+      expiration: res.Credentials.Expiration?.toISOString() || null,
+    };
+  }
+
   async function login(
     silent = false,
     initialPath: string | null = null,
@@ -583,7 +674,8 @@
         profileVisible = profileVisible; // Force reactivity
       }
 
-      let finalCreds = null;
+      let finalCreds: AwsCreds | null = null;
+      let refreshCredentials: (() => Promise<AwsCreds>) | undefined;
       let targetRegion = region || "us-east-1";
 
       if (authType === "qr") {
@@ -614,83 +706,43 @@
               `Source profile ${target.source_profile} not found`,
             );
 
-          const { STSClient, AssumeRoleCommand } = await import(
-            "@aws-sdk/client-sts"
-          );
-          const { customRequestHandler } = await import(
-            "$lib/services/aws.svelte"
+          const assumedProfile = selectedProfile;
+          finalCreds = await assumeRoleCredentials(
+            target,
+            source,
+            targetRegion,
+            assumedProfile,
           );
 
-          const sts = new STSClient({
-            region: targetRegion,
-            credentials: {
-              accessKeyId: source.aws_access_key_id,
-              secretAccessKey: source.aws_secret_access_key,
-              sessionToken: source.aws_session_token || undefined,
-            },
-            requestHandler: customRequestHandler,
-          });
-
-          let res;
-          console.log(
-            "[Auth] Attempting AssumeRole without MFA for",
-            target.role_arn,
-          );
-          try {
-            res = await sts.send(
-              new AssumeRoleCommand({
-                RoleArn: target.role_arn,
-                RoleSessionName: "CloudDashSession",
-              }),
+          // STS credentials are temporary. Re-read both profiles when the SDK
+          // asks for a refresh so changes to the source profile are picked up,
+          // then assume the role again instead of reusing the expired token.
+          refreshCredentials = async () => {
+            const refreshedProfiles = (await invoke(
+              "get_all_profiles",
+            )) as any[];
+            const refreshedTarget = refreshedProfiles.find(
+              (p) => p.profile === assumedProfile,
             );
-            console.log("[Auth] AssumeRole without MFA successful");
-          } catch (err: any) {
-            console.log(
-              "[Auth] AssumeRole failed:",
-              err,
-              "Target MFA Serial:",
-              target.mfa_serial,
-            );
-            // Check if failure might be due to MFA, and if we have mfa_serial
-            if (
-              target.mfa_serial &&
-              (err.name === "AccessDenied" ||
-                err.name === "AccessDeniedException" ||
-                err.message?.toLowerCase().includes("mfa") ||
-                err.message
-                  ?.toLowerCase()
-                  .includes("multifactorauthentication"))
-            ) {
-              console.log("[Auth] Prompting for MFA token...");
-              const mfaToken = window.prompt(
-                `MFA token code required for profile ${selectedProfile}:`,
-              );
-              if (!mfaToken) {
-                console.warn("[Auth] MFA token prompt cancelled or empty");
-                throw new Error("MFA token is required to assume this role.");
-              }
-              console.log("[Auth] Retrying AssumeRole with MFA Token...");
-              res = await sts.send(
-                new AssumeRoleCommand({
-                  RoleArn: target.role_arn,
-                  RoleSessionName: "CloudDashSession",
-                  SerialNumber: target.mfa_serial,
-                  TokenCode: mfaToken,
-                }),
-              );
-              console.log("[Auth] AssumeRole with MFA successful");
-            } else {
-              throw err;
+            if (!refreshedTarget?.role_arn || !refreshedTarget.source_profile) {
+              throw new Error(`Assumed-role profile ${assumedProfile} not found`);
             }
-          }
+            const refreshedSource = refreshedProfiles.find(
+              (p) => p.profile === refreshedTarget.source_profile,
+            );
+            if (!refreshedSource) {
+              throw new Error(
+                `Source profile ${refreshedTarget.source_profile} not found`,
+              );
+            }
 
-          if (!res.Credentials) throw new Error("STS returned no credentials");
-
-          finalCreds = {
-            access_key_id: res.Credentials.AccessKeyId!,
-            secret_access_key: res.Credentials.SecretAccessKey!,
-            session_token: res.Credentials.SessionToken || null,
-            region: targetRegion,
+            return assumeRoleCredentials(
+              refreshedTarget,
+              refreshedSource,
+              targetRegion,
+              assumedProfile,
+              true,
+            );
           };
         } else {
           if (!target.aws_access_key_id)
@@ -770,7 +822,7 @@
       isAuthenticated = true;
       isAddingProfile = false;
       error = "";
-      aws.setCredentials(finalCreds);
+      aws.setCredentials(finalCreds, refreshCredentials);
       refreshKey++;
       saveState();
 

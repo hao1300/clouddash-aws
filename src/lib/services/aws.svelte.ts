@@ -16,6 +16,10 @@ import { SESClient } from "@aws-sdk/client-ses";
 import { SSMClient } from "@aws-sdk/client-ssm";
 import { fetch } from "@tauri-apps/plugin-http";
 import type { AwsCreds } from "./aws-creds";
+import {
+    createRefreshingCredentialProvider,
+    type RefreshAwsCredentials,
+} from "./refreshing-credentials";
 
 export const customRequestHandler = {
     handle: async (request: any) => {
@@ -80,10 +84,19 @@ export const customRequestHandler = {
 
 class AwsState {
     #creds = $state<AwsCreds | null>(null);
+    #credentialProvider: ReturnType<
+        typeof createRefreshingCredentialProvider
+    > | null = null;
 
     constructor() {}
 
-    setCredentials(creds: AwsCreds | null) {
+    setCredentials(
+        creds: AwsCreds | null,
+        refresh?: RefreshAwsCredentials,
+    ) {
+        this.#credentialProvider = creds
+            ? createRefreshingCredentialProvider(creds, refresh)
+            : null;
         this.#creds = creds;
         // The $derived clients rebuild automatically, but these manual caches are
         // keyed by region alone — without clearing them a profile switch keeps
@@ -101,11 +114,7 @@ class AwsState {
         if (!this.#creds) return null;
         return {
             region: this.#creds.region,
-            credentials: {
-                accessKeyId: this.#creds.access_key_id,
-                secretAccessKey: this.#creds.secret_access_key,
-                sessionToken: this.#creds.session_token || undefined,
-            },
+            credentials: this.#credentialProvider!,
             requestHandler: customRequestHandler
         };
     });
