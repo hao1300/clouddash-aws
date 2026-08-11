@@ -143,7 +143,7 @@
     }
 </script>
 
-<div class="h-full flex flex-col bg-gray-950 overflow-hidden relative">
+<div class="h-full min-h-0 flex flex-col bg-gray-950 overflow-hidden relative">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
@@ -268,7 +268,7 @@
                         >Loading...</span
                     >{/if}
             </div>
-            <div class="bg-black overflow-hidden flex-1 p-0 flex flex-col relative">
+            <div class="bg-black overflow-hidden flex-1 min-h-0 p-0 flex flex-col relative">
                 {#if secretValue !== null}
                     {#if activeTab === "json"}
                         <div class="flex-1 w-full min-h-0 relative">

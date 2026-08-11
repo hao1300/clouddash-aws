@@ -142,12 +142,12 @@
     {/snippet}
 
     {#snippet sidebarSnippet()}
-        <div class="bg-gray-900 rounded-lg border border-gray-800 flex flex-col h-full overflow-hidden shadow-sm">
+        <div class="bg-gray-900 rounded-lg border border-gray-800 flex flex-col h-full min-h-0 overflow-hidden shadow-sm">
             <div class="p-4 border-b border-gray-800 bg-gray-900/50 shrink-0">
                 <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Statistics List</h3>
             </div>
 
-            <div class="flex-1 overflow-auto bg-gray-950/20">
+            <div class="flex-1 min-h-0 overflow-auto overscroll-contain bg-gray-950/20">
                 {#if loading && metricStats.length === 0}
                     <div class="p-8 text-center text-gray-600 animate-pulse text-xs italic">
                         Fetching datapoints...

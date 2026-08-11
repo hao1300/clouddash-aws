@@ -369,7 +369,7 @@
     }
 </script>
 
-<div class="h-full flex flex-col bg-gray-950 overflow-hidden relative">
+<div class="h-full min-h-0 flex flex-col bg-gray-950 overflow-hidden relative">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
@@ -433,9 +433,9 @@
         </div>
     </div>
 
-    <div class="flex-1 overflow-hidden p-2 flex gap-2 relative">
+    <div class="flex-1 min-h-0 overflow-hidden p-2 flex gap-2 relative">
         {#if viewMode === 'graph'}
-            <div class="flex-1 rounded-lg overflow-hidden relative shadow-sm border border-gray-800">
+            <div class="flex-1 min-h-0 rounded-lg overflow-hidden relative shadow-sm border border-gray-800">
                 {#if smDetails?.definition}
                     <StepFunctionsGraph 
                         definition={smDetails.definition} 
@@ -451,13 +451,13 @@
 
             {#if selectedNodeState}
                 {@const resInfo = getResourceInfo(selectedNodeDetails, selectedNodeRaw)}
-                <div class="w-80 shrink-0 bg-gray-900 border border-gray-800 rounded-lg flex flex-col overflow-hidden shadow-sm">
+                <div class="w-80 min-h-0 shrink-0 bg-gray-900 border border-gray-800 rounded-lg flex flex-col overflow-hidden shadow-sm">
                     <div class="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-950">
                         <h3 class="font-bold text-sm text-gray-200 truncate pr-2" title={selectedNodeState}>{selectedNodeState}</h3>
                         <button onclick={() => selectedNodeState = null} class="text-gray-500 hover:text-gray-300"><Icon path={mdiClose} size={16} /></button>
                     </div>
                     
-                    <div class="flex-1 overflow-auto p-3 space-y-4">
+                    <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-4">
                         <div class="flex items-center justify-between">
                             <div class="text-[11px] px-2 py-1 bg-gray-800 rounded text-gray-300 font-mono tracking-wider w-fit inline-block border border-gray-700">
                                 Status: <span class="{selectedNodeDetails?.status === 'SUCCEEDED' ? 'text-green-400' : selectedNodeDetails?.status === 'FAILED' ? 'text-red-400' : selectedNodeDetails?.status === 'RUNNING' ? 'text-blue-400 animate-pulse' : 'text-gray-400'}">{selectedNodeDetails?.status || 'PENDING'}</span>
@@ -534,7 +534,7 @@
                 </div>
             {/if}
         {:else}
-            <div class="flex-1 flex flex-col space-y-2 overflow-auto">
+            <div class="flex-1 min-h-0 flex flex-col space-y-2 overflow-y-auto overscroll-contain">
                 <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 grid grid-cols-1 md:grid-cols-2 gap-6 shadow-sm shrink-0">
                     <div>
                         <h3 class="text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-widest border-b border-gray-800 pb-1">Overall Input</h3>
@@ -551,7 +551,7 @@
                 </div>
 
                 <div class="flex-1 bg-gray-900 border border-gray-800 rounded-lg flex flex-col overflow-hidden min-h-[300px] shadow-sm">
-                    <div class="flex-1 relative">
+                    <div class="flex-1 min-h-0 relative">
                         <PaginatedTable
                             items={historyEvents}
                             {loading}

@@ -98,7 +98,7 @@
     </div>
 {/snippet}
 
-<div class="h-full flex flex-col bg-gray-950 overflow-hidden p-6 relative">
+<div class="h-full min-h-0 flex flex-col bg-gray-950 overflow-hidden p-6 relative">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
@@ -123,7 +123,7 @@
             <div class="p-4 border-b border-gray-800 shrink-0">
                 <h3 class="text-xs text-gray-400 uppercase tracking-widest font-bold">Environments</h3>
             </div>
-            <div class="flex-1 relative overflow-hidden">
+            <div class="flex-1 min-h-0 relative overflow-hidden">
                 <PaginatedTable
                     items={environments}
                     loading={envLoading}

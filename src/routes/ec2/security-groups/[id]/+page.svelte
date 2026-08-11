@@ -220,7 +220,7 @@
     }
 </script>
 
-<div class="h-full relative overflow-auto flex flex-col bg-gray-950 p-2 gap-4">
+<div class="h-full min-h-0 relative overflow-auto overscroll-contain flex flex-col bg-gray-950 p-2 gap-4">
     {#if error}<div class="bg-red-500/20 text-red-300 p-2 text-xs border border-red-500/30 rounded">{error}</div>{/if}
     {#if actionMsg}<div class="bg-blue-500/20 text-blue-300 p-2 text-xs border border-blue-500/30 rounded">{actionMsg}</div>{/if}
 
@@ -249,7 +249,7 @@
                     class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest transition shadow"
                 >Add Inbound Rule</button>
             </div>
-            <div class="flex-1 overflow-hidden relative">
+            <div class="flex-1 min-h-0 overflow-hidden relative">
                 <div class="absolute inset-0">
                     <PaginatedTable
                         items={inboundRules}
@@ -284,7 +284,7 @@
                     class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest transition shadow"
                 >Add Outbound Rule</button>
             </div>
-            <div class="flex-1 overflow-hidden relative">
+            <div class="flex-1 min-h-0 overflow-hidden relative">
                 <div class="absolute inset-0">
                     <PaginatedTable
                         items={outboundRules}

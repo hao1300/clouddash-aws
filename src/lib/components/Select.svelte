@@ -118,7 +118,7 @@
                     />
                 </div>
             {/if}
-            <div class="overflow-y-auto flex-1">
+            <div class="overflow-y-auto overscroll-contain flex-1 min-h-0">
                 {#each filteredOptions as opt}
                     <button
                         type="button"

@@ -917,7 +917,7 @@
 
         <!-- Services List -->
 
-        <div class="flex-1 overflow-y-auto p-4 space-y-8 pb-10">
+        <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-8 pb-10">
           <!-- Services -->
           <div class="space-y-4">
             <div class="space-y-4">
@@ -1107,7 +1107,7 @@
       </div>
 
       <!-- Main Content Area -->
-      <div class="flex-1 flex flex-col min-w-0 bg-gray-950 relative">
+      <div class="flex-1 min-h-0 flex flex-col min-w-0 bg-gray-950 relative">
         <!-- Unified Top Bar -->
         <header
           class="flex items-center bg-gray-900 border-b border-gray-800 shrink-0 px-3 py-2 gap-3"
@@ -1204,7 +1204,7 @@
           </div>
         {/if}
 
-        <div class="flex-1 overflow-hidden relative flex flex-col min-w-0">
+        <div class="flex-1 min-h-0 overflow-hidden relative flex flex-col min-w-0">
           {#if isMobile && (pullDistance > 0 || isRefreshing)}
             <div
               class="absolute left-1/2 z-[300] pointer-events-none"
@@ -1290,7 +1290,7 @@
             </button>
           </div>
 
-          <div class="flex-1 overflow-y-auto p-4 space-y-4">
+          <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-4">
             <button
               onclick={() => {
                 let label = serviceTitle;

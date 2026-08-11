@@ -133,7 +133,7 @@
     }
 </script>
 
-<div class="h-full flex flex-col overflow-hidden">
+<div class="h-full min-h-0 flex flex-col overflow-hidden">
     <TabBar
         tabs={[
             { id: "objects", label: "Objects", href: `/s3/bucket/${encodeURIComponent(bucket)}/objects` },
@@ -141,7 +141,7 @@
         ]}
         activeTab="details"
     />
-<div class="flex-1 p-4 bg-gray-950 text-gray-300 overflow-auto">
+<div class="flex-1 min-h-0 p-4 bg-gray-950 text-gray-300 overflow-auto overscroll-contain">
     <div class="max-w-6xl mx-auto space-y-6">
         {#if error}
             <div class="bg-red-500/20 text-red-300 px-4 py-3 rounded border border-red-500/30 text-sm">

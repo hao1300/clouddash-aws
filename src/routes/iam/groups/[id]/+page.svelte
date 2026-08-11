@@ -138,7 +138,7 @@
     }
 </script>
 
-<div class="h-full flex flex-col bg-gray-950 overflow-hidden relative">
+<div class="h-full min-h-0 flex flex-col bg-gray-950 overflow-hidden relative">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
@@ -202,7 +202,7 @@
                 </div>
             </div>
         {:else if detailTab === "users"}
-            <div class="h-full bg-gray-900 border border-gray-800 rounded-lg overflow-hidden flex flex-col">
+            <div class="h-full min-h-0 bg-gray-900 border border-gray-800 rounded-lg overflow-hidden flex flex-col">
                 <div class="p-4 border-b border-gray-800 bg-gray-900/50 flex justify-between items-center">
                     <h3 class="text-xs font-bold text-gray-300 uppercase tracking-widest">Group Users</h3>
                     <button onclick={() => showAddUserModal = true} class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded shadow-sm transition">
@@ -245,7 +245,7 @@
                             Attach Policy
                         </button>
                     </div>
-                    <div class="flex-1 overflow-auto">
+                    <div class="flex-1 min-h-0 overflow-auto overscroll-contain">
                         {#snippet policyActionsSnippet(item: any)}
                             <button onclick={() => promptDetachPolicy(item.PolicyArn, item.PolicyName)} class="text-[10px] bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1 rounded shadow-sm transition border border-red-800/50">
                                 Detach
@@ -276,7 +276,7 @@
                             Create Inline Policy
                         </button>
                     </div>
-                    <div class="flex-1 overflow-auto p-4">
+                    <div class="flex-1 min-h-0 overflow-auto overscroll-contain p-4">
                         {#if inlinePolicies.length === 0}
                             <div class="text-center text-gray-500 text-xs italic py-4 border border-gray-800 border-dashed rounded bg-gray-900/50">No inline policies</div>
                         {:else}

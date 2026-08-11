@@ -379,7 +379,7 @@
     let sidebarTab = $state<"fields" | "history">("fields");
 </script>
 
-<div class="h-full flex flex-col overflow-hidden">
+<div class="h-full min-h-0 flex flex-col overflow-hidden">
 <TabBar
     tabs={[
         { id: "alarms", label: "Alarms", href: "/cloudwatch/alarms" },
@@ -389,7 +389,7 @@
     ]}
     activeTab="insights"
 />
-<div class="flex-1 overflow-hidden relative">
+<div class="flex-1 min-h-0 overflow-hidden relative">
 <DetailLayout
     title="Insights"
     hideTitle={true}
@@ -624,7 +624,7 @@
                     <svg class="w-4 h-4 text-gray-500 transition-transform duration-200 {fieldsCollapsed ? '' : 'rotate-180'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                 </button>
             </div>
-            <div class="{fieldsCollapsed ? 'hidden' : ''} md:block p-4 overflow-y-auto flex-1" style="max-height: 300px;">
+            <div class="{fieldsCollapsed ? 'hidden' : ''} md:block p-4 overflow-y-auto overscroll-contain flex-1 min-h-0" style="max-height: 300px;">
                 {#if sidebarTab === "fields"}
                     {#if fieldsLoading}
                     <div class="text-xs text-gray-500 animate-pulse">
@@ -712,7 +712,7 @@
                     {/if}
                 </h3>
             </div>
-            <div class="flex-1 overflow-auto bg-gray-950/20">
+            <div class="flex-1 min-h-0 overflow-auto overscroll-contain bg-gray-950/20">
                 {#if logQueryLoading}
                     <div
                         class="h-64 flex flex-col items-center justify-center text-gray-400 text-sm"
@@ -831,4 +831,3 @@
         </div>
     {/if}
 </Modal>
-

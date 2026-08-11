@@ -296,7 +296,7 @@
 </script>
 <svelte:window onclick={() => (openDropdown = null)} />
 
-<div class="h-full flex flex-col overflow-hidden">
+<div class="h-full min-h-0 flex flex-col overflow-hidden">
     <TabBar
         tabs={[
             { id: "objects", label: "Objects", href: `/s3/bucket/${encodeURIComponent(bucket)}/objects` },
@@ -304,7 +304,7 @@
         ]}
         activeTab="objects"
     />
-<div class="flex-1 relative overflow-hidden flex flex-col bg-gray-950">
+<div class="flex-1 min-h-0 relative overflow-hidden flex flex-col bg-gray-950">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >

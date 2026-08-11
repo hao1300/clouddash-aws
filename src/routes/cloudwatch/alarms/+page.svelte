@@ -124,7 +124,7 @@
     </div>
 {/snippet}
 
-<div class="h-full flex flex-col overflow-hidden">
+<div class="h-full min-h-0 flex flex-col overflow-hidden">
 <TabBar
     tabs={[
         { id: "alarms", label: "Alarms", href: "/cloudwatch/alarms" },
@@ -134,7 +134,7 @@
     ]}
     activeTab="alarms"
 />
-<div class="flex-1 overflow-hidden relative">
+<div class="flex-1 min-h-0 overflow-hidden relative">
 <PaginatedTable
     items={alarms}
     loading={alarmsLoading}

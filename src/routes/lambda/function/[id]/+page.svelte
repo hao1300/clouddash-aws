@@ -410,7 +410,7 @@
     }
 </script>
 
-<div class="h-full flex flex-col bg-gray-950 overflow-hidden relative">
+<div class="h-full min-h-0 flex flex-col bg-gray-950 overflow-hidden relative">
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
         >
@@ -527,13 +527,13 @@
                         />
                     </button>
                     <div class="{isInvokeSidebarCollapsed ? 'opacity-0 invisible' : 'opacity-100 visible'} transition-all duration-300 h-full flex flex-col w-80">
-                        <div class="bg-gray-900 rounded-xl border border-gray-800 flex flex-col overflow-hidden h-full shadow-sm">
+                        <div class="bg-gray-900 rounded-xl border border-gray-800 flex flex-col overflow-hidden h-full min-h-0 shadow-sm">
                             <div class="p-4 border-b border-gray-800 bg-gray-900/50">
                                 <h3 class="text-xs font-bold text-gray-100 uppercase tracking-widest">
                                     Recent Payloads
                                 </h3>
                             </div>
-                            <div class="flex-1 overflow-auto p-4 space-y-3 bg-gray-950/50">
+                            <div class="flex-1 min-h-0 overflow-auto overscroll-contain p-4 space-y-3 bg-gray-950/50">
                                 {#if invokeHistory.length === 0}
                                     <div class="text-[10px] text-gray-600 italic text-center py-4 border border-gray-800 border-dashed rounded bg-gray-900/50">
                                         No recent history.

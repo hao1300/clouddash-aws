@@ -66,7 +66,7 @@
     }
 </script>
 
-<div class="h-full w-full bg-black rounded-lg overflow-hidden border border-gray-800">
+<div class="h-full min-h-0 w-full bg-black rounded-lg overflow-hidden border border-gray-800">
     <SvelteFlow
         {nodes}
         {edges}

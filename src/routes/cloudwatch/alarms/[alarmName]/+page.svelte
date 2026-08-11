@@ -343,7 +343,7 @@
         {#snippet sidebarSnippet()}
             <!-- History List Sidebar -->
             <div
-                class="bg-gray-900 rounded-xl border border-gray-800 flex flex-col overflow-hidden h-full"
+                class="bg-gray-900 rounded-xl border border-gray-800 flex flex-col overflow-hidden h-full min-h-0"
             >
                 <div class="p-4 border-b border-gray-800 bg-gray-900/50">
                     <h3
@@ -352,7 +352,7 @@
                         Recent Events
                     </h3>
                 </div>
-                <div class="flex-1 overflow-auto p-4 space-y-3 bg-gray-950/50">
+                <div class="flex-1 min-h-0 overflow-auto overscroll-contain p-4 space-y-3 bg-gray-950/50">
                     {#if historyLoading && alarmHistory.length === 0}
                         <div class="text-xs text-gray-600 animate-pulse">
                             Loading events...

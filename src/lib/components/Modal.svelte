@@ -56,7 +56,7 @@
             </div>
 
             <!-- Body -->
-            <div class="flex-1 p-5 {overflowVisible ? '' : 'overflow-auto'}">
+            <div class="flex-1 min-h-0 p-5 {overflowVisible ? '' : 'overflow-auto overscroll-contain'}">
                 {@render children()}
             </div>
         </div>

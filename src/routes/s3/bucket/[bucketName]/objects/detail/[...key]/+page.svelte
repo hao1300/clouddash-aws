@@ -242,14 +242,14 @@
     }
 </script>
 
-<div class="h-full bg-gray-950 flex flex-col overflow-hidden">
+<div class="h-full min-h-0 bg-gray-950 flex flex-col overflow-hidden">
     {#if error}
         <div class="bg-red-500/20 text-red-300 p-3 text-xs border-b border-red-500/30">
             {error}
         </div>
     {/if}
 
-    <div class="flex-1 overflow-auto p-6 space-y-6">
+    <div class="flex-1 min-h-0 overflow-auto overscroll-contain p-6 space-y-6">
         <!-- Header Actions -->
         <div class="flex justify-between items-start">
             <h1 class="text-xl font-bold text-white tracking-tight truncate flex-1 mr-4">

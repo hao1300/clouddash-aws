@@ -117,7 +117,7 @@
     }
 </script>
 
-<div class="h-full flex flex-col overflow-hidden">
+<div class="h-full min-h-0 flex flex-col overflow-hidden">
     <TabBar
         tabs={[
             { id: "messages", label: "Messages", href: `/sqs/queue/${encodeURIComponent(queueName)}/messages?url=${encodeURIComponent(queueUrl)}` },
@@ -126,7 +126,7 @@
         activeTab="metrics"
     />
 <div
-    class="flex-1 flex flex-col bg-gray-950 text-white overflow-hidden relative"
+    class="flex-1 min-h-0 flex flex-col bg-gray-950 text-white overflow-hidden relative"
 >
     <!-- Header with Time Selector -->
     <div
@@ -153,7 +153,7 @@
     </div>
 
     <!-- Scrollable Content -->
-    <div class="flex-1 overflow-auto p-4 custom-scrollbar">
+    <div class="flex-1 min-h-0 overflow-auto overscroll-contain p-4 custom-scrollbar">
         <!-- Summary Cards -->
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
             {#each [

@@ -97,7 +97,7 @@
         goto(`/ec2/instances/${id}`);
     }
 </script>
-<div class="h-full flex flex-col overflow-hidden">
+<div class="h-full min-h-0 flex flex-col overflow-hidden">
 <TabBar
     tabs={[
         { id: "instances", label: "Instances", href: "/ec2/instances" },
@@ -110,7 +110,7 @@
     ]}
     activeTab="instances"
 />
-<div class="flex-1 overflow-hidden relative">
+<div class="flex-1 min-h-0 overflow-hidden relative">
 {#snippet stateCell(v: string)}
     <div class="flex items-center gap-1.5">
         <Icon
@@ -125,7 +125,7 @@
         <span class="capitalize">{v}</span>
     </div>
 {/snippet}
-<div class="h-full relative overflow-hidden flex flex-col">
+<div class="h-full min-h-0 relative overflow-hidden flex flex-col">
 
     {#if error}<div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"

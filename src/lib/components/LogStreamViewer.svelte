@@ -236,7 +236,7 @@
     }
 </script>
 
-<div class="h-full relative overflow-hidden flex flex-col bg-gray-950">
+<div class="h-full min-h-0 relative overflow-hidden flex flex-col bg-gray-950">
     {#if error}
         <div
             class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30"
@@ -255,7 +255,7 @@
     <div
         class="flex-1 flex flex-col min-h-0 {error || actionMsg ? 'pt-8' : ''}"
     >
-        <div class="h-full flex flex-col bg-gray-950">
+        <div class="h-full min-h-0 flex flex-col bg-gray-950">
             <div
                 class="bg-gray-900 border-b border-gray-800 p-3 flex gap-3 items-center flex-wrap"
             >
@@ -296,7 +296,7 @@
                     </button>
                 </div>
             </div>
-            <div bind:this={scrollContainer} class="flex-1 overflow-auto p-4">
+            <div bind:this={scrollContainer} class="flex-1 min-h-0 overflow-auto overscroll-contain p-4">
                 {#if logEventsLoading && loadingDirection === "initial"}
                     <div
                         class="h-40 flex items-center justify-center text-gray-400 text-sm animate-pulse"

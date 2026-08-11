@@ -26,7 +26,7 @@
     } = $props();
 </script>
 
-<div class="h-full relative overflow-hidden flex flex-col bg-gray-950 w-full text-white">
+<div class="h-full min-h-0 relative overflow-hidden flex flex-col bg-gray-950 w-full text-white">
     {#if error}
         <div class="bg-red-500/20 text-red-300 p-2 text-xs absolute top-0 left-0 right-0 z-50 border-b border-red-500/30">
             {error}
@@ -38,7 +38,7 @@
         </div>
     {/if}
 
-    <div class="flex-1 overflow-auto p-2 transition-all duration-300 ease-in-out {error || actionMsg ? 'pt-8' : ''}">
+    <div class="flex-1 min-h-0 overflow-auto overscroll-contain p-2 transition-all duration-300 ease-in-out {error || actionMsg ? 'pt-8' : ''}">
         <div class="{fullWidth ? 'w-full' : 'max-w-6xl mx-auto w-full'} flex flex-col gap-4 {bottomSnippet ? 'min-h-full' : 'h-full min-h-0'}">
             <!-- Header -->
             {#if !hideTitle}
@@ -55,13 +55,13 @@
             <!-- Content Area -->
             <div class="flex flex-col lg:flex-row {bottomSnippet ? 'shrink-0' : 'flex-1 lg:h-full lg:min-h-0'} gap-4">
                 <!-- Main Content Section -->
-                <div class="flex-1 min-w-0 transition-all duration-300 {bottomSnippet ? '' : 'lg:h-full'}">
+                <div class="flex-1 min-h-0 min-w-0 transition-all duration-300 {bottomSnippet ? '' : 'lg:h-full'}">
                     {@render mainSnippet()}
                 </div>
 
                 <!-- Sidebar Section -->
                 {#if sidebarSnippet}
-                    <div class="{isSidebarCollapsed ? 'lg:w-10' : 'w-full lg:w-80'} shrink-0 transition-all duration-300 flex flex-col relative {bottomSnippet ? 'self-stretch' : 'min-h-[300px] lg:h-full'}">
+                    <div class="{isSidebarCollapsed ? 'lg:w-10' : 'w-full lg:w-80'} shrink-0 transition-all duration-300 flex flex-col relative {bottomSnippet ? 'self-stretch min-h-0' : 'min-h-[300px] lg:min-h-0 lg:h-full'}">
                         <button
                             onclick={() => isSidebarCollapsed = !isSidebarCollapsed}
                             class="absolute -left-3 top-1/2 -translate-y-1/2 bg-gray-800 border border-gray-700 rounded-full p-1 text-gray-400 hover:text-white hover:bg-gray-700 z-10 hidden lg:block shadow-md focus:outline-none"
@@ -71,7 +71,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                             </svg>
                         </button>
-                        <div class="{isSidebarCollapsed ? 'lg:opacity-0 lg:invisible' : 'opacity-100 visible'} transition-all duration-300 flex-1 lg:h-full flex flex-col gap-4 w-full lg:w-80 overflow-y-auto overflow-x-hidden">
+                        <div class="{isSidebarCollapsed ? 'lg:opacity-0 lg:invisible' : 'opacity-100 visible'} transition-all duration-300 flex-1 min-h-0 lg:h-full flex flex-col gap-4 w-full lg:w-80 overflow-y-auto overflow-x-hidden overscroll-contain">
                             {@render sidebarSnippet()}
                         </div>
                     </div>
@@ -80,7 +80,7 @@
 
             <!-- Bottom Section -->
             {#if bottomSnippet}
-                <div class="flex-1 min-w-0 transition-all duration-300 mt-2 flex flex-col">
+                <div class="flex-1 min-h-0 min-w-0 transition-all duration-300 mt-2 flex flex-col">
                     {@render bottomSnippet()}
                 </div>
             {/if}
