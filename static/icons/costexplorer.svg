@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="80px" height="80px" viewBox="0 0 80 80" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>Cost Explorer</title>
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect fill="#8C4FFF" x="0" y="0" width="80" height="80"></rect>
+        <g fill="#FFFFFF">
+            <path d="M15,60 L65,60 L65,63 L15,63 L15,17 L18,17 L18,60 Z"></path>
+            <path d="M23,44 L31,44 L31,60 L23,60 Z"></path>
+            <path d="M36,36 L44,36 L44,60 L36,60 Z"></path>
+            <path d="M49,27 L57,27 L57,60 L49,60 Z"></path>
+            <path d="M64.0606602,15 L64.0606602,26 L61.0606602,26 L61.0606602,20.1213203 L43.5606602,37.6213203 L36.5606602,30.6213203 L24.6213203,42.5606602 L22.5,40.4393398 L36.5606602,26.3786797 L43.5606602,33.3786797 L58.9393398,18 L53.0606602,18 L53.0606602,15 Z"></path>
+        </g>
+    </g>
+</svg>

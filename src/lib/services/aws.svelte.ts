@@ -14,6 +14,7 @@ import { ElasticBeanstalkClient } from "@aws-sdk/client-elastic-beanstalk";
 import { CloudFormationClient } from "@aws-sdk/client-cloudformation";
 import { SESClient } from "@aws-sdk/client-ses";
 import { SSMClient } from "@aws-sdk/client-ssm";
+import { CostExplorerClient } from "@aws-sdk/client-cost-explorer";
 import { fetch } from "@tauri-apps/plugin-http";
 import type { AwsCreds } from "./aws-creds";
 import {
@@ -135,6 +136,10 @@ class AwsState {
     cloudFormation = $derived(this.#config ? new CloudFormationClient(this.#config) : null);
     ses = $derived(this.#config ? new SESClient(this.#config) : null);
     ssm = $derived(this.#config ? new SSMClient(this.#config) : null);
+    // Cost Explorer only answers on its partition-wide endpoint (ce.us-east-1
+    // for the aws partition); the SDK ruleset redirects there and signs for
+    // that region, so the configured region is irrelevant here.
+    costExplorer = $derived(this.#config ? new CostExplorerClient(this.#config) : null);
 
     #s3Clients = new Map<string, S3Client>();
     #cwClients = new Map<string, CloudWatchClient>();

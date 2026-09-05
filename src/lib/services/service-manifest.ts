@@ -130,5 +130,11 @@ export const SERVICE_MANIFEST: Record<string, ServiceEntry> = {
         icon: "/icons/parameterstore.svg",
         tabs: {
         }
+    },
+    costexplorer: {
+        label: "Cost Explorer",
+        icon: "/icons/costexplorer.svg",
+        tabs: {
+        }
     }
 };
