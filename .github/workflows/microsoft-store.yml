@@ -1,0 +1,125 @@
+name: Microsoft Store
+
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: Submit an update for certification after the first Store publication
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build Windows x64 MSIX
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: microsoft-store-x64
+
+      - run: npm ci
+
+      - name: Build CloudDash for the Store
+        env:
+          VITE_CLOUDDASH_MICROSOFT_STORE: 'true'
+        run: npm run tauri-build -- --no-bundle --target x86_64-pc-windows-msvc --features microsoft-store --ci
+
+      - name: Package MSIX
+        run: ./scripts/package-microsoft-store.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clouddash-microsoft-store-x64
+          path: release-dist/microsoft-store/clouddash-windows-x64.msix
+          if-no-files-found: error
+
+  submit:
+    name: Submit update for Microsoft Store certification
+    if: inputs.submit
+    needs: package
+    runs-on: windows-latest
+    timeout-minutes: 25
+    environment: microsoft-store
+    concurrency:
+      group: microsoft-store-submission
+      cancel-in-progress: false
+    steps:
+      - name: Require the release branch
+        if: github.ref != 'refs/heads/main'
+        run: throw 'Microsoft Store updates must be submitted from main.'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: clouddash-microsoft-store-x64
+          path: store-package
+
+      - name: Install the Microsoft Store Developer CLI
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'MSStoreCLI-win-x64.zip'
+          $cliDir = Join-Path $env:RUNNER_TEMP 'msstore-cli'
+          Invoke-WebRequest 'https://github.com/microsoft/msstore-cli/releases/download/v0.4.4/MSStoreCLI-win-x64.zip' -OutFile $zip
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne 'd288a324541dc68244a683eb5b6445e9239bb47d1e6acf5cca4d1476017f1447') {
+            throw 'Microsoft Store Developer CLI checksum mismatch.'
+          }
+          Expand-Archive -LiteralPath $zip -DestinationPath $cliDir
+          $cli = Get-ChildItem -LiteralPath $cliDir -Recurse -Filter msstore.exe -File | Select-Object -First 1
+          if (-not $cli) { throw 'The Microsoft Store Developer CLI archive did not contain msstore.exe.' }
+          $cli.DirectoryName >> $env:GITHUB_PATH
+
+      - name: Authenticate to Partner Center
+        env:
+          MS_STORE_TENANT_ID: ${{ secrets.MS_STORE_TENANT_ID }}
+          MS_STORE_SELLER_ID: ${{ secrets.MS_STORE_SELLER_ID }}
+          MS_STORE_CLIENT_ID: ${{ secrets.MS_STORE_CLIENT_ID }}
+          MS_STORE_CLIENT_SECRET: ${{ secrets.MS_STORE_CLIENT_SECRET }}
+        run: |
+          if (!$env:MS_STORE_TENANT_ID -or !$env:MS_STORE_SELLER_ID -or !$env:MS_STORE_CLIENT_ID -or !$env:MS_STORE_CLIENT_SECRET) {
+            throw 'Configure the four MS_STORE_* secrets in the microsoft-store GitHub environment.'
+          }
+          msstore reconfigure --tenantId $env:MS_STORE_TENANT_ID --sellerId $env:MS_STORE_SELLER_ID --clientId $env:MS_STORE_CLIENT_ID --clientSecret $env:MS_STORE_CLIENT_SECRET
+
+      - name: Upload the package and submit for certification
+        env:
+          STORE_PRODUCT_ID: 9NTQGXWN04TD
+          STORE_US_PRICE_ID: Tier1022
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $app = msstore apps get $env:STORE_PRODUCT_ID | Out-String | ConvertFrom-Json
+          if (!$app.LastPublishedApplicationSubmission.Id) {
+            throw 'Complete the first publication in Partner Center before submitting updates from GitHub Actions.'
+          }
+          if ($app.PendingApplicationSubmission.Id) {
+            throw 'Partner Center already has a pending submission. Finish it before submitting another update.'
+          }
+
+          $published = msstore submission get $env:STORE_PRODUCT_ID | Out-String | ConvertFrom-Json
+          if ($published.Pricing.PriceId -ne $env:STORE_US_PRICE_ID) {
+            throw 'The published submission does not expose the expected US$1.99 base tier. Review pricing and upload this package manually in Partner Center.'
+          }
+
+          $package = (Resolve-Path -LiteralPath 'store-package/clouddash-windows-x64.msix').Path
+          msstore publish . --appId $env:STORE_PRODUCT_ID --inputFile $package --noCommit
+
+          $draft = msstore submission get $env:STORE_PRODUCT_ID | Out-String | ConvertFrom-Json
+          $publishedPricing = $published.Pricing | ConvertTo-Json -Depth 20 -Compress
+          $draftPricing = $draft.Pricing | ConvertTo-Json -Depth 20 -Compress
+          if ($draft.Id -eq $published.Id -or $draftPricing -ne $publishedPricing) {
+            throw 'Could not verify that the new draft preserved the published pricing. Review the draft in Partner Center.'
+          }
+
+          msstore submission publish $env:STORE_PRODUCT_ID

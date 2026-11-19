@@ -40,13 +40,16 @@ pub extern "C" fn Java_dev_clouddash_aws_MainActivity_onBackPressedNative(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default();
+    let builder = tauri::Builder::default();
 
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    {
-        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
-        builder = builder.plugin(tauri_plugin_process::init());
-    }
+    #[cfg(not(any(
+        target_os = "android",
+        target_os = "ios",
+        feature = "microsoft-store"
+    )))]
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
 
     builder
         .setup(|app| {
