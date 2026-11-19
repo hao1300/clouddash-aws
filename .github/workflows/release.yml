@@ -437,3 +437,13 @@ jobs:
             args+=(--prerelease)
           fi
           gh "${args[@]}"
+
+  microsoft-store:
+    name: Release to Microsoft Store
+    needs: [prepare, publish]
+    if: github.ref == 'refs/heads/main' && needs.prepare.outputs.draft == 'false' && needs.prepare.outputs.prerelease == 'false'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/microsoft-store.yml
+    with:
+      submit: true
