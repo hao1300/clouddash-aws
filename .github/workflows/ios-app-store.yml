@@ -97,13 +97,14 @@ jobs:
           if original.count(identity) != 2:
               raise SystemExit('Expected the two iOS signing configurations in the Xcode project.')
           settings = {
-              'CODE_SIGN_IDENTITY': 'Apple Distribution',
+              'CODE_SIGN_IDENTITY': json.dumps('Apple Distribution'),
+              # Tauri copies this token into the export plist without trimming quotes.
               'CODE_SIGN_STYLE': 'Manual',
-              'DEVELOPMENT_TEAM': os.environ['APPLE_DEVELOPMENT_TEAM'],
-              'PROVISIONING_PROFILE': uuid,
-              'PROVISIONING_PROFILE_SPECIFIER': name,
+              'DEVELOPMENT_TEAM': json.dumps(os.environ['APPLE_DEVELOPMENT_TEAM']),
+              'PROVISIONING_PROFILE': json.dumps(uuid),
+              'PROVISIONING_PROFILE_SPECIFIER': json.dumps(name),
           }
-          replacement = '\n\t\t\t\t'.join(f'{key} = {json.dumps(value)};' for key, value in settings.items())
+          replacement = '\n\t\t\t\t'.join(f'{key} = {value};' for key, value in settings.items())
           project.write_text(original.replace(identity, replacement))
           PY
 
