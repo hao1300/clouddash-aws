@@ -45,6 +45,7 @@ keychain_password="$(openssl rand -hex 24)"
 security create-keychain -p "$keychain_password" "$keychain"
 security unlock-keychain -p "$keychain_password" "$keychain"
 security set-keychain-settings -lut 3600 "$keychain"
+security list-keychains -d user -s "$keychain"
 
 # The Mac App Store distribution identities are issued under Apple's WWDR G3 intermediate.
 curl --fail --silent --show-error --location --retry 3 \
@@ -75,7 +76,9 @@ cp src-tauri/macos/AppStore.entitlements "$entitlements"
 "$plist" -c "Add :com.apple.developer.team-identifier string $team_id" "$entitlements"
 install -m 0644 "$profile" "$app/Contents/embedded.provisionprofile"
 
+printf 'Signing the CloudDash app bundle.\n'
 codesign --force --sign "$app_identity" --keychain "$keychain" --entitlements "$entitlements" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
+printf 'Signing the Mac App Store installer package.\n'
 productbuild --component "$app" /Applications --sign "$installer_identity" --keychain "$keychain" "$package"
 pkgutil --check-signature "$package"
