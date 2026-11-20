@@ -22,6 +22,22 @@ DISCLAIMER: CloudDash is not affiliated with Amazon Web Services.
 - Provide native desktop builds for Windows, Linux, and macOS, plus Android builds where supported. iOS builds are not available until we have more funding.
 - Make the source available so users can inspect, build, and contribute to the app.
 
+## Mac App Store package
+
+The [Mac App Store workflow](.github/workflows/mac-app-store.yml) builds a universal Apple Silicon and Intel app, verifies its signature, and produces a signed `CloudDash-for-AWS.pkg`. Set these secrets in the GitHub `mac-app-store` environment before running it:
+
+| Secret | Value |
+| --- | --- |
+| `MAC_APP_STORE_APP_CERTIFICATE` | Base64-encoded `.p12` export of the Apple Distribution or Mac App Distribution certificate and its private key. |
+| `MAC_APP_STORE_APP_CERTIFICATE_PASSWORD` | Password for that `.p12` export. |
+| `MAC_APP_STORE_INSTALLER_CERTIFICATE` | Base64-encoded `.p12` export of the Mac Installer Distribution certificate and its private key. |
+| `MAC_APP_STORE_INSTALLER_CERTIFICATE_PASSWORD` | Password for that `.p12` export. |
+| `MAC_APP_STORE_PROVISIONING_PROFILE` | Base64-encoded Mac App Store Connect provisioning profile for `dev.clouddash.aws`, created with the same app distribution certificate. |
+
+Run **Actions → Mac App Store → Run workflow** and download the `clouddash-mac-app-store` artifact. Upload the `.pkg` using Transporter on a Mac. The package uses the marketing version from [the Tauri configuration](src-tauri/tauri.conf.json) and a build number based on the workflow run and attempt. Set the App Store Connect macOS version to the matching marketing version before attaching the processed build.
+
+See the [Apple app record guide](https://developer.apple.com/help/app-store-connect/create-an-app-record/add-a-new-app/) and [Tauri App Store guide](https://v2.tauri.app/distribute/app-store/).
+
 ## Sponsorship
 
 CloudDash development is sponsored by [Chrome-Stats](https://chrome-stats.com/), a platform for researching Chrome extensions, browser ecosystem data, and extension market trends.

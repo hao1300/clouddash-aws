@@ -18,7 +18,8 @@
     let os = $state("windows");
     let version = $state("0.0.0");
     let isDesktop = $derived(os !== "android" && os !== "ios");
-    const isMicrosoftStoreBuild = import.meta.env.VITE_CLOUDDASH_MICROSOFT_STORE === "true";
+    const isStoreBuild = import.meta.env.VITE_CLOUDDASH_MICROSOFT_STORE === "true" ||
+        import.meta.env.VITE_CLOUDDASH_APPLE_STORE === "true";
 
     // Update check state
     let updateChecking = $state(false);
@@ -668,7 +669,7 @@
                     </div>
 
                     <div class="flex flex-col gap-2 w-full max-w-xs">
-                        {#if isDesktop && !isMicrosoftStoreBuild}
+                        {#if isDesktop && !isStoreBuild}
                             <div class="flex flex-col gap-1.5">
                                 {#if updateStatus === "available" && updateAvailable}
                                     <button

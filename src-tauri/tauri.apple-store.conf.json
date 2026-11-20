@@ -1,0 +1,11 @@
+{
+  "productName": "CloudDash for AWS",
+  "bundle": {
+    "targets": ["app"],
+    "category": "DeveloperTool",
+    "createUpdaterArtifacts": false,
+    "macOS": {
+      "entitlements": "macos/AppStore.entitlements"
+    }
+  }
+}
