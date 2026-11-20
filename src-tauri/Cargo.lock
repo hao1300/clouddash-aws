@@ -854,6 +854,9 @@ dependencies = [
  "tauri-plugin-scoped-storage",
  "tauri-plugin-updater",
  "tokio",
+ "windows",
+ "windows-collections",
+ "windows-future",
 ]
 
 [[package]]

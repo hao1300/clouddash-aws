@@ -12,7 +12,7 @@ interface Entitlement {
     accountId: string;
     trialEndsAt: number | null;
     playProductId: string | null;
-    windowsCheckout: boolean;
+    microsoftProductId: string | null;
 }
 
 interface PlayPurchase {
@@ -56,6 +56,7 @@ class ProService {
         if (response.status === 409 && action === "sign-in") throw new Error("Finish Google sign-in in your browser, then try again.");
         if (response.status === 409 && action === "play-purchase") throw new Error("Google Play is still processing your payment.");
         if (response.status === 422 && action === "play-purchase") throw new Error("This purchase belongs to another CloudDash account or is no longer active.");
+        if (response.status === 422 && action === "microsoft-purchase") throw new Error("No unclaimed CloudDash Pro purchase was found on this Microsoft Store account. If you just bought it, try Restore Microsoft Store purchase in a moment.");
         if (!response.ok) throw new Error("CloudDash Pro is unavailable. Try again shortly.");
         if (response.status === 204) return undefined as T;
         return response.json();
@@ -114,15 +115,31 @@ class ProService {
         return offer.price;
     }
 
-    async buyOnWindows() {
-        if (!microsoftStoreBuild || !this.entitlement?.windowsCheckout) return;
-        const { url } = await this.request<{ url: string }>("windows-checkout", "POST");
-        if (new URL(url).origin !== "https://checkout.stripe.com") throw new Error("CloudDash could not open checkout.");
-        await openUrl(url);
+    async getMicrosoftPrice() {
+        const productId = this.entitlement?.microsoftProductId;
+        if (!microsoftStoreBuild || !productId) return null;
+        const offer = await invoke<{ price: string }>("microsoft_billing", { action: "price", productId });
+        return offer.price;
     }
 
-    get canBuyOnWindows() {
-        return microsoftStoreBuild && Boolean(this.entitlement?.windowsCheckout);
+    get canRestoreMicrosoft() {
+        return microsoftStoreBuild && Boolean(this.entitlement?.microsoftProductId);
+    }
+
+    async microsoftPurchase(action: "purchase" | "restore") {
+        if (!microsoftStoreBuild) return;
+        const current = await this.refresh();
+        const productId = current?.microsoftProductId;
+        if (!current || !productId || (action === "purchase" && current.state === "pro")) return;
+        const { ticket } = await this.request<{ ticket: string }>("microsoft-ticket", "POST");
+        if (action === "purchase") {
+            const { purchased } = await invoke<{ purchased: boolean }>("microsoft_billing", { action, productId });
+            if (!purchased) return;
+        }
+        const { key } = await invoke<{ key: string }>("microsoft_billing", {
+            action: "store-key", productId, serviceTicket: ticket, accountId: current.accountId,
+        });
+        this.entitlement = await this.request<Entitlement>("microsoft-purchase", "POST", { key });
     }
 
     async playPurchase(action: "purchase" | "restore") {

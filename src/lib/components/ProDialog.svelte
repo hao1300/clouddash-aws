@@ -7,6 +7,7 @@
     let busy = $state(false);
     let message = $state("");
     let price = $state<string | null>(null);
+    let microsoftPrice = $state<string | null>(null);
     const button = "px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50";
 
     $effect(() => {
@@ -19,7 +20,10 @@
         message = "";
         try {
             await action();
-            if (pro.entitlement?.state !== "pro") price = await pro.getPlayPrice().catch(() => null);
+            if (pro.entitlement?.state !== "pro") {
+                price = await pro.getPlayPrice().catch(() => null);
+                microsoftPrice = await pro.getMicrosoftPrice().catch(() => null);
+            }
         } catch (error) {
             message = error instanceof Error ? error.message : String(error);
         } finally {
@@ -54,12 +58,15 @@
                 {#if pro.entitlement?.state !== "pro"}
                     {#if price}
                         <button class={button} disabled={busy} onclick={() => run(() => pro.playPurchase("purchase"))}>Buy Pro for {price}</button>
-                    {:else if pro.canBuyOnWindows}
-                        <button class={button} disabled={busy} onclick={() => run(() => pro.buyOnWindows())}>Buy Pro for $1.99 USD</button>
+                    {:else if microsoftPrice}
+                        <button class={button} disabled={busy} onclick={() => run(() => pro.microsoftPurchase("purchase"))}>Buy Pro for {microsoftPrice}</button>
                     {/if}
                     {#if pro.os === "android" && pro.entitlement?.playProductId}
                         <button class={button} disabled={busy} onclick={() => run(() => pro.playPurchase("restore"))}>Restore Google Play purchase</button>
                     {/if}
+                {/if}
+                {#if pro.canRestoreMicrosoft}
+                    <button class={button} disabled={busy} onclick={() => run(() => pro.microsoftPurchase("restore"))}>Restore Microsoft Store purchase</button>
                 {/if}
                 <button class={button} disabled={busy} onclick={() => run(() => pro.refresh())}>Refresh Pro status</button>
                 <button class={button} disabled={busy} onclick={() => run(() => pro.signOut())}>Sign out</button>

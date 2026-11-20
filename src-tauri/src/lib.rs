@@ -1,3 +1,4 @@
+mod microsoft_billing;
 mod play_billing;
 mod state;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -70,6 +71,7 @@ pub fn run() {
             set_back_button_intercept,
             exit_app,
             play_billing::play_billing,
+            microsoft_billing::microsoft_billing,
             state::list_profiles,
             state::authenticate,
             state::get_credentials,
