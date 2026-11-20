@@ -83,6 +83,13 @@ jobs:
           profile_dir="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
           mkdir -p "$profile_dir"
           install -m 600 "$profile_file" "$profile_dir/$profile_uuid.mobileprovision"
+          export XCODE_XCCONFIG_FILE="$RUNNER_TEMP/CloudDash-iOS-Signing.xcconfig"
+          cat > "$XCODE_XCCONFIG_FILE" <<EOF
+          CODE_SIGN_STYLE = Manual
+          CODE_SIGN_IDENTITY = Apple Distribution
+          DEVELOPMENT_TEAM = $APPLE_DEVELOPMENT_TEAM
+          PROVISIONING_PROFILE_SPECIFIER = $profile_uuid
+          EOF
 
           release_plist="$RUNNER_TEMP/CloudDash-iOS-Release.plist"
           plutil -create xml1 "$release_plist"
