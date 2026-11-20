@@ -28,6 +28,7 @@ jobs:
         with:
           workspaces: src-tauri -> target
           key: mac-app-store-universal
+          cache-on-failure: true
 
       - run: npm ci
 
