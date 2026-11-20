@@ -1,0 +1,169 @@
+name: iOS App Store
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version in the iOS App Store Connect draft
+        required: true
+        default: '1.0'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-app-store
+  cancel-in-progress: false
+
+jobs:
+  build-and-upload:
+    name: Build, sign, and upload the iPhone and iPad app
+    runs-on: macos-26
+    timeout-minutes: 60
+    environment: ios-app-store
+    env:
+      STORE_VERSION: ${{ inputs.version }}
+      STORE_BUILD: ${{ github.run_number }}.${{ github.run_attempt }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ios-app-store
+          cache-on-failure: true
+
+      - run: npm ci
+
+      - name: Build and sign the App Store IPA
+        shell: bash
+        env:
+          VITE_CLOUDDASH_APPLE_STORE: 'true'
+          IOS_CERTIFICATE: ${{ secrets.IOS_APP_STORE_CERTIFICATE }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_APP_STORE_CERTIFICATE_PASSWORD }}
+          IOS_MOBILE_PROVISION: ${{ secrets.IOS_APP_STORE_PROVISIONING_PROFILE }}
+        run: |
+          set -euo pipefail
+          for name in IOS_CERTIFICATE IOS_CERTIFICATE_PASSWORD IOS_MOBILE_PROVISION; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Configure the iOS distribution certificate and provisioning profile in the ios-app-store environment (missing $name)."
+              exit 1
+            fi
+          done
+
+          if [[ ! "$STORE_VERSION" =~ ^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){1,2}$ ]]; then
+            echo '::error::Enter an App Store version such as 1.0 or 1.1.2.'
+            exit 1
+          fi
+
+          xcodebuild -version
+          sdk_version="$(xcrun --sdk iphoneos --show-sdk-version)"
+          if [[ "${sdk_version%%.*}" -lt 26 ]]; then
+            echo "::error::App Store Connect requires the iOS 26 SDK or later (found $sdk_version)."
+            exit 1
+          fi
+
+          release_plist="$RUNNER_TEMP/CloudDash-iOS-Release.plist"
+          plutil -create xml1 "$release_plist"
+          plutil -insert CFBundleShortVersionString -string "$STORE_VERSION" "$release_plist"
+          plutil -insert CFBundleVersion -string "$STORE_BUILD" "$release_plist"
+          config="$(node - "$release_plist" <<'NODE'
+          const versionParts = process.env.STORE_VERSION.split('.');
+          if (versionParts.length === 2) versionParts.push('0');
+          process.stdout.write(JSON.stringify({
+            productName: 'CloudDash for AWS',
+            version: versionParts.join('.'),
+            bundle: {
+              createUpdaterArtifacts: false,
+              iOS: { bundleVersion: process.env.STORE_BUILD, infoPlist: process.argv[2] },
+            },
+          }));
+          NODE
+          )"
+          npm run tauri-ios-build -- --ci --target aarch64 --features apple-app-store \
+            --export-method app-store-connect --config "$config"
+
+          ipa="$(find src-tauri/gen/apple -type f -name '*.ipa' -print)"
+          if [[ ! -f "$ipa" ]]; then
+            echo '::error::Expected exactly one exported iOS IPA.'
+            exit 1
+          fi
+          cp "$ipa" "$RUNNER_TEMP/clouddash-ios.ipa"
+
+      - name: Verify the signed IPA and supported devices
+        shell: bash
+        run: |
+          set -euo pipefail
+          verify_dir="$(mktemp -d "$RUNNER_TEMP/clouddash-ios-verify.XXXXXX")"
+          ditto -x -k "$RUNNER_TEMP/clouddash-ios.ipa" "$verify_dir"
+          apps=("$verify_dir"/Payload/*.app)
+          if [[ "${#apps[@]}" -ne 1 || ! -d "${apps[0]}" ]]; then
+            echo '::error::Expected a single signed app in the IPA.'
+            exit 1
+          fi
+          codesign --verify --deep --strict "${apps[0]}"
+          test -s "${apps[0]}/embedded.mobileprovision"
+          /usr/bin/python3 - "${apps[0]}/Info.plist" <<'PY'
+          import os
+          import plistlib
+          import sys
+
+          with open(sys.argv[1], 'rb') as info_file:
+              info = plistlib.load(info_file)
+          expected = {
+              'CFBundleIdentifier': 'dev.clouddash.aws',
+              'CFBundleShortVersionString': os.environ['STORE_VERSION'],
+              'CFBundleVersion': os.environ['STORE_BUILD'],
+              'UIDeviceFamily': [1, 2],
+          }
+          for key, value in expected.items():
+              if info.get(key) != value:
+                  raise SystemExit(f'{key}: expected {value!r}, found {info.get(key)!r}')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clouddash-ios-app-store
+          path: ${{ runner.temp }}/clouddash-ios.ipa
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload to App Store Connect for processing
+        shell: bash
+        env:
+          IOS_APP_STORE_API_ISSUER_ID: ${{ secrets.IOS_APP_STORE_API_ISSUER_ID }}
+          IOS_APP_STORE_API_KEY_ID: ${{ secrets.IOS_APP_STORE_API_KEY_ID }}
+          IOS_APP_STORE_API_PRIVATE_KEY: ${{ secrets.IOS_APP_STORE_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          for name in IOS_APP_STORE_API_ISSUER_ID IOS_APP_STORE_API_KEY_ID IOS_APP_STORE_API_PRIVATE_KEY; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Configure $name in the ios-app-store environment."
+              exit 1
+            fi
+          done
+
+          umask 077
+          upload_dir="$(mktemp -d "$RUNNER_TEMP/clouddash-ios-upload.XXXXXX")"
+          key_path="$upload_dir/private_keys/AuthKey_${IOS_APP_STORE_API_KEY_ID}.p8"
+          trap 'rm -f -- "$key_path"' EXIT
+          mkdir "$upload_dir/private_keys"
+          printf '%s\n' "$IOS_APP_STORE_API_PRIVATE_KEY" > "$key_path"
+          export API_PRIVATE_KEYS_DIR="$upload_dir/private_keys"
+          unset IOS_APP_STORE_API_PRIVATE_KEY
+
+          cd "$upload_dir"
+          xcrun altool --upload-app --type ios --file "$RUNNER_TEMP/clouddash-ios.ipa" \
+            --apiKey "$IOS_APP_STORE_API_KEY_ID" --apiIssuer "$IOS_APP_STORE_API_ISSUER_ID"
