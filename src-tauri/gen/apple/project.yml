@@ -39,7 +39,9 @@ targets:
     info:
       path: clouddash-aws_iOS/Info.plist
       properties:
+        CFBundleDisplayName: CloudDash for AWS
         LSRequiresIPhoneOS: true
+        NSCameraUsageDescription: CloudDash uses the camera to scan a QR code when you import an AWS profile.
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
@@ -62,6 +64,7 @@ targets:
     settings:
       base:
         ENABLE_BITCODE: false
+        TARGETED_DEVICE_FAMILY: "1,2"
         ARCHS: [arm64]
         VALID_ARCHS: arm64 
         LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)
