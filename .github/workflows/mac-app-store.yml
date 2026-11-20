@@ -1,0 +1,62 @@
+name: Mac App Store
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build and sign the universal macOS package
+    runs-on: macos-15
+    timeout-minutes: 60
+    environment: mac-app-store
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: mac-app-store-universal
+
+      - run: npm ci
+
+      - name: Build CloudDash for the Mac App Store
+        env:
+          VITE_CLOUDDASH_APPLE_STORE: 'true'
+        run: |
+          config="$(node -p 'JSON.stringify({bundle: {macOS: {
+            signingIdentity: "-", bundleVersion: `${process.env.GITHUB_RUN_NUMBER}.${process.env.GITHUB_RUN_ATTEMPT}`
+          }}})')"
+          npm run tauri-build -- --ci --target universal-apple-darwin --features apple-app-store \
+            --config src-tauri/tauri.apple-store.conf.json --config "$config"
+
+      - name: Sign and verify the Mac App Store package
+        env:
+          MAC_APP_STORE_APP_CERTIFICATE: ${{ secrets.MAC_APP_STORE_APP_CERTIFICATE }}
+          MAC_APP_STORE_APP_CERTIFICATE_PASSWORD: ${{ secrets.MAC_APP_STORE_APP_CERTIFICATE_PASSWORD }}
+          MAC_APP_STORE_INSTALLER_CERTIFICATE: ${{ secrets.MAC_APP_STORE_INSTALLER_CERTIFICATE }}
+          MAC_APP_STORE_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.MAC_APP_STORE_INSTALLER_CERTIFICATE_PASSWORD }}
+          MAC_APP_STORE_PROVISIONING_PROFILE: ${{ secrets.MAC_APP_STORE_PROVISIONING_PROFILE }}
+        run: |
+          bash scripts/sign-mac-app-store.sh \
+            'src-tauri/target/universal-apple-darwin/release/bundle/macos/CloudDash for AWS.app' \
+            "$RUNNER_TEMP/CloudDash-for-AWS.pkg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clouddash-mac-app-store
+          path: ${{ runner.temp }}/CloudDash-for-AWS.pkg
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

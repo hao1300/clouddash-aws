@@ -3,32 +3,37 @@ use aws_config::Region;
 use serde::Deserialize;
 use std::sync::Arc;
 use tauri::Emitter;
-// `Manager` is only needed for the mobile app_data_dir/document_dir lookups.
-#[cfg(any(target_os = "android", target_os = "ios"))]
 use tauri::Manager;
 use tokio::sync::RwLock;
 
-#[cfg_attr(not(any(target_os = "android", target_os = "ios")), allow(unused_variables))]
+const APPLE_STORE_SANDBOX: bool = cfg!(all(target_os = "macos", feature = "apple-app-store"));
+const IN_APP_STORAGE: bool =
+    cfg!(any(target_os = "android", target_os = "ios")) || APPLE_STORE_SANDBOX;
+
 fn get_aws_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    #[cfg(any(target_os = "android", target_os = "ios"))]
-    {
-        Ok(app_handle
+    if IN_APP_STORAGE {
+        return Ok(app_handle
             .path()
             .app_data_dir()
             .map_err(|e| e.to_string())?
-            .join(".aws"))
+            .join(".aws"));
     }
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    {
-        Ok(dirs::home_dir()
-            .ok_or("Could not find home directory")?
-            .join(".aws"))
-    }
+    Ok(dirs::home_dir()
+        .ok_or("Could not find home directory")?
+        .join(".aws"))
 }
 
 #[tauri::command]
-#[cfg_attr(not(any(target_os = "android", target_os = "ios")), allow(unused_variables))]
 pub fn get_default_download_directory(app_handle: tauri::AppHandle) -> Result<String, String> {
+    if APPLE_STORE_SANDBOX {
+        let path = app_handle
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?
+            .join("Downloads");
+        std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+        return Ok(path.to_string_lossy().to_string());
+    }
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         let path = app_handle
@@ -136,8 +141,7 @@ pub async fn authenticate(
 
     std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
 
-    #[cfg(any(target_os = "android", target_os = "ios"))]
-    {
+    if IN_APP_STORAGE {
         if let Ok(aws_dir) = get_aws_dir(&app_handle) {
             std::env::set_var("AWS_SHARED_CREDENTIALS_FILE", aws_dir.join("credentials"));
             std::env::set_var("AWS_CONFIG_FILE", aws_dir.join("config"));

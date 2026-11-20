@@ -20,6 +20,7 @@ tauri-build = { version = "2", features = [] }
 
 [features]
 microsoft-store = []
+apple-app-store = []
 
 [dependencies]
 tauri = { version = "2", features = [] }

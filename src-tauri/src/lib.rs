@@ -45,7 +45,8 @@ pub fn run() {
     #[cfg(not(any(
         target_os = "android",
         target_os = "ios",
-        feature = "microsoft-store"
+        feature = "microsoft-store",
+        feature = "apple-app-store"
     )))]
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
