@@ -7,17 +7,24 @@
         type ResultByTime,
     } from "@aws-sdk/client-cost-explorer";
     import { page } from "$app/stores";
+    import { invoke } from "@tauri-apps/api/core";
+    import { save } from "@tauri-apps/plugin-dialog";
+    import { exists, pickFolder, writeFile } from "tauri-plugin-scoped-storage-api";
     import { aws } from "$lib/services/aws.svelte";
+    import { pro, proEnabled } from "$lib/services/pro.svelte";
+    import { toastService } from "$lib/services/toast.svelte";
     import { titleService } from "$lib/services/title.svelte";
     import CostChart from "$lib/components/CostChart.svelte";
     import Icon from "$lib/components/Icon.svelte";
     import InfoCard from "$lib/components/InfoCard.svelte";
+    import ProDialog from "$lib/components/ProDialog.svelte";
     import Select from "$lib/components/Select.svelte";
     import {
         COST_RANGE_PRESETS,
         addCostDays,
         buildCostBreakdown,
         collapseToTopSeries,
+        costBreakdownCsv,
         formatCostAmount,
         mergeCostPages,
         percentOfTotal,
@@ -150,6 +157,8 @@
     let loading = $state(false);
     let error = $state("");
     let filterText = $state("");
+    let proOpen = $state(false);
+    let exporting = $state(false);
 
     let forecast = $state<{ amount: number; unit: string } | null>(null);
     let forecastNote = $state("");
@@ -260,6 +269,40 @@
     function onPresetChange(value: string) {
         const selected = COST_RANGE_PRESETS.find((item) => item.id === value);
         if (selected && value !== "custom") granularity = selected.granularity;
+    }
+
+    async function exportCosts() {
+        if (!breakdown || exporting) return;
+        const report = breakdown;
+        const reportMetric = metric;
+        const groups = new Set(tableRows.map(row => row.key));
+        exporting = true;
+        try {
+            await pro.load();
+            if (pro.entitlement?.state !== "pro" && pro.entitlement?.state !== "trial") {
+                proOpen = true;
+                return;
+            }
+            const csv = costBreakdownCsv(report, report.series.filter(group => groups.has(group.key)), reportMetric);
+            const bytes = new TextEncoder().encode(csv);
+            const name = `clouddash-costs-${report.periods[0].start}`;
+            if (pro.os === "android") {
+                const folder = await pickFolder();
+                if (!folder) return;
+                let file = `${name}.csv`;
+                for (let index = 1; await exists(folder.id, file); index++) file = `${name} (${index}).csv`;
+                await writeFile(folder.id, file, bytes);
+            } else {
+                const path = await save({ defaultPath: `${name}.csv`, filters: [{ name: "CSV", extensions: ["csv"] }] });
+                if (!path) return;
+                await invoke("save_file", { path, data: Array.from(bytes) });
+            }
+            toastService.success("Cost report exported.");
+        } catch (error) {
+            toastService.error(error instanceof Error ? error.message : String(error));
+        } finally {
+            exporting = false;
+        }
     }
 
     /** `UnblendedCost` -> `UNBLENDED_COST`, the casing the forecast API wants. */
@@ -592,13 +635,19 @@
             class="bg-gray-900/40 rounded-xl border border-gray-800/50 shadow-lg overflow-hidden"
         >
             <div
-                class="flex items-center justify-between gap-3 p-3 border-b border-gray-800/60"
+                class="flex flex-wrap items-center justify-between gap-3 p-3 border-b border-gray-800/60"
             >
                 <h4
                     class="text-[10px] font-bold text-gray-500 uppercase tracking-widest"
                 >
                     Breakdown{breakdown ? ` (${breakdown.series.length})` : ""}
                 </h4>
+                {#if proEnabled}
+                    <div class="ml-auto flex flex-wrap gap-2">
+                        <button type="button" class="rounded border border-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-800" onclick={() => (proOpen = true)}>Pro</button>
+                        <button type="button" class="rounded border border-blue-500/50 px-2 py-1 text-xs text-blue-200 hover:bg-blue-500/10 disabled:opacity-50" disabled={exporting || loading || !!error || rangeInvalid || !tableRows.length || !periodCount} onclick={exportCosts}>Export CSV</button>
+                    </div>
+                {/if}
                 <div class="relative w-full sm:w-64">
                     <span
                         class="absolute inset-y-0 left-2.5 flex items-center text-gray-500"
@@ -681,3 +730,7 @@
         </div>
     </div>
 </div>
+
+{#if proEnabled}
+    <ProDialog bind:open={proOpen} />
+{/if}

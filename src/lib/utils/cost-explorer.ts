@@ -28,6 +28,23 @@ export interface CostBreakdown {
     unit: string;
 }
 
+export function costBreakdownCsv(breakdown: CostBreakdown, series: CostSeries[], metric: string): string {
+    function cell(value: string | number | boolean) {
+        if (typeof value !== "string") return String(value);
+        // AWS group names can be user-generated. Keep spreadsheet formulas inert.
+        const text = /^[\x00-\x20]*[=+\-@]|^[\t\r\n]/u.test(value) ? `'${value}` : value;
+        return `"${text.replaceAll('"', '""')}"`;
+    }
+
+    const rows: (string | number | boolean)[][] = [["Start", "End (exclusive)", "Group", "Metric", "Amount", "Unit", "Estimated"]];
+    for (const group of series) {
+        breakdown.periods.forEach((period, index) => {
+            rows.push([period.start, period.end, group.key, metric, group.values[index], breakdown.unit, period.estimated]);
+        });
+    }
+    return rows.map(row => row.map(cell).join(",")).join("\r\n") + "\r\n";
+}
+
 export interface CostDateRange {
     /** Inclusive `YYYY-MM-DD` start, as Cost Explorer expects it. */
     start: string;

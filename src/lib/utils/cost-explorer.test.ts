@@ -4,6 +4,7 @@ import {
     addCostDays,
     buildCostBreakdown,
     collapseToTopSeries,
+    costBreakdownCsv,
     formatCostAmount,
     formatPeriodLabel,
     mergeCostPages,
@@ -13,6 +14,15 @@ import {
 } from "./cost-explorer";
 
 const NOW = new Date("2026-03-12T09:30:00Z");
+
+it("keeps exported group names inert and cost amounts numeric", () => {
+    const group = { key: '=SUM("one,two")', total: -1.25, values: [-1.25] };
+    const csv = costBreakdownCsv({
+        periods: [{ start: "2026-03-12", end: "2026-03-13", label: "Mar 12", estimated: true }],
+        series: [group], periodTotals: [-1.25], total: -1.25, unit: "USD",
+    }, [group], "NetUnblendedCost");
+    expect(csv.split("\r\n")[1]).toBe(`"2026-03-12","2026-03-13","'=SUM(""one,two"")","NetUnblendedCost",-1.25,"USD",true`);
+});
 
 describe("resolveCostRange", () => {
     it("ends ranges that include today on tomorrow, so today is covered", () => {

@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Tauri loads the CloudDash Play Billing bridge and its arguments by reflection.
+-keep class dev.clouddash.aws.CloudDashPlayBilling { *; }
+-keep class dev.clouddash.aws.PlayBillingArgs { *; }

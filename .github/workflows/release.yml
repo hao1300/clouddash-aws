@@ -373,6 +373,8 @@ jobs:
         run: npm ci
 
       - name: Build Android artifacts
+        env:
+          VITE_CLOUDDASH_PRO: ${{ vars.CLOUDDASH_PRO_ENABLED }}
         run: npm run tauri-android-build
 
       - name: Stage Android assets

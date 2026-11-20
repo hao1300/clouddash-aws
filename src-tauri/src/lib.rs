@@ -1,3 +1,4 @@
+mod play_billing;
 mod state;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
@@ -42,6 +43,9 @@ pub extern "C" fn Java_dev_clouddash_aws_MainActivity_onBackPressedNative(
 pub fn run() {
     let builder = tauri::Builder::default();
 
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(play_billing::init());
+
     #[cfg(not(any(
         target_os = "android",
         target_os = "ios",
@@ -65,6 +69,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             set_back_button_intercept,
             exit_app,
+            play_billing::play_billing,
             state::list_profiles,
             state::authenticate,
             state::get_credentials,

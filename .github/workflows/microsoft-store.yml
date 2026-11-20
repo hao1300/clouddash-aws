@@ -42,6 +42,7 @@ jobs:
       - name: Build CloudDash for the Store
         env:
           VITE_CLOUDDASH_MICROSOFT_STORE: 'true'
+          VITE_CLOUDDASH_PRO: ${{ vars.CLOUDDASH_PRO_ENABLED }}
         run: npm run tauri-build -- --no-bundle --target x86_64-pc-windows-msvc --features microsoft-store --ci
 
       - name: Package MSIX
