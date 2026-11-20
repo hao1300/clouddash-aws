@@ -2,7 +2,7 @@ name: clouddash-aws
 options:
   bundleIdPrefix: dev.clouddash.aws
   deploymentTarget:
-    iOS: 14.0
+    iOS: 15.0
 fileGroups: [../../src]
 configs:
   debug: debug

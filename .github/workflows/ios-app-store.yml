@@ -19,7 +19,7 @@ concurrency:
 jobs:
   build-and-upload:
     name: Build, sign, and upload the iPhone and iPad app
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     environment: ios-app-store
     env:
@@ -70,8 +70,8 @@ jobs:
 
           xcodebuild -version
           sdk_version="$(xcrun --sdk iphoneos --show-sdk-version)"
-          if [[ "${sdk_version%%.*}" -lt 26 ]]; then
-            echo "::error::App Store Connect requires the iOS 26 SDK or later (found $sdk_version)."
+          if [[ "${sdk_version%%.*}" -lt 27 ]]; then
+            echo "::error::CloudDash Store builds require the iOS 27 SDK or later (found $sdk_version)."
             exit 1
           fi
 
@@ -135,7 +135,7 @@ jobs:
           fi
           cp "$ipa" "$RUNNER_TEMP/clouddash-ios.ipa"
 
-      - name: Verify the signed IPA and supported devices
+      - name: Verify the signed IPA, supported devices, and iOS version
         shell: bash
         run: |
           set -euo pipefail
@@ -151,6 +151,7 @@ jobs:
           /usr/bin/python3 - "${apps[0]}/Info.plist" <<'PY'
           import os
           import plistlib
+          import re
           import sys
 
           with open(sys.argv[1], 'rb') as info_file:
@@ -159,11 +160,17 @@ jobs:
               'CFBundleIdentifier': 'dev.clouddash.aws',
               'CFBundleShortVersionString': os.environ['STORE_VERSION'],
               'CFBundleVersion': os.environ['STORE_BUILD'],
+              'MinimumOSVersion': '15.0',
               'UIDeviceFamily': [1, 2],
           }
           for key, value in expected.items():
               if info.get(key) != value:
                   raise SystemExit(f'{key}: expected {value!r}, found {info.get(key)!r}')
+          sdk_name = info.get('DTSDKName', '')
+          sdk = re.fullmatch(r'iphoneos(\d+)(?:\.\d+)*', sdk_name)
+          if sdk is None or int(sdk[1]) < 27:
+              raise SystemExit(f'DTSDKName: expected the iOS 27 SDK or later, found {sdk_name!r}')
+          print(f'Verified {sdk_name} with iOS {info["MinimumOSVersion"]} deployment target.')
           PY
 
       - uses: actions/upload-artifact@v4
