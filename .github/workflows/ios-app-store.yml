@@ -49,6 +49,7 @@ jobs:
       - name: Build and sign the App Store IPA
         shell: bash
         env:
+          APPLE_DEVELOPMENT_TEAM: AF2ZRN4Q56
           VITE_CLOUDDASH_APPLE_STORE: 'true'
           IOS_CERTIFICATE: ${{ secrets.IOS_APP_STORE_CERTIFICATE }}
           IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_APP_STORE_CERTIFICATE_PASSWORD }}
@@ -73,6 +74,15 @@ jobs:
             echo "::error::App Store Connect requires the iOS 26 SDK or later (found $sdk_version)."
             exit 1
           fi
+
+          profile_file="$RUNNER_TEMP/CloudDash.mobileprovision"
+          profile_plist="$RUNNER_TEMP/CloudDash-Provisioning.plist"
+          printf '%s' "$IOS_MOBILE_PROVISION" | base64 -D > "$profile_file"
+          security cms -D -i "$profile_file" -o "$profile_plist"
+          profile_uuid="$(plutil -extract UUID raw -o - "$profile_plist")"
+          profile_dir="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          mkdir -p "$profile_dir"
+          install -m 600 "$profile_file" "$profile_dir/$profile_uuid.mobileprovision"
 
           release_plist="$RUNNER_TEMP/CloudDash-iOS-Release.plist"
           plutil -create xml1 "$release_plist"
