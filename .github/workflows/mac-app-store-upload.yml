@@ -1,0 +1,76 @@
+name: Upload to App Store Connect
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Run ID of the successful Mac App Store build on main
+        type: string
+        required: true
+
+permissions:
+  actions: read
+
+concurrency:
+  group: mac-app-store-upload
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Upload the signed macOS installer
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 20
+    environment: mac-app-store
+    steps:
+      - name: Download and verify the signed installer
+        shell: bash
+        env:
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ ! "$BUILD_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo '::error::Enter the numeric run ID from the Mac App Store build URL.'
+            exit 1
+          fi
+
+          if ! gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID" |
+            jq -e --arg repo "$GITHUB_REPOSITORY" '
+              .path == ".github/workflows/mac-app-store.yml" and
+              .head_repository.full_name == $repo and .head_branch == "main" and
+              .status == "completed" and .conclusion == "success"
+            ' >/dev/null; then
+            echo '::error::Use a successful Mac App Store build run from main in this repository.'
+            exit 1
+          fi
+
+          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name clouddash-mac-app-store --dir "$RUNNER_TEMP/store-upload"
+          pkgutil --check-signature "$RUNNER_TEMP/store-upload/CloudDash-for-AWS.pkg"
+
+      - name: Upload to Apple for processing
+        shell: bash
+        env:
+          MAC_APP_STORE_API_ISSUER_ID: ${{ secrets.MAC_APP_STORE_API_ISSUER_ID }}
+          MAC_APP_STORE_API_KEY_ID: ${{ secrets.MAC_APP_STORE_API_KEY_ID }}
+          MAC_APP_STORE_API_PRIVATE_KEY: ${{ secrets.MAC_APP_STORE_API_PRIVATE_KEY }}
+        run: |
+          for name in MAC_APP_STORE_API_ISSUER_ID MAC_APP_STORE_API_KEY_ID MAC_APP_STORE_API_PRIVATE_KEY; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Configure the $name secret in the mac-app-store environment."
+              exit 1
+            fi
+          done
+
+          umask 077
+          upload_dir="$(mktemp -d "$RUNNER_TEMP/app-store-upload.XXXXXX")"
+          trap 'rm -rf -- "$upload_dir"' EXIT
+          cd "$upload_dir"
+          mkdir private_keys
+          printf '%s\n' "$MAC_APP_STORE_API_PRIVATE_KEY" > "private_keys/AuthKey_${MAC_APP_STORE_API_KEY_ID}.p8"
+          export API_PRIVATE_KEYS_DIR="$upload_dir/private_keys"
+          unset MAC_APP_STORE_API_PRIVATE_KEY
+
+          xcrun altool --upload-app --type macos \
+            --file "$RUNNER_TEMP/store-upload/CloudDash-for-AWS.pkg" \
+            --apiKey "$MAC_APP_STORE_API_KEY_ID" --apiIssuer "$MAC_APP_STORE_API_ISSUER_ID"

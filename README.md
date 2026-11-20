@@ -36,6 +36,12 @@ The [Mac App Store workflow](.github/workflows/mac-app-store.yml) builds a unive
 
 Run **Actions → Mac App Store → Run workflow** and download the `clouddash-mac-app-store` artifact. Upload the `.pkg` using Transporter on a Mac. The package uses the marketing version from [the Tauri configuration](src-tauri/tauri.conf.json) and a build number based on the workflow run and attempt. Set the App Store Connect macOS version to the matching marketing version before attaching the processed build.
 
+### Upload to App Store Connect from GitHub Actions
+
+Create an App Store Connect team API key with the **Developer** role. Add the issuer UUID as `MAC_APP_STORE_API_ISSUER_ID`, the key ID as `MAC_APP_STORE_API_KEY_ID`, and the contents of the downloaded `.p8` as `MAC_APP_STORE_API_PRIVATE_KEY` in the `mac-app-store` environment.
+
+From **Actions → Upload to App Store Connect**, run [the upload workflow](.github/workflows/mac-app-store-upload.yml) on `main`. Enter the numeric run ID from the successful Mac App Store build URL. The workflow verifies and uploads that build’s signed installer. After Apple processes it, select the build on the macOS draft in App Store Connect.
+
 See the [Apple app record guide](https://developer.apple.com/help/app-store-connect/create-an-app-record/add-a-new-app/) and [Tauri App Store guide](https://v2.tauri.app/distribute/app-store/).
 
 ## Sponsorship
