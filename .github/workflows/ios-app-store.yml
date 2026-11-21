@@ -37,6 +37,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios
+          # swift-rs uses llvm-objcopy to preserve Swift exports when linking on Xcode 27.
+          components: llvm-tools
 
       - uses: Swatinem/rust-cache@v2
         with:
