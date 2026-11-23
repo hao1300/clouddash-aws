@@ -5276,9 +5276,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-scoped-storage"
-version = "0.1.4"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0943382eef1cde1df8514759c59447e2b5013c4ec59b0fa1bab6017fcb7ec4e3"
+checksum = "15c76a07946fb84866dc289fef15d69a590a2938cc6de65cb416ce563c97a797"
 dependencies = [
  "serde",
  "tauri",

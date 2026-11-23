@@ -65,7 +65,7 @@
     "html5-qrcode": "^2.3.8",
     "qrcode": "1.5.4",
     "svelte-dnd-action": "^0.9.69",
-    "tauri-plugin-scoped-storage-api": "^0.1.4"
+    "tauri-plugin-scoped-storage-api": "^1.5.1"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.6",
