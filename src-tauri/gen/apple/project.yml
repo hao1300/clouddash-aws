@@ -42,6 +42,12 @@ targets:
         CFBundleDisplayName: CloudDash for AWS
         LSRequiresIPhoneOS: true
         NSCameraUsageDescription: CloudDash uses the camera to scan a QR code when you import an AWS profile.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default Configuration
+                UISceneDelegateClassName: TaoSceneDelegate
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
