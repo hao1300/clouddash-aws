@@ -8,9 +8,13 @@ on:
         required: false
         default: ""
       macos_backfill:
-        description: Add notarized Mac installers to an existing stable release
+        description: Submit or finalize Mac installers for an existing stable release
         type: boolean
         default: false
+      macos_source_run:
+        description: Run ID to finalize. Leave blank to build and submit to Apple.
+        type: string
+        default: ""
       draft:
         description: Create the release as a draft
         required: true
@@ -33,6 +37,10 @@ jobs:
   prepare:
     name: Prepare release
     runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      actions: read
     outputs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
@@ -49,6 +57,7 @@ jobs:
         env:
           REQUESTED_TAG: ${{ inputs.release_tag }}
           MACOS_BACKFILL: ${{ inputs.macos_backfill }}
+          MACOS_SOURCE_RUN: ${{ inputs.macos_source_run }}
           RELEASE_DRAFT: ${{ inputs.draft }}
           RELEASE_PRERELEASE: ${{ inputs.prerelease }}
           GH_TOKEN: ${{ github.token }}
@@ -58,6 +67,10 @@ jobs:
           tag="${REQUESTED_TAG:-v$version}"
           source_ref="$GITHUB_SHA"
 
+          if [[ -n "$MACOS_SOURCE_RUN" && "$MACOS_BACKFILL" != true ]]; then
+            echo "::error::A source run can only be finalized in macOS backfill mode."
+            exit 1
+          fi
           if [[ "$MACOS_BACKFILL" == true ]]; then
             if [[ "$GITHUB_REF" != refs/heads/main || -z "$REQUESTED_TAG" ]]; then
               echo "::error::Backfill an explicit release tag from main."
@@ -82,6 +95,14 @@ jobs:
             if [[ "$tag" != "v$version" ]]; then
               echo "::error::The release tag does not match the tagged app version."
               exit 1
+            fi
+            if [[ -n "$MACOS_SOURCE_RUN" ]]; then
+              if [[ ! "$MACOS_SOURCE_RUN" =~ ^[0-9]+$ ]]; then
+                echo "::error::Provide the numeric GitHub Actions run ID."
+                exit 1
+              fi
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$MACOS_SOURCE_RUN" |
+                jq -e '.path == ".github/workflows/release.yml" and .head_branch == "main" and .conclusion == "success"' >/dev/null
             fi
           fi
 
@@ -180,9 +201,9 @@ jobs:
   macos:
     name: Sign macOS ${{ matrix.label }}
     needs: [prepare, verify]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' && (inputs.macos_backfill || needs.verify.result == 'success') }}
+    if: ${{ !cancelled() && inputs.macos_source_run == '' && needs.prepare.result == 'success' && (inputs.macos_backfill || needs.verify.result == 'success') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: ${{ inputs.macos_backfill && 26 || 120 }}
     environment: macos-website
     permissions:
       contents: read
@@ -300,6 +321,19 @@ jobs:
           codesign --verify --strict --verbose=2 "$dmg"
           npm run release:stage -- macos "$MAC_TARGET"
 
+          if [[ "$MACOS_BACKFILL" == true ]]; then
+            dmg="release-dist/clouddash-darwin-$MAC_ARCH.dmg"
+            checksum="$(shasum -a 256 "$dmg" | awk '{print $1}')"
+            result="$(xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY_PATH" \
+              --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --output-format json)"
+            submission="$(jq -er '.id' <<< "$result")"
+            jq -n --arg submission "$submission" --arg sha256 "$checksum" \
+              --arg tag "$RELEASE_TAG" --arg commit "$(git rev-parse HEAD)" \
+              '{submission: $submission, sha256: $sha256, tag: $tag, commit: $commit}' \
+              > release-dist/notarization.json
+            echo "Submitted $MAC_ARCH to Apple: $submission" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: signed-macos-${{ matrix.arch }}
@@ -308,23 +342,30 @@ jobs:
 
   notarize-macos:
     name: Notarize macOS ${{ matrix.arch }} DMG
-    needs: macos
+    needs: [prepare, macos]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && ((inputs.macos_backfill && inputs.macos_source_run != '') || (!inputs.macos_backfill && needs.macos.result == 'success')) }}
     runs-on: macos-15
-    timeout-minutes: 80
+    timeout-minutes: ${{ inputs.macos_backfill && 20 || 30 }}
     environment: macos-website
     permissions:
       contents: read
+      actions: read
     strategy:
       fail-fast: false
       matrix:
         arch: [aarch64, x86_64]
     env:
       MAC_ARCH: ${{ matrix.arch }}
+      MACOS_SOURCE_RUN: ${{ inputs.macos_source_run }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.source_ref }}
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: signed-macos-${{ matrix.arch }}
           path: release-dist
+          run-id: ${{ inputs.macos_source_run || github.run_id }}
+          github-token: ${{ github.token }}
 
       - name: Notarize and verify the signed disk image
         shell: bash
@@ -345,23 +386,41 @@ jobs:
           dmg="release-dist/clouddash-darwin-$MAC_ARCH.dmg"
 
           codesign --verify --strict --verbose=2 "$dmg"
-          xcrun notarytool submit "$dmg" "${auth[@]}" --output-format json > "$response"
-          submission="$(jq -er '.id' "$response")"
-          echo "Apple notarization submission: $submission"
-
-          deadline=$((SECONDS + 3600))
-          status="In Progress"
-          while (( SECONDS < deadline )); do
-            if xcrun notarytool info "$submission" "${auth[@]}" --output-format json > "$response"; then
-              status="$(jq -er '.status' "$response")"
-              if [[ "$status" != "In Progress" ]]; then
+          if [[ -n "$MACOS_SOURCE_RUN" ]]; then
+            record=release-dist/notarization.json
+            checksum="$(shasum -a 256 "$dmg" | awk '{print $1}')"
+            jq -e --arg tag "$RELEASE_TAG" --arg commit "$RELEASE_COMMIT" --arg sha "$checksum" \
+              '.tag == $tag and .commit == $commit and .sha256 == $sha' "$record" >/dev/null
+            submission="$(jq -er '.submission' "$record")"
+            for attempt in 1 2 3; do
+              if xcrun notarytool info "$submission" "${auth[@]}" --output-format json > "$response"; then
                 break
               fi
-            else
-              echo "::warning::Could not check notarization status. Retrying the same submission."
-            fi
-            sleep 30
-          done
+              if [[ "$attempt" == 3 ]]; then
+                echo "::error::Could not retrieve Apple notarization status for $submission."
+                exit 1
+              fi
+              sleep 5
+            done
+            status="$(jq -er '.status' "$response")"
+          else
+            xcrun notarytool submit "$dmg" "${auth[@]}" --output-format json > "$response"
+            submission="$(jq -er '.id' "$response")"
+            echo "Apple notarization submission: $submission"
+            deadline=$((SECONDS + 1200))
+            status="In Progress"
+            while (( SECONDS < deadline )); do
+              if xcrun notarytool info "$submission" "${auth[@]}" --output-format json > "$response"; then
+                status="$(jq -er '.status' "$response")"
+                if [[ "$status" != "In Progress" ]]; then
+                  break
+                fi
+              else
+                echo "::warning::Could not check notarization status. Retrying the same submission."
+              fi
+              sleep 30
+            done
+          fi
 
           if [[ "$status" == "In Progress" ]]; then
             echo "::error::Apple is still processing submission $submission."
@@ -381,6 +440,9 @@ jobs:
           xcrun stapler validate "$dmg"
           codesign --verify --strict --verbose=2 "$dmg"
           cp "$dmg" "release-dist/clouddash-darwin-$MAC_ARCH-notarized.dmg"
+          if [[ -n "$MACOS_SOURCE_RUN" ]]; then
+            rm release-dist/notarization.json
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -391,8 +453,9 @@ jobs:
   publish-macos-downloads:
     name: Publish notarized Mac installers
     needs: [prepare, notarize-macos]
-    if: inputs.macos_backfill
+    if: inputs.macos_backfill && inputs.macos_source_run != ''
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
