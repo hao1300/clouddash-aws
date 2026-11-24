@@ -15,6 +15,10 @@ on:
         description: Run ID to finalize. Leave blank to build and submit to Apple.
         type: string
         default: ""
+      macos_completed_submissions:
+        description: Apple submission IDs supplied by the completion webhook
+        type: string
+        default: ""
       draft:
         description: Create the release as a draft
         required: true
@@ -58,6 +62,7 @@ jobs:
           REQUESTED_TAG: ${{ inputs.release_tag }}
           MACOS_BACKFILL: ${{ inputs.macos_backfill }}
           MACOS_SOURCE_RUN: ${{ inputs.macos_source_run }}
+          MACOS_COMPLETED_SUBMISSIONS: ${{ inputs.macos_completed_submissions }}
           RELEASE_DRAFT: ${{ inputs.draft }}
           RELEASE_PRERELEASE: ${{ inputs.prerelease }}
           GH_TOKEN: ${{ github.token }}
@@ -69,6 +74,10 @@ jobs:
 
           if [[ -n "$MACOS_SOURCE_RUN" && "$MACOS_BACKFILL" != true ]]; then
             echo "::error::A source run can only be finalized in macOS backfill mode."
+            exit 1
+          fi
+          if [[ -n "$MACOS_COMPLETED_SUBMISSIONS" && -z "$MACOS_SOURCE_RUN" ]]; then
+            echo "::error::Apple completion notifications require a source run."
             exit 1
           fi
           if [[ "$MACOS_BACKFILL" == true ]]; then
@@ -257,6 +266,8 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+          CALLBACK_BASE: ${{ vars.MACOS_NOTARY_CALLBACK_URL }}
+          CALLBACK_SECRET: ${{ secrets.MACOS_NOTARY_CALLBACK_SECRET }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
@@ -293,6 +304,20 @@ jobs:
           export APPLE_API_KEY_PATH="$signing_dir/AuthKey_$APPLE_API_KEY.p8"
           printf '%s' "$APPLE_API_PRIVATE_KEY" > "$APPLE_API_KEY_PATH"
           unset APPLE_API_PRIVATE_KEY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
+          callback_args=()
+          if [[ "$MACOS_BACKFILL" == true && -n "$CALLBACK_BASE" ]]; then
+            if [[ -z "$CALLBACK_SECRET" || "$CALLBACK_BASE" != https://* ]]; then
+              echo "::error::Configure an HTTPS callback URL and its shared secret."
+              exit 1
+            fi
+            callback_path="/notarization/$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT/$RELEASE_TAG/$MAC_ARCH"
+            proof="$(python3 -c 'import hmac, os, sys; print(hmac.digest(os.environ["CALLBACK_SECRET"].encode(), sys.argv[1].encode(), "sha256").hex())' "$callback_path")"
+            callback_url="${CALLBACK_BASE%/}$callback_path/$proof"
+            echo "::add-mask::$callback_url"
+            callback_args=(--webhook "$callback_url")
+          fi
+          unset CALLBACK_SECRET
+
           if [[ "$MACOS_BACKFILL" == true ]]; then
             # Backfills distribute only the DMG, which Apple scans with its enclosed app.
             env -u APPLE_API_KEY_PATH -u APPLE_API_KEY -u APPLE_API_ISSUER \
@@ -325,7 +350,8 @@ jobs:
             dmg="release-dist/clouddash-darwin-$MAC_ARCH.dmg"
             checksum="$(shasum -a 256 "$dmg" | awk '{print $1}')"
             result="$(xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY_PATH" \
-              --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --output-format json)"
+              --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" \
+              --output-format json "${callback_args[@]}")"
             submission="$(jq -er '.id' <<< "$result")"
             jq -n --arg submission "$submission" --arg sha256 "$checksum" \
               --arg tag "$RELEASE_TAG" --arg commit "$(git rev-parse HEAD)" \
@@ -357,6 +383,7 @@ jobs:
     env:
       MAC_ARCH: ${{ matrix.arch }}
       MACOS_SOURCE_RUN: ${{ inputs.macos_source_run }}
+      MACOS_COMPLETED_SUBMISSIONS: ${{ inputs.macos_completed_submissions }}
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
       RELEASE_COMMIT: ${{ needs.prepare.outputs.source_ref }}
     steps:
@@ -392,6 +419,10 @@ jobs:
             jq -e --arg tag "$RELEASE_TAG" --arg commit "$RELEASE_COMMIT" --arg sha "$checksum" \
               '.tag == $tag and .commit == $commit and .sha256 == $sha' "$record" >/dev/null
             submission="$(jq -er '.submission' "$record")"
+            if [[ -n "$MACOS_COMPLETED_SUBMISSIONS" ]]; then
+              jq -e --arg arch "$MAC_ARCH" --arg id "$submission" \
+                '.[$arch] == $id' <<< "$MACOS_COMPLETED_SUBMISSIONS" >/dev/null
+            fi
             for attempt in 1 2 3; do
               if xcrun notarytool info "$submission" "${auth[@]}" --output-format json > "$response"; then
                 break
