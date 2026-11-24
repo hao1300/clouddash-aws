@@ -177,48 +177,6 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
-  desktop:
-    name: Windows x64
-    needs: [prepare, verify]
-    runs-on: windows-latest
-    env:
-      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Validate updater signing secret
-        shell: bash
-        run: |
-          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            echo "::error::TAURI_SIGNING_PRIVATE_KEY is required for updater artifacts."
-            exit 1
-          fi
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-          key: release-windows-x64
-          cache-on-failure: true
-
-      - run: npm ci
-      - run: npm run tauri-build
-      - run: npm run release:stage -- windows
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-windows-x64
-          path: release-dist
-          if-no-files-found: error
-
   macos:
     name: macOS ${{ matrix.label }}
     needs: [prepare, verify]
@@ -468,7 +426,6 @@ jobs:
     name: Create GitHub Release
     needs:
       - prepare
-      - desktop
       - macos
       - android
     runs-on: ubuntu-22.04
@@ -495,7 +452,7 @@ jobs:
           cat > release-notes.md <<EOF
           CloudDash ${RELEASE_VERSION}
 
-          Official builds for Windows, macOS, and Android.
+          Official builds for macOS and Android. The Windows app is available through the Microsoft Store.
           The macOS installers are signed with Developer ID and notarized by Apple.
           EOF
 
