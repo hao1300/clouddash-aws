@@ -7,6 +7,10 @@ on:
         description: Release tag. Defaults to v{src-tauri version}.
         required: false
         default: ""
+      macos_backfill:
+        description: Add notarized Mac installers to an existing stable release
+        type: boolean
+        default: false
       draft:
         description: Create the release as a draft
         required: true
@@ -21,6 +25,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   prepare:
     name: Prepare release
@@ -30,6 +38,7 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
       draft: ${{ steps.release.outputs.draft }}
       prerelease: ${{ steps.release.outputs.prerelease }}
+      source_ref: ${{ steps.release.outputs.source_ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,26 +46,53 @@ jobs:
       - name: Resolve version and tag
         id: release
         shell: bash
+        env:
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+          MACOS_BACKFILL: ${{ inputs.macos_backfill }}
+          RELEASE_DRAFT: ${{ inputs.draft }}
+          RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          version="$(node -e "console.log(JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json', 'utf8')).version)")"
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            tag="${GITHUB_REF_NAME}"
-            draft="false"
-            prerelease="false"
-          else
-            tag="${{ inputs.release_tag }}"
-            if [ -z "$tag" ]; then
-              tag="v${version}"
+          set -euo pipefail
+          version="$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          tag="${REQUESTED_TAG:-v$version}"
+          source_ref="$GITHUB_SHA"
+
+          if [[ "$MACOS_BACKFILL" == true ]]; then
+            if [[ "$GITHUB_REF" != refs/heads/main || -z "$REQUESTED_TAG" ]]; then
+              echo "::error::Backfill an explicit release tag from main."
+              exit 1
             fi
-            draft="${{ inputs.draft }}"
-            prerelease="${{ inputs.prerelease }}"
+            if [[ "$RELEASE_DRAFT" == true || "$RELEASE_PRERELEASE" == true ]]; then
+              echo "::error::Mac backfills require an existing stable release."
+              exit 1
+            fi
+            if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Provide a release tag such as v1.1.8."
+              exit 1
+            fi
+            state="$(gh release view "$tag" --json isDraft,isPrerelease --jq '.isDraft or .isPrerelease')"
+            if [[ "$state" != false ]]; then
+              echo "::error::The release must already be public and stable."
+              exit 1
+            fi
+            git fetch --no-tags origin "refs/tags/$tag:refs/tags/$tag"
+            source_ref="$(git rev-parse "refs/tags/$tag^{commit}")"
+            version="$(git show "$source_ref:src-tauri/tauri.conf.json" | jq -er .version)"
+            if [[ "$tag" != "v$version" ]]; then
+              echo "::error::The release tag does not match the tagged app version."
+              exit 1
+            fi
           fi
+
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "draft=$draft" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "draft=$RELEASE_DRAFT" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$RELEASE_PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "source_ref=$source_ref" >> "$GITHUB_OUTPUT"
 
       - name: Fail if release already exists
+        if: ${{ !inputs.macos_backfill }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -101,6 +137,7 @@ jobs:
   verify:
     name: Verify (check, test)
     needs: prepare
+    if: ${{ !inputs.macos_backfill }}
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -141,42 +178,17 @@ jobs:
         run: cargo test
 
   desktop:
-    name: ${{ matrix.label }}
+    name: Windows x64
     needs: [prepare, verify]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     env:
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - label: Windows x64
-            os: windows-latest
-            build_command: npm run tauri-build
-            stage_command: npm run release:stage -- windows
-            rust_target: ""
-            artifact: release-windows-x64
-          - label: macOS Apple Silicon
-            os: macos-14
-            build_command: npx tauri build --target aarch64-apple-darwin
-            stage_command: npm run release:stage -- macos aarch64-apple-darwin
-            rust_target: aarch64-apple-darwin
-            artifact: release-macos-aarch64
-          - label: macOS Intel
-            os: macos-15-intel
-            build_command: npx tauri build --target x86_64-apple-darwin
-            stage_command: npm run release:stage -- macos x86_64-apple-darwin
-            rust_target: x86_64-apple-darwin
-            artifact: release-macos-x86_64
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -184,128 +196,195 @@ jobs:
       - name: Validate updater signing secret
         shell: bash
         run: |
-          if [ -z "${TAURI_SIGNING_PRIVATE_KEY}" ]; then
-            echo "::error::TAURI_SIGNING_PRIVATE_KEY is required because src-tauri/tauri.conf.json enables bundle.createUpdaterArtifacts."
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is required for updater artifacts."
             exit 1
           fi
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Add Rust target
-        if: matrix.rust_target != ''
-        run: rustup target add ${{ matrix.rust_target }}
-
-      - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
-          key: ${{ matrix.artifact }}
+          key: release-windows-x64
           cache-on-failure: true
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
+      - run: npm run tauri-build
+      - run: npm run release:stage -- windows
 
-      - name: Import Apple Developer certificate
-        if: runner.os == 'macOS'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x64
+          path: release-dist
+          if-no-files-found: error
+
+  macos:
+    name: macOS ${{ matrix.label }}
+    needs: [prepare, verify]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && (inputs.macos_backfill || needs.verify.result == 'success') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    environment: macos-website
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Apple Silicon
+            os: macos-15
+            target: aarch64-apple-darwin
+            arch: aarch64
+            macho_arch: arm64
+          - label: Intel
+            os: macos-15-intel
+            target: x86_64-apple-darwin
+            arch: x86_64
+            macho_arch: x86_64
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      MAC_TARGET: ${{ matrix.target }}
+      MAC_ARCH: ${{ matrix.arch }}
+      MACHO_ARCH: ${{ matrix.macho_arch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: release-macos-${{ matrix.arch }}
+          cache-on-failure: true
+
+      - run: npm ci
+
+      - name: Sign, notarize, and verify the installer
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY_SECRET: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID_SECRET: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD_SECRET: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID_SECRET: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_API_ISSUER APPLE_API_KEY APPLE_API_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::The release signing configuration is missing $name."
+              exit 1
+            fi
+          done
 
-          if [ -z "${APPLE_CERTIFICATE}" ] && [ -z "${APPLE_CERTIFICATE_PASSWORD}" ]; then
-            echo "::warning::APPLE_CERTIFICATE is not configured. Building unsigned macOS artifacts."
-            echo "MACOS_SIGNING_MODE=unsigned" >> "$GITHUB_ENV"
-            exit 0
-          fi
-
-          if [ -z "${APPLE_CERTIFICATE}" ] || [ -z "${APPLE_CERTIFICATE_PASSWORD}" ]; then
-            echo "::error::APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD must either both be set or both be omitted for unsigned macOS builds."
-            exit 1
-          fi
-
-          certificate_path="$RUNNER_TEMP/apple-certificate.p12"
-          keychain_path="$RUNNER_TEMP/clouddash-signing.keychain-db"
+          umask 077
+          signing_dir="$(mktemp -d "$RUNNER_TEMP/clouddash-signing.XXXXXX")"
+          keychain="$signing_dir/website.keychain-db"
+          trap 'security delete-keychain "$keychain" >/dev/null 2>&1 || true; rm -rf "$signing_dir"' EXIT
           keychain_password="$(openssl rand -base64 32)"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 7200 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 -D > "$signing_dir/developer-id.p12"
+          security import "$signing_dir/developer-id.p12" -k "$keychain" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -f pkcs12 -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
 
-          if ! printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$certificate_path" 2>/dev/null; then
-            printf '%s' "$APPLE_CERTIFICATE" | base64 -D > "$certificate_path"
-          fi
-
-          if ! openssl pkcs12 -in "$certificate_path" -nokeys -passin "pass:${APPLE_CERTIFICATE_PASSWORD}" >/dev/null 2>&1; then
-            echo "::error::APPLE_CERTIFICATE must be the base64 contents of an exported .p12, and APPLE_CERTIFICATE_PASSWORD must match that .p12 export password."
+          identities="$(security find-identity -v -p codesigning "$keychain")"
+          signing_identity="$(awk -F'"' '/Developer ID Application: .*\(AF2ZRN4Q56\)/ {print $2; exit}' <<< "$identities")"
+          if [[ -z "$signing_identity" ]]; then
+            echo "::error::No trusted ChatbotsPlace Developer ID Application identity was imported."
             exit 1
           fi
 
-          security create-keychain -p "$keychain_password" "$keychain_path"
-          security set-keychain-settings -lut 21600 "$keychain_path"
-          security unlock-keychain -p "$keychain_password" "$keychain_path"
-          security import "$certificate_path" -k "$keychain_path" -P "$APPLE_CERTIFICATE_PASSWORD" -f pkcs12 -T /usr/bin/codesign -T /usr/bin/productbuild
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain_path"
-          security list-keychains -d user -s "$keychain_path" $(security list-keychains -d user | sed 's/"//g')
-          security default-keychain -d user -s "$keychain_path"
+          export APPLE_SIGNING_IDENTITY="$signing_identity"
+          export APPLE_API_KEY_PATH="$signing_dir/AuthKey_$APPLE_API_KEY.p8"
+          printf '%s' "$APPLE_API_PRIVATE_KEY" > "$APPLE_API_KEY_PATH"
+          unset APPLE_API_PRIVATE_KEY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
+          npm run tauri-build -- --ci --target "$MAC_TARGET"
 
-          identities="$(security find-identity -v -p codesigning "$keychain_path")"
-          echo "$identities"
-
-          signing_identity="${APPLE_SIGNING_IDENTITY_SECRET:-}"
-          if [ -z "$signing_identity" ]; then
-            signing_identity="$(printf '%s\n' "$identities" | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
-          fi
-          if [ -z "$signing_identity" ]; then
-            signing_identity="$(printf '%s\n' "$identities" | awk -F'"' '/Apple Distribution/ { print $2; exit }')"
-          fi
-          if [ -z "$signing_identity" ]; then
-            signing_identity="$(printf '%s\n' "$identities" | awk -F'"' '/Apple Development/ { print $2; exit }')"
-          fi
-          if [ -z "$signing_identity" ]; then
-            echo "::error::No valid Apple code signing identity was found in APPLE_CERTIFICATE."
+          shopt -s nullglob
+          bundle="src-tauri/target/$MAC_TARGET/release/bundle"
+          apps=("$bundle"/macos/*.app)
+          images=("$bundle"/dmg/*.dmg)
+          if [[ "${#apps[@]}" != 1 || "${#images[@]}" != 1 ]]; then
+            echo "::error::Expected one app and one DMG for $MAC_TARGET."
             exit 1
           fi
 
-          echo "APPLE_SIGNING_IDENTITY=$signing_identity" >> "$GITHUB_ENV"
-          echo "APPLE_KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
-          echo "MACOS_SIGNING_MODE=signed" >> "$GITHUB_ENV"
+          codesign --verify --deep --strict --verbose=2 "${apps[0]}"
+          xcrun stapler validate "${apps[0]}"
+          executable="$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "${apps[0]}/Contents/Info.plist")"
+          lipo -verify_arch "$MACHO_ARCH" "${apps[0]}/Contents/MacOS/$executable"
 
-          if [ -n "${APPLE_ID_SECRET}" ] && [ -n "${APPLE_PASSWORD_SECRET}" ] && [ -n "${APPLE_TEAM_ID_SECRET}" ]; then
-            echo "APPLE_ID=${APPLE_ID_SECRET}" >> "$GITHUB_ENV"
-            echo "APPLE_PASSWORD=${APPLE_PASSWORD_SECRET}" >> "$GITHUB_ENV"
-            echo "APPLE_TEAM_ID=${APPLE_TEAM_ID_SECRET}" >> "$GITHUB_ENV"
-          else
-            echo "::warning::Apple notarization secrets are incomplete. macOS artifacts will be signed but not notarized."
+          dmg="${images[0]}"
+          codesign --verify --strict --verbose=2 "$dmg"
+          response="$signing_dir/notarization.json"
+          xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" \
+            --issuer "$APPLE_API_ISSUER" --wait --timeout 20m --output-format json > "$response"
+          if ! jq -e '.status == "Accepted"' "$response" > /dev/null; then
+            submission_id="$(jq -r .id "$response")"
+            xcrun notarytool log "$submission_id" --key "$APPLE_API_KEY_PATH" \
+              --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER"
+            exit 1
           fi
-
-      - name: Build
-        run: ${{ matrix.build_command }}
-
-      - name: Report unsigned macOS build
-        if: runner.os == 'macOS' && env.MACOS_SIGNING_MODE == 'unsigned'
-        run: |
-          echo "::warning::This macOS artifact is unsigned. Users will need to right-click Open or approve it in System Settings > Privacy & Security."
-
-      - name: Delete Apple signing keychain
-        if: always() && runner.os == 'macOS'
-        shell: bash
-        run: |
-          if [ -n "${APPLE_KEYCHAIN_PATH:-}" ] && [ -f "$APPLE_KEYCHAIN_PATH" ]; then
-            security delete-keychain "$APPLE_KEYCHAIN_PATH"
-          fi
+          xcrun stapler staple "$dmg"
+          xcrun stapler validate "$dmg"
+          codesign --verify --strict --verbose=2 "$dmg"
 
       - name: Stage release assets
-        run: ${{ matrix.stage_command }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run release:stage -- macos "$MAC_TARGET"
+          cp "release-dist/clouddash-darwin-$MAC_ARCH.dmg" \
+            "release-dist/clouddash-darwin-$MAC_ARCH-notarized.dmg"
 
-      - name: Upload staged assets
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
+          name: release-macos-${{ matrix.arch }}
           path: release-dist
           if-no-files-found: error
+
+  publish-macos-downloads:
+    name: Publish notarized Mac installers
+    needs: [prepare, macos]
+    if: inputs.macos_backfill
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-macos-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Add verified DMGs to the existing release
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          for arch in aarch64 x86_64; do
+            file="clouddash-darwin-$arch-notarized.dmg"
+            test -s "release-assets/$file"
+            if ! grep -Fxq "$file" <<< "$assets"; then
+              gh release upload "$RELEASE_TAG" "release-assets/$file" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
 
   android:
     name: Android APK and AAB
@@ -390,6 +469,7 @@ jobs:
     needs:
       - prepare
       - desktop
+      - macos
       - android
     runs-on: ubuntu-22.04
     env:
@@ -416,7 +496,7 @@ jobs:
           CloudDash ${RELEASE_VERSION}
 
           Official builds for Windows, macOS, and Android.
-          macOS builds are unsigned unless Apple Developer signing secrets are configured.
+          The macOS installers are signed with Developer ID and notarized by Apple.
           EOF
 
       - name: Create release
