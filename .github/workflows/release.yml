@@ -178,7 +178,7 @@ jobs:
         run: cargo test
 
   macos:
-    name: macOS ${{ matrix.label }}
+    name: Sign macOS ${{ matrix.label }}
     needs: [prepare, verify]
     if: ${{ !cancelled() && needs.prepare.result == 'success' && (inputs.macos_backfill || needs.verify.result == 'success') }}
     runs-on: ${{ matrix.os }}
@@ -205,6 +205,7 @@ jobs:
       MAC_TARGET: ${{ matrix.target }}
       MAC_ARCH: ${{ matrix.arch }}
       MACHO_ARCH: ${{ matrix.macho_arch }}
+      MACOS_BACKFILL: ${{ inputs.macos_backfill }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -227,7 +228,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Sign, notarize, and verify the installer
+      - name: Build and verify the Developer ID signature
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -271,7 +272,13 @@ jobs:
           export APPLE_API_KEY_PATH="$signing_dir/AuthKey_$APPLE_API_KEY.p8"
           printf '%s' "$APPLE_API_PRIVATE_KEY" > "$APPLE_API_KEY_PATH"
           unset APPLE_API_PRIVATE_KEY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
-          npm run tauri-build -- --ci --target "$MAC_TARGET"
+          if [[ "$MACOS_BACKFILL" == true ]]; then
+            # Backfills distribute only the DMG, which Apple scans with its enclosed app.
+            env -u APPLE_API_KEY_PATH -u APPLE_API_KEY -u APPLE_API_ISSUER \
+              npm run tauri-build -- --ci --target "$MAC_TARGET"
+          else
+            npm run tauri-build -- --ci --target "$MAC_TARGET"
+          fi
 
           shopt -s nullglob
           bundle="src-tauri/target/$MAC_TARGET/release/bundle"
@@ -283,32 +290,97 @@ jobs:
           fi
 
           codesign --verify --deep --strict --verbose=2 "${apps[0]}"
-          xcrun stapler validate "${apps[0]}"
+          if [[ "$MACOS_BACKFILL" != true ]]; then
+            xcrun stapler validate "${apps[0]}"
+          fi
           executable="$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "${apps[0]}/Contents/Info.plist")"
           lipo "${apps[0]}/Contents/MacOS/$executable" -verify_arch "$MACHO_ARCH"
 
           dmg="${images[0]}"
           codesign --verify --strict --verbose=2 "$dmg"
-          response="$signing_dir/notarization.json"
-          xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" \
-            --issuer "$APPLE_API_ISSUER" --wait --timeout 60m --output-format json > "$response"
-          if ! jq -e '.status == "Accepted"' "$response" > /dev/null; then
-            submission_id="$(jq -r .id "$response")"
-            xcrun notarytool log "$submission_id" --key "$APPLE_API_KEY_PATH" \
-              --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER"
-            exit 1
-          fi
-          xcrun stapler staple "$dmg"
-          xcrun stapler validate "$dmg"
-          codesign --verify --strict --verbose=2 "$dmg"
+          npm run release:stage -- macos "$MAC_TARGET"
 
-      - name: Stage release assets
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-macos-${{ matrix.arch }}
+          path: release-dist
+          if-no-files-found: error
+
+  notarize-macos:
+    name: Notarize macOS ${{ matrix.arch }} DMG
+    needs: macos
+    runs-on: macos-15
+    timeout-minutes: 80
+    environment: macos-website
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [aarch64, x86_64]
+    env:
+      MAC_ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-macos-${{ matrix.arch }}
+          path: release-dist
+
+      - name: Notarize and verify the signed disk image
         shell: bash
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          npm run release:stage -- macos "$MAC_TARGET"
-          cp "release-dist/clouddash-darwin-$MAC_ARCH.dmg" \
-            "release-dist/clouddash-darwin-$MAC_ARCH-notarized.dmg"
+          umask 077
+          notary_dir="$(mktemp -d "$RUNNER_TEMP/clouddash-notary.XXXXXX")"
+          trap 'rm -rf "$notary_dir"' EXIT
+          private_key="$notary_dir/AuthKey_$APPLE_API_KEY.p8"
+          printf '%s' "$APPLE_API_PRIVATE_KEY" > "$private_key"
+          unset APPLE_API_PRIVATE_KEY
+          auth=(--key "$private_key" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER")
+          response="$notary_dir/response.json"
+          dmg="release-dist/clouddash-darwin-$MAC_ARCH.dmg"
+
+          codesign --verify --strict --verbose=2 "$dmg"
+          xcrun notarytool submit "$dmg" "${auth[@]}" --output-format json > "$response"
+          submission="$(jq -er '.id' "$response")"
+          echo "Apple notarization submission: $submission"
+
+          deadline=$((SECONDS + 3600))
+          status="In Progress"
+          while (( SECONDS < deadline )); do
+            if xcrun notarytool info "$submission" "${auth[@]}" --output-format json > "$response"; then
+              status="$(jq -er '.status' "$response")"
+              if [[ "$status" != "In Progress" ]]; then
+                break
+              fi
+            else
+              echo "::warning::Could not check notarization status. Retrying the same submission."
+            fi
+            sleep 30
+          done
+
+          if [[ "$status" == "In Progress" ]]; then
+            echo "::error::Apple is still processing submission $submission."
+            exit 1
+          fi
+          if [[ "$status" != "Accepted" ]]; then
+            xcrun notarytool log "$submission" "${auth[@]}"
+            exit 1
+          fi
+
+          for delay in 5 15 30; do
+            if xcrun stapler staple "$dmg"; then
+              break
+            fi
+            sleep "$delay"
+          done
+          xcrun stapler validate "$dmg"
+          codesign --verify --strict --verbose=2 "$dmg"
+          cp "$dmg" "release-dist/clouddash-darwin-$MAC_ARCH-notarized.dmg"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -318,7 +390,7 @@ jobs:
 
   publish-macos-downloads:
     name: Publish notarized Mac installers
-    needs: [prepare, macos]
+    needs: [prepare, notarize-macos]
     if: inputs.macos_backfill
     runs-on: ubuntu-22.04
     env:
@@ -426,7 +498,7 @@ jobs:
     name: Create GitHub Release
     needs:
       - prepare
-      - macos
+      - notarize-macos
       - android
     runs-on: ubuntu-22.04
     env:
