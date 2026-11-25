@@ -1,0 +1,32 @@
+{
+  "appRecord": {
+    "name": "CloudDash for AWS",
+    "bundleId": "dev.clouddash.aws",
+    "sku": "clouddash-aws-apple",
+    "primaryLocale": "en-US",
+    "platforms": ["iOS", "macOS"],
+    "primaryCategory": "Developer Tools",
+    "subtitle": "Local-first cloud management",
+    "price": "Free",
+    "privacyPolicyUrl": "https://clouddash.dev/privacy"
+  },
+  "iOS": {
+    "devices": ["iPhone", "iPad"],
+    "description": "Use CloudDash to inspect your AWS resources from iPhone or iPad. Switch between AWS profiles and regions, browse S3 buckets, look up EC2 instances, view CloudWatch logs and metrics, and explore spending with Cost Explorer.\n\nCloudDash connects directly to AWS using the credentials you provide. Profiles stay on your device. An AWS account with permissions for the services you want to access is required.\n\nCloudDash is independently developed and is not affiliated with Amazon Web Services.",
+    "keywords": "cloud,console,metrics,logging,storage,server,cost monitoring,developer,profiles",
+    "supportUrl": "https://clouddash.dev/contact",
+    "marketingUrl": "https://clouddash.dev/"
+  },
+  "macOS": {
+    "description": "CloudDash is a local-first AWS dashboard for Mac. Switch between accounts and regions, browse S3 objects, inspect EC2 instances, query CloudWatch logs, check metrics, and review spending with Cost Explorer.\n\nCloudDash connects directly to AWS using the credentials you provide. Profiles stay on your Mac. An AWS account with permissions for the services you want to access is required.\n\nCloudDash is independently developed and is not affiliated with Amazon Web Services.",
+    "keywords": "cloud,console,metrics,logging,storage,server,cost monitoring,developer,profiles",
+    "supportUrl": "https://clouddash.dev/contact",
+    "marketingUrl": "https://clouddash.dev/"
+  },
+  "reviewNotesDraft": "CloudDash is a client for Amazon Web Services. It does not use a separate CloudDash login. A reviewer can choose Manual on the sign-in screen, enter the supplied limited-permission AWS test credentials, select the supplied region, and open CloudWatch or S3 to view the sample resources. The QR import option asks for camera access only when selected.",
+  "screenshotTargets": {
+    "iPhonePortrait": { "width": 1206, "height": 2622, "suggestedScreen": "CloudWatch logs" },
+    "iPadLandscape": { "width": 2752, "height": 2064, "suggestedScreen": "Cost Explorer" },
+    "macOSLandscape": { "width": 2560, "height": 1600, "suggestedScreen": "S3 object browser" }
+  }
+}
