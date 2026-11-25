@@ -7,18 +7,6 @@ on:
         description: Release tag. Defaults to v{src-tauri version}.
         required: false
         default: ""
-      macos_backfill:
-        description: Submit or finalize Mac installers for an existing stable release
-        type: boolean
-        default: false
-      macos_source_run:
-        description: Run ID to finalize. Leave blank to build and submit to Apple.
-        type: string
-        default: ""
-      macos_completed_submissions:
-        description: Apple submission IDs supplied by the completion webhook
-        type: string
-        default: ""
       draft:
         description: Create the release as a draft
         required: true
@@ -44,13 +32,11 @@ jobs:
     timeout-minutes: 2
     permissions:
       contents: read
-      actions: read
     outputs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
       draft: ${{ steps.release.outputs.draft }}
       prerelease: ${{ steps.release.outputs.prerelease }}
-      source_ref: ${{ steps.release.outputs.source_ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,69 +46,18 @@ jobs:
         shell: bash
         env:
           REQUESTED_TAG: ${{ inputs.release_tag }}
-          MACOS_BACKFILL: ${{ inputs.macos_backfill }}
-          MACOS_SOURCE_RUN: ${{ inputs.macos_source_run }}
-          MACOS_COMPLETED_SUBMISSIONS: ${{ inputs.macos_completed_submissions }}
           RELEASE_DRAFT: ${{ inputs.draft }}
           RELEASE_PRERELEASE: ${{ inputs.prerelease }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           version="$(node -p 'require("./src-tauri/tauri.conf.json").version')"
           tag="${REQUESTED_TAG:-v$version}"
-          source_ref="$GITHUB_SHA"
-
-          if [[ -n "$MACOS_SOURCE_RUN" && "$MACOS_BACKFILL" != true ]]; then
-            echo "::error::A source run can only be finalized in macOS backfill mode."
-            exit 1
-          fi
-          if [[ -n "$MACOS_COMPLETED_SUBMISSIONS" && -z "$MACOS_SOURCE_RUN" ]]; then
-            echo "::error::Apple completion notifications require a source run."
-            exit 1
-          fi
-          if [[ "$MACOS_BACKFILL" == true ]]; then
-            if [[ "$GITHUB_REF" != refs/heads/main || -z "$REQUESTED_TAG" ]]; then
-              echo "::error::Backfill an explicit release tag from main."
-              exit 1
-            fi
-            if [[ "$RELEASE_DRAFT" == true || "$RELEASE_PRERELEASE" == true ]]; then
-              echo "::error::Mac backfills require an existing stable release."
-              exit 1
-            fi
-            if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "::error::Provide a release tag such as v1.1.8."
-              exit 1
-            fi
-            state="$(gh release view "$tag" --json isDraft,isPrerelease --jq '.isDraft or .isPrerelease')"
-            if [[ "$state" != false ]]; then
-              echo "::error::The release must already be public and stable."
-              exit 1
-            fi
-            git fetch --no-tags origin "refs/tags/$tag:refs/tags/$tag"
-            source_ref="$(git rev-parse "refs/tags/$tag^{commit}")"
-            version="$(git show "$source_ref:src-tauri/tauri.conf.json" | jq -er .version)"
-            if [[ "$tag" != "v$version" ]]; then
-              echo "::error::The release tag does not match the tagged app version."
-              exit 1
-            fi
-            if [[ -n "$MACOS_SOURCE_RUN" ]]; then
-              if [[ ! "$MACOS_SOURCE_RUN" =~ ^[0-9]+$ ]]; then
-                echo "::error::Provide the numeric GitHub Actions run ID."
-                exit 1
-              fi
-              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$MACOS_SOURCE_RUN" |
-                jq -e '.path == ".github/workflows/release.yml" and .head_branch == "main" and .conclusion == "success"' >/dev/null
-            fi
-          fi
-
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "draft=$RELEASE_DRAFT" >> "$GITHUB_OUTPUT"
           echo "prerelease=$RELEASE_PRERELEASE" >> "$GITHUB_OUTPUT"
-          echo "source_ref=$source_ref" >> "$GITHUB_OUTPUT"
 
       - name: Fail if release already exists
-        if: ${{ !inputs.macos_backfill }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -167,7 +102,6 @@ jobs:
   verify:
     name: Verify (check, test)
     needs: prepare
-    if: ${{ !inputs.macos_backfill }}
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -206,309 +140,6 @@ jobs:
       - name: Rust tests
         working-directory: src-tauri
         run: cargo test
-
-  macos:
-    name: Sign macOS ${{ matrix.label }}
-    needs: [prepare, verify]
-    if: ${{ !cancelled() && inputs.macos_source_run == '' && needs.prepare.result == 'success' && (inputs.macos_backfill || needs.verify.result == 'success') }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ inputs.macos_backfill && 26 || 120 }}
-    environment: macos-website
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - label: Apple Silicon
-            os: macos-15
-            target: aarch64-apple-darwin
-            arch: aarch64
-            macho_arch: arm64
-          - label: Intel
-            os: macos-15-intel
-            target: x86_64-apple-darwin
-            arch: x86_64
-            macho_arch: x86_64
-    env:
-      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-      MAC_TARGET: ${{ matrix.target }}
-      MAC_ARCH: ${{ matrix.arch }}
-      MACHO_ARCH: ${{ matrix.macho_arch }}
-      MACOS_BACKFILL: ${{ inputs.macos_backfill }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.prepare.outputs.source_ref }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-          key: release-macos-${{ matrix.arch }}
-          cache-on-failure: true
-
-      - run: npm ci
-
-      - name: Build and verify the Developer ID signature
-        shell: bash
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
-          CALLBACK_BASE: ${{ vars.MACOS_NOTARY_CALLBACK_URL }}
-          CALLBACK_SECRET: ${{ secrets.MACOS_NOTARY_CALLBACK_SECRET }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_API_ISSUER APPLE_API_KEY APPLE_API_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY; do
-            if [[ -z "${!name:-}" ]]; then
-              echo "::error::The release signing configuration is missing $name."
-              exit 1
-            fi
-          done
-
-          umask 077
-          signing_dir="$(mktemp -d "$RUNNER_TEMP/clouddash-signing.XXXXXX")"
-          keychain="$signing_dir/website.keychain-db"
-          trap 'security delete-keychain "$keychain" >/dev/null 2>&1 || true; rm -rf "$signing_dir"' EXIT
-          keychain_password="$(openssl rand -base64 32)"
-          security create-keychain -p "$keychain_password" "$keychain"
-          security set-keychain-settings -lut 7200 "$keychain"
-          security unlock-keychain -p "$keychain_password" "$keychain"
-          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
-          printf '%s' "$APPLE_CERTIFICATE" | base64 -D > "$signing_dir/developer-id.p12"
-          security import "$signing_dir/developer-id.p12" -k "$keychain" \
-            -P "$APPLE_CERTIFICATE_PASSWORD" -f pkcs12 -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
-
-          identities="$(security find-identity -v -p codesigning "$keychain")"
-          signing_identity="$(awk -F'"' '/Developer ID Application: .*\(AF2ZRN4Q56\)/ {print $2; exit}' <<< "$identities")"
-          if [[ -z "$signing_identity" ]]; then
-            echo "::error::No trusted ChatbotsPlace Developer ID Application identity was imported."
-            exit 1
-          fi
-
-          export APPLE_SIGNING_IDENTITY="$signing_identity"
-          export APPLE_API_KEY_PATH="$signing_dir/AuthKey_$APPLE_API_KEY.p8"
-          printf '%s' "$APPLE_API_PRIVATE_KEY" > "$APPLE_API_KEY_PATH"
-          unset APPLE_API_PRIVATE_KEY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
-          callback_args=()
-          if [[ "$MACOS_BACKFILL" == true && -n "$CALLBACK_BASE" ]]; then
-            if [[ -z "$CALLBACK_SECRET" || "$CALLBACK_BASE" != https://* ]]; then
-              echo "::error::Configure an HTTPS callback URL and its shared secret."
-              exit 1
-            fi
-            callback_path="/notarization/$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT/$RELEASE_TAG/$MAC_ARCH"
-            proof="$(python3 -c 'import hmac, os, sys; print(hmac.digest(os.environ["CALLBACK_SECRET"].encode(), sys.argv[1].encode(), "sha256").hex())' "$callback_path")"
-            callback_url="${CALLBACK_BASE%/}$callback_path/$proof"
-            echo "::add-mask::$callback_url"
-            callback_args=(--webhook "$callback_url")
-          fi
-          unset CALLBACK_SECRET
-
-          if [[ "$MACOS_BACKFILL" == true ]]; then
-            # Backfills distribute only the DMG, which Apple scans with its enclosed app.
-            env -u APPLE_API_KEY_PATH -u APPLE_API_KEY -u APPLE_API_ISSUER \
-              npm run tauri-build -- --ci --target "$MAC_TARGET"
-          else
-            npm run tauri-build -- --ci --target "$MAC_TARGET"
-          fi
-
-          shopt -s nullglob
-          bundle="src-tauri/target/$MAC_TARGET/release/bundle"
-          apps=("$bundle"/macos/*.app)
-          images=("$bundle"/dmg/*.dmg)
-          if [[ "${#apps[@]}" != 1 || "${#images[@]}" != 1 ]]; then
-            echo "::error::Expected one app and one DMG for $MAC_TARGET."
-            exit 1
-          fi
-
-          codesign --verify --deep --strict --verbose=2 "${apps[0]}"
-          if [[ "$MACOS_BACKFILL" != true ]]; then
-            xcrun stapler validate "${apps[0]}"
-          fi
-          executable="$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "${apps[0]}/Contents/Info.plist")"
-          lipo "${apps[0]}/Contents/MacOS/$executable" -verify_arch "$MACHO_ARCH"
-
-          dmg="${images[0]}"
-          codesign --verify --strict --verbose=2 "$dmg"
-          npm run release:stage -- macos "$MAC_TARGET"
-
-          if [[ "$MACOS_BACKFILL" == true ]]; then
-            dmg="release-dist/clouddash-darwin-$MAC_ARCH.dmg"
-            checksum="$(shasum -a 256 "$dmg" | awk '{print $1}')"
-            result="$(xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY_PATH" \
-              --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" \
-              --output-format json "${callback_args[@]}")"
-            submission="$(jq -er '.id' <<< "$result")"
-            jq -n --arg submission "$submission" --arg sha256 "$checksum" \
-              --arg tag "$RELEASE_TAG" --arg commit "$(git rev-parse HEAD)" \
-              '{submission: $submission, sha256: $sha256, tag: $tag, commit: $commit}' \
-              > release-dist/notarization.json
-            echo "Submitted $MAC_ARCH to Apple: $submission" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: signed-macos-${{ matrix.arch }}
-          path: release-dist
-          if-no-files-found: error
-
-  notarize-macos:
-    name: Notarize macOS ${{ matrix.arch }} DMG
-    needs: [prepare, macos]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' && ((inputs.macos_backfill && inputs.macos_source_run != '') || (!inputs.macos_backfill && needs.macos.result == 'success')) }}
-    runs-on: macos-15
-    timeout-minutes: ${{ inputs.macos_backfill && 20 || 30 }}
-    environment: macos-website
-    permissions:
-      contents: read
-      actions: read
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [aarch64, x86_64]
-    env:
-      MAC_ARCH: ${{ matrix.arch }}
-      MACOS_SOURCE_RUN: ${{ inputs.macos_source_run }}
-      MACOS_COMPLETED_SUBMISSIONS: ${{ inputs.macos_completed_submissions }}
-      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-      RELEASE_COMMIT: ${{ needs.prepare.outputs.source_ref }}
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: signed-macos-${{ matrix.arch }}
-          path: release-dist
-          run-id: ${{ inputs.macos_source_run || github.run_id }}
-          github-token: ${{ github.token }}
-
-      - name: Notarize and verify the signed disk image
-        shell: bash
-        env:
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          umask 077
-          notary_dir="$(mktemp -d "$RUNNER_TEMP/clouddash-notary.XXXXXX")"
-          trap 'rm -rf "$notary_dir"' EXIT
-          private_key="$notary_dir/AuthKey_$APPLE_API_KEY.p8"
-          printf '%s' "$APPLE_API_PRIVATE_KEY" > "$private_key"
-          unset APPLE_API_PRIVATE_KEY
-          auth=(--key "$private_key" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER")
-          response="$notary_dir/response.json"
-          dmg="release-dist/clouddash-darwin-$MAC_ARCH.dmg"
-
-          codesign --verify --strict --verbose=2 "$dmg"
-          if [[ -n "$MACOS_SOURCE_RUN" ]]; then
-            record=release-dist/notarization.json
-            checksum="$(shasum -a 256 "$dmg" | awk '{print $1}')"
-            jq -e --arg tag "$RELEASE_TAG" --arg commit "$RELEASE_COMMIT" --arg sha "$checksum" \
-              '.tag == $tag and .commit == $commit and .sha256 == $sha' "$record" >/dev/null
-            submission="$(jq -er '.submission' "$record")"
-            if [[ -n "$MACOS_COMPLETED_SUBMISSIONS" ]]; then
-              jq -e --arg arch "$MAC_ARCH" --arg id "$submission" \
-                '.[$arch] == $id' <<< "$MACOS_COMPLETED_SUBMISSIONS" >/dev/null
-            fi
-            for attempt in 1 2 3; do
-              if xcrun notarytool info "$submission" "${auth[@]}" --output-format json > "$response"; then
-                break
-              fi
-              if [[ "$attempt" == 3 ]]; then
-                echo "::error::Could not retrieve Apple notarization status for $submission."
-                exit 1
-              fi
-              sleep 5
-            done
-            status="$(jq -er '.status' "$response")"
-          else
-            xcrun notarytool submit "$dmg" "${auth[@]}" --output-format json > "$response"
-            submission="$(jq -er '.id' "$response")"
-            echo "Apple notarization submission: $submission"
-            deadline=$((SECONDS + 1200))
-            status="In Progress"
-            while (( SECONDS < deadline )); do
-              if xcrun notarytool info "$submission" "${auth[@]}" --output-format json > "$response"; then
-                status="$(jq -er '.status' "$response")"
-                if [[ "$status" != "In Progress" ]]; then
-                  break
-                fi
-              else
-                echo "::warning::Could not check notarization status. Retrying the same submission."
-              fi
-              sleep 30
-            done
-          fi
-
-          if [[ "$status" == "In Progress" ]]; then
-            echo "::error::Apple is still processing submission $submission."
-            exit 1
-          fi
-          if [[ "$status" != "Accepted" ]]; then
-            xcrun notarytool log "$submission" "${auth[@]}"
-            exit 1
-          fi
-
-          for delay in 5 15 30; do
-            if xcrun stapler staple "$dmg"; then
-              break
-            fi
-            sleep "$delay"
-          done
-          xcrun stapler validate "$dmg"
-          codesign --verify --strict --verbose=2 "$dmg"
-          cp "$dmg" "release-dist/clouddash-darwin-$MAC_ARCH-notarized.dmg"
-          if [[ -n "$MACOS_SOURCE_RUN" ]]; then
-            rm release-dist/notarization.json
-          fi
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-macos-${{ matrix.arch }}
-          path: release-dist
-          if-no-files-found: error
-
-  publish-macos-downloads:
-    name: Publish notarized Mac installers
-    needs: [prepare, notarize-macos]
-    if: inputs.macos_backfill && inputs.macos_source_run != ''
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    env:
-      GH_TOKEN: ${{ github.token }}
-      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: release-macos-*
-          path: release-assets
-          merge-multiple: true
-
-      - name: Add verified DMGs to the existing release
-        shell: bash
-        run: |
-          set -euo pipefail
-          assets="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
-          for arch in aarch64 x86_64; do
-            file="clouddash-darwin-$arch-notarized.dmg"
-            test -s "release-assets/$file"
-            if ! grep -Fxq "$file" <<< "$assets"; then
-              gh release upload "$RELEASE_TAG" "release-assets/$file" --repo "$GITHUB_REPOSITORY"
-            fi
-          done
 
   android:
     name: Android APK and AAB
@@ -592,7 +223,6 @@ jobs:
     name: Create GitHub Release
     needs:
       - prepare
-      - notarize-macos
       - android
     runs-on: ubuntu-22.04
     env:
@@ -608,9 +238,8 @@ jobs:
       - name: Download staged assets
         uses: actions/download-artifact@v4
         with:
-          pattern: release-*
+          name: release-android
           path: release-assets
-          merge-multiple: true
 
       - name: Write release notes
         shell: bash
@@ -618,8 +247,7 @@ jobs:
           cat > release-notes.md <<EOF
           CloudDash ${RELEASE_VERSION}
 
-          Official builds for macOS and Android. The Windows app is available through the Microsoft Store.
-          The macOS installers are signed with Developer ID and notarized by Apple.
+          Android release assets are attached. Find the Mac App Store and Microsoft Store links on the [CloudDash download page](https://clouddash.dev/download).
           EOF
 
       - name: Create release

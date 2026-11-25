@@ -2,7 +2,7 @@
 
 CloudDash for AWS is a local-first AWS management dashboard built with Tauri, SvelteKit, TypeScript, and Rust. It is designed for developers and operators who want a fast native interface for day-to-day AWS work without moving their cloud credentials, profiles, or operational data into a hosted team service.
 
-This repository contains the CloudDash app source code, including the desktop shell, frontend UI, Tauri commands, AWS service integrations, and release automation. Official builds are published from this repository through GitHub Releases.
+This repository contains the CloudDash app source code, including the desktop shell, frontend UI, Tauri commands, AWS service integrations, and release automation. Find official downloads on the [CloudDash website](https://clouddash.dev/download). The macOS app is distributed through the [Mac App Store](https://apps.apple.com/us/app/clouddash-for-aws/id6837349494?mt=12&platform=mac).
 
 Official Website: [clouddash.dev](https://clouddash.dev/)
 
@@ -19,7 +19,7 @@ DISCLAIMER: CloudDash is not affiliated with Amazon Web Services.
 ## Project Goals
 
 - Keep AWS profiles and user data local.
-- Provide native desktop builds for Windows, Linux, and macOS, plus Android builds where supported. iOS builds are not available until we have more funding.
+- Provide native builds for Windows, Linux, macOS, Android, iPhone, and iPad.
 - Make the source available so users can inspect, build, and contribute to the app.
 
 ## Mac App Store package

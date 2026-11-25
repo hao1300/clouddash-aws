@@ -103,38 +103,6 @@ function stageLinux() {
     }
 }
 
-const MAC_TARGETS = {
-    'aarch64-apple-darwin': 'aarch64',
-    'x86_64-apple-darwin': 'x86_64'
-};
-
-function stageMac(target) {
-    const arch = MAC_TARGETS[target];
-    if (!arch) {
-        throw new Error(`Unsupported macOS target: ${target}`);
-    }
-
-    const bundleDir = path.join('src-tauri', 'target', target, 'release', 'bundle');
-    const dmgDir = path.join(bundleDir, 'dmg');
-    const macosDir = path.join(bundleDir, 'macos');
-
-    const dmg = findFile(dmgDir, file => file.endsWith('.dmg'), `macOS ${arch} DMG`);
-    const tar = findFile(macosDir, file => file.endsWith('.app.tar.gz'), `macOS ${arch} updater archive`);
-    const sig = findFile(macosDir, file => file.endsWith('.app.tar.gz.sig'), `macOS ${arch} updater signature`);
-
-    const dmgAsset = `clouddash-darwin-${arch}.dmg`;
-    const tarAsset = `clouddash-darwin-${arch}.app.tar.gz`;
-
-    stageFile(dmg, dmgAsset);
-    stageFile(tar, tarAsset);
-    stageMetadata({
-        platform: 'darwin',
-        arch,
-        signaturePath: sig,
-        payloadAssetName: tarAsset
-    });
-}
-
 function findFiles(dir, predicate) {
     if (!fs.existsSync(dir)) return [];
 
@@ -172,10 +140,8 @@ if (kind === 'windows') {
     stageWindows();
 } else if (kind === 'linux') {
     stageLinux();
-} else if (kind === 'macos') {
-    stageMac(process.argv[3]);
 } else if (kind === 'android') {
     stageAndroid();
 } else {
-    throw new Error('Usage: node scripts/stage-release-artifacts.js <windows|linux|macos|android> [mac-target]');
+    throw new Error('Usage: node scripts/stage-release-artifacts.js <windows|linux|android>');
 }
