@@ -22,7 +22,13 @@ DISCLAIMER: CloudDash is not affiliated with Amazon Web Services.
 - Provide native builds for Windows, Linux, macOS, Android, iPhone, and iPad.
 - Make the source available so users can inspect, build, and contribute to the app.
 
-## Mac App Store package
+## Apple App Store preparation
+
+The [listing metadata](store/apple/listing.json) uses one [App Store Connect record](https://appstoreconnect.apple.com/apps/6837349494/distribution) for `dev.clouddash.aws` with iOS and macOS enabled. The iOS target supports both iPhone and iPad.
+
+On a Mac with Xcode and the team’s distribution signing configured, build the iPhone and iPad package with `npm run tauri-ios-build -- --export-method app-store-connect`. Capture screenshots from the corresponding Apple builds and provide App Review with dedicated sample AWS access through its private review fields.
+
+### Mac App Store package
 
 The [Mac App Store workflow](.github/workflows/mac-app-store.yml) builds a universal Apple Silicon and Intel app, verifies its signature, and produces a signed `CloudDash-for-AWS.pkg`. Set these secrets in the GitHub `mac-app-store` environment before running it:
 
@@ -46,7 +52,7 @@ See the [Apple app record guide](https://developer.apple.com/help/app-store-conn
 
 ## Sponsorship
 
-CloudDash development is sponsored by [Chrome-Stats](https://chrome-stats.com/), a platform for researching Chrome extensions, browser ecosystem data, and extension market trends.
+CloudDash development is sponsored by [ChatbotsPlace](https://chatbotsplace.com/), an all-in-one AI workspace.
 
 If CloudDash is useful to you or your company, please consider sponsoring the project. Sponsorship helps pay for code signing, release infrastructure, CI builds, test devices, security maintenance, and the time required to keep CloudDash improving.
 
@@ -54,7 +60,7 @@ You can support the project by using the GitHub Sponsors button available on thi
 
 ## License
 
-This repository is licensed under the Functional Source License, Version 1.1, ALv2 Future License (`FSL-1.1-ALv2`). Current releases are Fair Source / source-available, not OSI-approved open source.
+CloudDash is source-available under the Functional Source License, Version 1.1, ALv2 Future License (`FSL-1.1-ALv2`).
 
 Each version becomes available under Apache License 2.0 on the second anniversary of the date that version was made available. See [LICENSE.md](LICENSE.md) and [NOTICE.md](NOTICE.md).
 

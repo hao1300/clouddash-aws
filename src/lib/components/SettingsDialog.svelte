@@ -660,7 +660,7 @@
                         </div>
                         <div class="flex items-center justify-between bg-gray-900/60 border border-gray-800 rounded-lg px-4 py-2.5">
                             <span class="text-xs text-gray-400">License</span>
-                            <span class="text-xs font-mono text-gray-200">MIT</span>
+                            <span class="text-xs font-mono text-gray-200">FSL-1.1-ALv2</span>
                         </div>
                         <div class="flex items-center justify-between bg-gray-900/60 border border-gray-800 rounded-lg px-4 py-2.5">
                             <span class="text-xs text-gray-400">Platform</span>
